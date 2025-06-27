@@ -1,0 +1,31 @@
+# Copyright (C) 2013 The Libphonenumber Authors
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+# http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+673228|DSTCom
+673229|DSTCom
+67371|UNN
+67372|UNN
+67373|UNN
+67374|UNN
+67376|UNN
+67377|UNN
+67379|UNN
+67381|UNN
+67382|UNN
+67383|UNN
+67384|UNN
+67386|UNN
+67387|UNN
+67388|UNN
+67389|UNN

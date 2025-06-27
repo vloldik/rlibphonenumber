@@ -1,0 +1,8 @@
+[package]
+name = "rlibphonenumbers"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+logger = "0.4.0"
+protobuf = "3.7.2"
