@@ -3,6 +3,26 @@ name = "rlibphonenumbers"
 version = "0.1.0"
 edition = "2024"
 
+build = "build/rust_build.rs"
+
 [dependencies]
+# logging standard in rust
 logger = "0.4.0"
+# helpful error package
+thiserror = "2.0.12"
+# google protobuf lib required to use .proto files from assets
 protobuf = "3.7.2"
+# optimized concurrent map
+dashmap = "6.1.0"
+# just regex package
+regex = "1.11.1"
+# for fast 0-alloc int to string conversion
+itoa = "1.0.15"
+# simple macro for single allocation 
+# concatenation of strings
+fast-cat = "0.1.1"
+strum = { version = "0.27.1", features = ["derive"] }
+
+[build-dependencies]
+thiserror = "2.0.12"
+protobuf-codegen = "3.7.2"
