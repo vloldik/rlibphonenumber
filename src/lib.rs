@@ -4,3 +4,4 @@ mod interfaces;
 mod proto_gen;
 mod phonenumberutil;
 mod regexp_cache;
+mod regex_based_matcher;

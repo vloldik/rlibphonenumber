@@ -261,7 +261,7 @@ pub(super) fn normalize_helper(
     let mut normalized_number = String::with_capacity(phone_number.len());
     // Skip UTF checking because strings in rust are valid UTF-8 already
     for phone_char in phone_number.chars() {
-        if let Some(replacement) = normalization_replacements.get(&phone_char) {
+        if let Some(replacement) = normalization_replacements.get(&phone_char.to_ascii_uppercase()) {
             normalized_number.push(*replacement);
         } else if !remove_non_matches {
             normalized_number.push(phone_char);

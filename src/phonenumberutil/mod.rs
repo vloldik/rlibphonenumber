@@ -3,6 +3,7 @@ pub mod helper_functions;
 mod enums;
 mod phonenumberutil;
 mod regex_and_mappings;
+mod phone_number_regexps_and_mappings;
 
 pub use enums::{MatchType, PhoneNumberFormat, PhoneNumberType, ValidationResultErr, ValidNumberLenType};
 use thiserror::Error;

@@ -7,7 +7,7 @@ build = "build/rust_build.rs"
 
 [dependencies]
 # logging standard in rust
-logger = "0.4.0"
+log = "0.4.27"
 # helpful error package
 thiserror = "2.0.12"
 # google protobuf lib required to use .proto files from assets
