@@ -1,6 +1,7 @@
 use log::{error};
+use super::regex_util::{RegexFullMatch, RegexConsume};
 
-use crate::{interfaces, proto_gen::phonemetadata::PhoneNumberDesc, regexp_cache::{self, RegexCache}};
+use crate::{interfaces, proto_gen::phonemetadata::PhoneNumberDesc, regexp_cache::{ErrorInvalidRegex, RegexCache}};
 
 pub struct RegexBasedMatcher {
     cache: RegexCache,   
@@ -15,23 +16,15 @@ impl RegexBasedMatcher {
         &self, phone_number: &str, 
         number_pattern: &str,
         allow_prefix_match: bool
-    ) -> Result<bool, regexp_cache::ErrorInvalidRegex> {
+    ) -> Result<bool, ErrorInvalidRegex> {
         let regexp = self.cache.get_regex(number_pattern)?;
 
         // find first occurrence
-        if let Some(mat) = regexp.find(phone_number) {
-            // if first position is not matched none of scenarios are  possible
-            if mat.start() != 0 {
-                return Ok(false);
-            }
-            // full match
-            if mat.end() == phone_number.len() {
-                return Ok(true);
-            } else if allow_prefix_match {
-                return Ok(true);
-            }
+        if allow_prefix_match {
+            Ok(regexp.consume_start(phone_number).is_some())
+        } else {
+            Ok(regexp.full_match(phone_number))
         }
-        Ok(false)
     }
 }
 

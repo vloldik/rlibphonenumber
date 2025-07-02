@@ -1,12 +1,16 @@
 mod helper_constants;
 pub mod helper_functions;
+mod errors;
 mod enums;
 mod phonenumberutil;
-mod regex_and_mappings;
 mod phone_number_regexps_and_mappings;
+
+use std::sync::LazyLock;
 
 pub use enums::{MatchType, PhoneNumberFormat, PhoneNumberType, ValidationResultErr, ValidNumberLenType};
 use thiserror::Error;
+
+use crate::phonenumberutil::phonenumberutil::PhoneNumberUtil;
 
 #[derive(Debug, Error)]
 pub enum ErrorType {
@@ -23,3 +27,7 @@ pub enum ErrorType {
     #[error("Too long nsn")]
     TooLongNsn, // TOO_LONG in the java version.
 }
+
+static PHONE_NUMBER_UTIL: LazyLock<PhoneNumberUtil> = LazyLock::new(|| {
+    PhoneNumberUtil::new()
+});

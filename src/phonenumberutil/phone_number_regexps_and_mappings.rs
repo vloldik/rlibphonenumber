@@ -2,7 +2,11 @@ use std::collections::{HashMap, HashSet};
 
 use regex::Regex;
 
-use crate::{phonenumberutil::{helper_constants::{self, CAPTURE_UP_TO_SECOND_NUMBER_START, DIGITS, MIN_LENGTH_FOR_NSN, PLUS_CHARS, PLUS_SIGN, RFC3966_VISUAL_SEPARATOR, STAR_SIGN, VALID_ALPHA, VALID_ALPHA_INCL_UPPERCASE, VALID_PUNCTUATION}, helper_functions::create_extn_pattern}, regexp_cache::RegexCache};
+use crate::{phonenumberutil::{helper_constants::{
+    CAPTURE_UP_TO_SECOND_NUMBER_START, DIGITS, MIN_LENGTH_FOR_NSN, PLUS_CHARS, 
+    PLUS_SIGN, RFC3966_VISUAL_SEPARATOR, STAR_SIGN, VALID_ALPHA, VALID_ALPHA_INCL_UPPERCASE, 
+    VALID_PUNCTUATION
+}, helper_functions::create_extn_pattern}, regexp_cache::RegexCache};
 
 pub(super) struct PhoneNumberRegExpsAndMappings {
     /// Regular expression of viable phone numbers. This is location independent.
@@ -150,6 +154,17 @@ pub(super) struct PhoneNumberRegExpsAndMappings {
     /// Regular expression of valid domainname for the phone-context parameter,
     /// following the syntax defined in RFC3966.
     pub rfc3966_domainname_pattern: Regex,
+
+    /// *Rust note*: It's for some reason calculated inside function in C++,
+    /// so, we move it here
+    /// 
+    /// A pattern that is used to determine if a numberFormat under
+    /// availableFormats is eligible to be used by the AYTF. It is eligible when
+    /// the format element under numberFormat contains groups of the dollar sign
+    /// followed by a single digit, separated by valid phone number punctuation.
+    /// This prevents invalid punctuation (such as the star sign in Israeli star
+    /// numbers) getting into the output of the AYTF. 
+    pub is_format_eligible_as_you_type_formatting_regex: Regex
 }
 
 impl PhoneNumberRegExpsAndMappings {
@@ -200,6 +215,8 @@ impl PhoneNumberRegExpsAndMappings {
         alpha_map.insert('X', '9');
         alpha_map.insert('Y', '9');
         alpha_map.insert('Z', '9');
+        // IMPORTANT: only uppercase letters like in Java version
+
         self.alpha_mappings = alpha_map;
 
         let mut combined_map = HashMap::with_capacity(100);
@@ -241,7 +258,7 @@ impl PhoneNumberRegExpsAndMappings {
         self.all_plus_number_grouping_symbols = all_plus_number_groupings;
     }
 
-    fn new() -> Self {
+    pub fn new() -> Self {
         let alphanum = fast_cat::concat_str!(VALID_ALPHA_INCL_UPPERCASE, DIGITS);
         let extn_patterns_for_parsing = create_extn_pattern(true);
         let valid_phone_number = format!(
@@ -302,6 +319,9 @@ impl PhoneNumberRegExpsAndMappings {
             ).unwrap(),
             rfc3966_domainname_pattern: Regex::new(
                 &format!("^({}\\.)*{}\\.?$", rfc3966_domainlabel, rfc3966_toplabel)
+            ).unwrap(),
+            is_format_eligible_as_you_type_formatting_regex: Regex::new(
+                &format!("[{}]*\\$1[{}]*(\\$\\d[{}]*)*",VALID_PUNCTUATION, VALID_PUNCTUATION, VALID_PUNCTUATION)
             ).unwrap(),
         };
         instance.initialize_regexp_mappings();

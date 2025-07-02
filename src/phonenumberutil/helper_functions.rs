@@ -253,11 +253,13 @@ pub(super) fn create_extn_pattern(for_parsing: bool) -> String {
 /// * `remove_non_matches` - indicates whether characters that are not able to be
 ///   replaced should be stripped from the number. If this is false, they will be
 ///   left unchanged in the number.
+/// 
+/// Returns: normalized_string
 pub(super) fn normalize_helper(
     normalization_replacements: &HashMap<char, char>,
     remove_non_matches: bool,
-    phone_number: &mut String,
-) {
+    phone_number: &str
+) -> String {
     let mut normalized_number = String::with_capacity(phone_number.len());
     // Skip UTF checking because strings in rust are valid UTF-8 already
     for phone_char in phone_number.chars() {
@@ -269,7 +271,7 @@ pub(super) fn normalize_helper(
         // If neither of the above are true, we remove this character.
     }
 
-    *phone_number = normalized_number;
+    normalized_number
 }
 
 /// Returns `true` if there is any possible number data set for a particular
@@ -307,7 +309,7 @@ pub(super) fn desc_has_data(desc: &PhoneNumberDesc) -> bool {
 
 /// Returns the types we have metadata for based on the PhoneMetadata object
 /// passed in.
-pub(super) fn get_supported_types_for_metadata(
+pub(super) fn populate_supported_types_for_metadata(
     metadata: &PhoneMetadata,
     types: &mut HashSet<PhoneNumberType>,
 ) {
@@ -325,6 +327,13 @@ pub(super) fn get_supported_types_for_metadata(
         .for_each(|number_type| {
             types.insert(number_type);
         });
+}
+
+pub(super) fn get_supported_types_for_metadata(metadata: &PhoneMetadata) -> HashSet<PhoneNumberType> {
+    const EFFECTIVE_NUMBER_TYPES: usize = 11 /* count */ - 2 /* filter type or unknown */;
+    let mut types = HashSet::with_capacity(EFFECTIVE_NUMBER_TYPES);
+    populate_supported_types_for_metadata(metadata, &mut types);
+    types
 }
 
 /// Helper method to check a number against possible lengths for this number
@@ -444,7 +453,7 @@ pub(crate) fn copy_core_fields_only(from_number: &PhoneNumber, to_number: &mut P
 /// Determines whether the given number is a national number match for the given
 /// PhoneNumberDesc. Does not check against possible lengths!
 pub(super) fn is_match(
-    matcher_api: Box<dyn MatcherApi>,
+    matcher_api: &Box<dyn MatcherApi>,
     number: &str,
     number_desc: &PhoneNumberDesc,
 ) -> bool {

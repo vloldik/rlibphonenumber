@@ -3,7 +3,7 @@ use std::sync::Arc;
 use dashmap::DashMap;
 use thiserror::Error;
 
-#[derive(Debug, Error)]
+#[derive(Debug, PartialEq, Error)]
 #[error("An error occurred while trying to create regex: {0}")]
 pub struct ErrorInvalidRegex(#[from] regex::Error);
 
