@@ -2182,6 +2182,91 @@ impl PhoneNumberUtil {
         )
     }
 
+    fn get_length_of_geographical_area_code(
+        &self, phone_number: &PhoneNumber
+    ) -> RegexResult<usize> {
+        let region_code = self.get_region_code_for_number(phone_number)?;
+        let Some(metadata) = self.region_to_metadata_map.get(region_code) else {
+            return Ok(0)
+        };
+
+        let phone_number_type = self.get_number_type(phone_number)?;
+        let country_calling_code = phone_number.country_code();
+
+        // If a country doesn't use a national prefix, and this number doesn't have an
+        // Italian leading zero, we assume it is a closed dialling plan with no area
+        // codes.
+        // Note:this is our general assumption, but there are exceptions which are
+        // tracked in COUNTRIES_WITHOUT_NATIONAL_PREFIX_WITH_AREA_CODES.
+        if !metadata.has_national_prefix() && !phone_number.italian_leading_zero() &&
+            !self.reg_exps.countries_without_national_prefix_with_area_codes
+                .contains(&country_calling_code) {
+            return Ok(0);
+        }
+
+        if (matches!(phone_number_type, PhoneNumberType::Mobile) &&
+            !self.reg_exps.geo_mobile_countries_without_mobile_area_codes.contains(&country_calling_code)
+        ) {
+            return Ok(0);
+        }
+
+        if !self.is_number_geographical_by_country_code_and_type(phone_number_type, country_calling_code) {
+            return Ok(0);
+        }
+
+        return self.get_length_of_national_destination_code(phone_number);
+    }
+
+    fn get_length_of_national_destination_code(
+        &self, phone_number: &PhoneNumber
+    ) -> RegexResult<usize> {
+        let mut copied_proto = phone_number.clone();
+        if phone_number.has_extension() {
+            // Clear the extension so it's not included when formatting.
+            copied_proto.clear_extension();
+        }
+
+        let formatted_number = self.format(
+            &copied_proto, PhoneNumberFormat::International
+        )?;
+        
+        const ITERATIONS_COUNT: usize = 3;
+        let mut captured_groups = [0; ITERATIONS_COUNT];
+        let (ndc_index, third_group) = (1, 2);
+        let mut capture_iter = self.reg_exps.capturing_ascii_digits_pattern
+            .captures_iter(&formatted_number);
+        for i in 0..ITERATIONS_COUNT {
+            if let Some(matches) = capture_iter.next().and_then(| captures  | captures.get(1)) {
+                captured_groups[i] = matches.len();
+            } else {
+                return Ok(0)
+            }
+        }
+
+        if matches!(self.get_number_type(phone_number)?, PhoneNumberType::Mobile) {
+            // For example Argentinian mobile numbers, when formatted in the
+            // international format, are in the form of +54 9 NDC XXXX.... As a result,
+            // we take the length of the third group (NDC) and add the length of the
+            // mobile token, which also forms part of the national significant number.
+            // This assumes that the mobile token is always formatted separately from
+            // the rest of the phone number.
+            if let Some(mobile_token) = self.get_country_mobile_token(
+                phone_number.country_code()
+            ) {
+                return Ok(captured_groups[third_group] + mobile_token.len_utf8())
+            }
+        }
+        Ok(captured_groups[ndc_index])
+    }
+
+    fn get_country_mobile_token(&self, country_calling_code: i32) -> Option<char> {
+        self
+            .reg_exps
+            .mobile_token_mappings
+            .get(&country_calling_code)
+            .copied()
+    }
+
     /// Extracts country calling code from national_number, and returns tuple
     /// that contains national_number without calling code and calling code itself. 
     /// 
