@@ -8,7 +8,7 @@ use crate::{
         errors::{ExtractNumberError, GetExampleNumberError, ParseError, PhoneNumberUtilError}, helper_constants::{
             DEFAULT_EXTN_PREFIX, MAX_LENGTH_COUNTRY_CODE, MAX_LENGTH_FOR_NSN, MIN_LENGTH_FOR_NSN, NANPA_COUNTRY_CODE, PLUS_SIGN, REGION_CODE_FOR_NON_GEO_ENTITY, RFC3966_EXTN_PREFIX, RFC3966_ISDN_SUBADDRESS, RFC3966_PHONE_CONTEXT, RFC3966_PREFIX
         }, helper_functions::{
-            self, get_number_desc_by_type, get_supported_types_for_metadata, load_compiled_metadata, normalize_helper, prefix_number_with_country_calling_code, test_number_length_with_unknown_type
+            self, get_number_desc_by_type, get_supported_types_for_metadata, load_compiled_metadata, normalize_helper, prefix_number_with_country_calling_code, test_number_length, test_number_length_with_unknown_type
         }, helper_types::{PhoneNumberAndCarrierCode, PhoneNumberWithCountryCodeSource}, PhoneNumberFormat, PhoneNumberType, ValidNumberLenType, ValidationResultErr
     }, proto_gen::{
         phonemetadata::{NumberFormat, PhoneMetadata, PhoneNumberDesc},
@@ -28,6 +28,7 @@ pub type RegexResult<T> = std::result::Result<T, ErrorInvalidRegex>;
 pub type ParseResult<T> = std::result::Result<T, ParseError>;
 
 pub type ExampleNumberResult = std::result::Result<PhoneNumber, GetExampleNumberError>;
+pub type ValidationResult = std::result::Result<ValidNumberLenType, ValidationResultErr>;
 
 pub struct PhoneNumberUtil {
     /// An API for validation checking.
@@ -754,7 +755,7 @@ impl PhoneNumberUtil {
                     && test_number_length_with_unknown_type(
                         &national_number, 
                         region_metadata
-                ).is_err_and(| e | matches!(e, ValidationResultErr::TooShort)) {
+                    ).is_err_and(| e | matches!(e, ValidationResultErr::TooShort)) {
                     PhoneNumberFormat::International
                 }
                 else {
@@ -1542,6 +1543,65 @@ impl PhoneNumberUtil {
             .map(move | m | m.as_str() )
             .unwrap_or("")
         )
+    }
+
+    fn is_possible_number(&self, phone_number: &PhoneNumber) -> bool{
+        self.is_possible_number_with_reason(phone_number).is_ok()
+    }
+
+    fn is_possible_number_for_type(
+        &self, 
+        phone_number: &PhoneNumber, 
+        phone_number_type: PhoneNumberType
+    ) -> bool {
+        self.is_possible_number_for_type_with_reason(phone_number, phone_number_type).is_ok()
+    }
+
+    fn is_possible_number_for_string(
+        &self,
+        phone_number: &str,
+        region_dialing_from: &str
+    ) -> bool {
+        if let Ok(number_proto) = self.parse(
+            phone_number, region_dialing_from
+        ) {
+            self.is_possible_number(&number_proto)
+        } else {
+            false
+        }
+    }
+
+    fn is_possible_number_with_reason(
+        &self, phone_number: &PhoneNumber
+    ) -> ValidationResult {
+        self.is_possible_number_for_type_with_reason(phone_number, PhoneNumberType::Unknown)
+    }
+
+
+    fn is_possible_number_for_type_with_reason(
+        &self, phone_number: &PhoneNumber, phone_number_type: PhoneNumberType
+    ) -> ValidationResult {
+        let national_number = Self::get_national_significant_number(phone_number);
+        let country_code = phone_number.country_code();
+        // Note: For regions that share a country calling code, like NANPA numbers, we
+        // just use the rules from the default region (US in this case) since the
+        // GetRegionCodeForNumber will not work if the number is possible but not
+        // valid. There is in fact one country calling code (290) where the possible
+        // number pattern differs between various regions (Saint Helena and Tristan da
+        // Cuñha), but this is handled by putting all possible lengths for any country
+        // with this country calling code in the metadata for the default region in
+        // this case.
+        if !self.has_valid_country_calling_code(country_code) {
+            return Err(ValidationResultErr::InvalidCountryCode)
+        }
+        let region_code = self.get_region_code_for_country_code(country_code);
+        // Metadata cannot be NULL because the country calling code is valid.
+        let Some(metadata) = self.get_metadata_for_region_or_calling_code(
+            country_code, region_code
+        ) else {
+            return Err(ValidationResultErr::InvalidCountryCode)
+        };
+        return test_number_length(&national_number, metadata, phone_number_type);
     }
 
     // Note if any new field is added to this method that should always be filled
