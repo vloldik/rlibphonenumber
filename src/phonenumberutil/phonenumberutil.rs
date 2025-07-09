@@ -1604,6 +1604,28 @@ impl PhoneNumberUtil {
         return test_number_length(&national_number, metadata, phone_number_type);
     }
 
+    fn truncate_too_long_number(&self, phone_number: &mut PhoneNumber) -> RegexResult<bool> {
+        if self.is_valid_number(&phone_number)? {
+            return Ok(true)
+        }
+        let mut number_copy = phone_number.clone();
+        let mut national_number = phone_number.national_number();
+        loop {
+            national_number /= 10;
+            number_copy.set_national_number(national_number);
+            if self.is_possible_number_with_reason(&number_copy)
+                .is_err_and(| err | matches!(err, ValidationResultErr::TooShort))
+                || national_number == 0 {
+                return Ok(false);
+            }
+            if self.is_valid_number(&number_copy)? {
+                break;
+            }
+        }
+        phone_number.set_national_number(national_number);
+        return Ok(true);
+    }
+
     // Note if any new field is added to this method that should always be filled
     // in, even when keepRawInput is false, it should also be handled in the
     // CopyCoreFieldsOnly() method.
