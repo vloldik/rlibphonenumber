@@ -184,7 +184,7 @@ impl PhoneNumberRegExpsAndMappings {
         // Simple ASCII digits map used to populate ALPHA_PHONE_MAPPINGS and
         // ALL_PLUS_NUMBER_GROUPING_SYMBOLS.
         let mut ascii_digit_mappings = HashMap::with_capacity(10);
-        for d in '0'..'9' {
+        for d in '0'..='9' {
             ascii_digit_mappings.insert(d, d);
         }
 
