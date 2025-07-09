@@ -266,7 +266,7 @@ impl PhoneNumberUtil {
         &self,
         phone_number: &'b PhoneNumber,
         number_format: PhoneNumberFormat,
-    ) -> Result<Cow<'b, str>> {
+    ) -> RegexResult<Cow<'b, str>> {
         if phone_number.national_number() == 0 {
             let raw_input = phone_number.raw_input();
             if !raw_input.is_empty() {
@@ -386,7 +386,7 @@ impl PhoneNumberUtil {
         phone_number: &'b str,
         metadata: &PhoneMetadata,
         number_format: PhoneNumberFormat,
-    ) -> Result<Cow<'b, str>> {
+    ) -> RegexResult<Cow<'b, str>> {
         self.format_nsn_with_carrier(phone_number, metadata, number_format, "")
     }
 
@@ -396,7 +396,7 @@ impl PhoneNumberUtil {
         metadata: &PhoneMetadata,
         number_format: PhoneNumberFormat,
         carrier_code: &str,
-    ) -> Result<Cow<'b, str>> {
+    ) -> RegexResult<Cow<'b, str>> {
         // When the intl_number_formats exists, we use that to format national number
         // for the INTERNATIONAL format instead of using the number_formats.
         let available_formats = if metadata.intl_number_format.len() == 0
@@ -424,7 +424,7 @@ impl PhoneNumberUtil {
         &self,
         available_formats: &'b [NumberFormat],
         national_number: &str,
-    ) -> Result<Option<&'b NumberFormat>> {
+    ) -> RegexResult<Option<&'b NumberFormat>> {
         for format in available_formats {
             if !format
                 .leading_digits_pattern
@@ -458,15 +458,12 @@ impl PhoneNumberUtil {
         formatting_pattern: &NumberFormat,
         number_format: PhoneNumberFormat,
         carrier_code: &str,
-    ) -> Result<Cow<'b, str>> {
+    ) -> RegexResult<Cow<'b, str>> {
         let mut number_format_rule = Cow::Borrowed(formatting_pattern.format());
         if matches!(number_format, PhoneNumberFormat::National)
             && carrier_code.len() > 0
             && formatting_pattern
-                .domestic_carrier_code_formatting_rule()
-                .len()
-                > 0
-        {
+                .domestic_carrier_code_formatting_rule().len() > 0 {
             // Replace the $CC in the formatting rule with the desired carrier code.
             let mut carrier_code_formatting_rule =
                 Cow::Borrowed(formatting_pattern.domestic_carrier_code_formatting_rule());
@@ -542,7 +539,7 @@ impl PhoneNumberUtil {
         national_number: &'b str,
         formatting_pattern: &NumberFormat,
         number_format: PhoneNumberFormat,
-    ) -> Result<Cow<'b, str>> {
+    ) -> RegexResult<Cow<'b, str>> {
         self.format_nsn_using_pattern_with_carrier(
             national_number,
             formatting_pattern,
@@ -577,7 +574,7 @@ impl PhoneNumberUtil {
         phone_number: &PhoneNumber,
         number_format: PhoneNumberFormat,
         user_defined_formats: &[NumberFormat],
-    ) -> Result<String> {
+    ) -> RegexResult<String> {
         let country_calling_code = phone_number.country_code();
         // Note GetRegionCodeForCountryCode() is used because formatting information
         // for regions which share a country calling code is contained by only one
@@ -1003,7 +1000,7 @@ impl PhoneNumberUtil {
         &self,
         phone_number: &'a PhoneNumber,
         calling_from: &str,
-    ) -> Result<Cow<'a, str>> {
+    ) -> RegexResult<Cow<'a, str>> {
         let Some(metadata_calling_from) = self.region_to_metadata_map.get(calling_from) else {
             trace!("Trying to format number from invalid region {calling_from}\
               . International formatting applied.");
@@ -1097,7 +1094,7 @@ impl PhoneNumberUtil {
 
     fn has_formatting_pattern_for_number(
         &self, phone_number: &PhoneNumber
-    ) -> Result<bool> {
+    ) -> RegexResult<bool> {
         let country_calling_code = phone_number.country_code();
         let region_code = self.get_region_code_for_country_code(country_calling_code);
         let Some(metadata) = self.get_metadata_for_region_or_calling_code(
@@ -1117,7 +1114,7 @@ impl PhoneNumberUtil {
         &self,
         phone_number: &'a PhoneNumber,
         region_calling_from: &str,
-    ) -> Result<Cow<'a, str>> {
+    ) -> RegexResult<Cow<'a, str>> {
         if phone_number.has_raw_input() && !self.has_formatting_pattern_for_number(phone_number)? {
             // We check if we have the formatting pattern because without that, we might
             // format the number as a group without national prefix.
@@ -1270,6 +1267,130 @@ impl PhoneNumberUtil {
             false
         }
     }
+
+    fn FormatOutOfCountryKeepingAlphaChars<'a>(
+        &self,
+        phone_number: &'a PhoneNumber,
+        calling_from: &str,
+    ) -> Cow<'a, str> {
+        // If there is no raw input, then we can't keep alpha characters because there
+        // aren't any. In this case, we return FormatOutOfCountryCallingNumber.
+        if (number.raw_input().empty()){
+            return self.format_out_of_country_calling_number(phone_number, calling_from);
+            FormatOutOfCountryCallingNumber(number, calling_from, formatted_number);
+            return;
+        }
+        int country_code = number.country_code();
+        if (!HasValidCountryCallingCode(country_code))
+        {
+            formatted_number->assign(number.raw_input());
+            return;
+        }
+        // Strip any prefix such as country calling code, IDD, that was present. We do
+        // this by comparing the number in raw_input with the parsed number.
+        string raw_input_copy(number.raw_input());
+        // Normalize punctuation. We retain number grouping symbols such as " " only.
+        NormalizeHelper(reg_exps_->all_plus_number_grouping_symbols_, true,
+                        &raw_input_copy);
+        // Now we trim everything before the first three digits in the parsed number.
+        // We choose three because all valid alpha numbers have 3 digits at the start
+        // - if it does not, then we don't trim anything at all. Similarly, if the
+        // national number was less than three digits, we don't trim anything at all.
+        string national_number;
+        GetNationalSignificantNumber(number, &national_number);
+        if (national_number.length() > 3)
+        {
+            size_t first_national_number_digit =
+                raw_input_copy.find(national_number.substr(0, 3));
+            if (first_national_number_digit != string::npos)
+            {
+                raw_input_copy = raw_input_copy.substr(first_national_number_digit);
+            }
+        }
+        const PhoneMetadata *metadata = GetMetadataForRegion(calling_from);
+        if (country_code == kNanpaCountryCode)
+        {
+            if (IsNANPACountry(calling_from))
+            {
+                StrAppend(formatted_number, country_code, " ", raw_input_copy);
+                return;
+            }
+        }
+        else if (metadata &&
+                    country_code == GetCountryCodeForValidRegion(calling_from))
+        {
+            const NumberFormat *formatting_pattern =
+                ChooseFormattingPatternForNumber(metadata->number_format(),
+                                                    national_number);
+            if (!formatting_pattern)
+            {
+                // If no pattern above is matched, we format the original input.
+                formatted_number->assign(raw_input_copy);
+                return;
+            }
+            NumberFormat new_format;
+            new_format.MergeFrom(*formatting_pattern);
+            // The first group is the first group of digits that the user wrote
+            // together.
+            new_format.set_pattern("(\\d+)(.*)");
+            // Here we just concatenate them back together after the national prefix
+            // has been fixed.
+            new_format.set_format("$1$2");
+            // Now we format using this pattern instead of the default pattern, but
+            // with the national prefix prefixed if necessary.
+            // This will not work in the cases where the pattern (and not the
+            // leading digits) decide whether a national prefix needs to be used, since
+            // we have overridden the pattern to match anything, but that is not the
+            // case in the metadata to date.
+            FormatNsnUsingPattern(raw_input_copy, new_format, NATIONAL,
+                                    formatted_number);
+            return;
+        }
+
+        string international_prefix_for_formatting;
+        // If an unsupported region-calling-from is entered, or a country with
+        // multiple international prefixes, the international format of the number is
+        // returned, unless there is a preferred international prefix.
+        if (metadata)
+        {
+            const string &international_prefix = metadata->international_prefix();
+            international_prefix_for_formatting =
+                reg_exps_->single_international_prefix_->FullMatch(international_prefix)
+                    ? international_prefix
+                    : metadata->preferred_international_prefix();
+        }
+        if (!international_prefix_for_formatting.empty())
+        {
+            StrAppend(formatted_number, international_prefix_for_formatting, " ",
+                        country_code, " ", raw_input_copy);
+        }
+        else
+        {
+            // Invalid region entered as country-calling-from (so no metadata was found
+            // for it) or the region chosen has multiple international dialling
+            // prefixes.
+            if (!IsValidRegionCode(calling_from))
+            {
+                VLOG(1) << "Trying to format number from invalid region " << calling_from
+                        << ". International formatting applied.";
+            }
+            formatted_number->assign(raw_input_copy);
+            PrefixNumberWithCountryCallingCode(country_code, INTERNATIONAL,
+                                                formatted_number);
+        }
+        std::string region_code;
+        GetRegionCodeForCountryCode(country_code, &region_code);
+        // Metadata cannot be null because the country code is valid.
+        const PhoneMetadata *metadata_for_region =
+            GetMetadataForRegionOrCallingCode(country_code, region_code);
+        // Strip any extension
+        std::string extension;
+        MaybeStripExtension(formatted_number, &extension);
+        // Append the formatted extension
+        MaybeAppendFormattedExtension(number, *metadata_for_region, INTERNATIONAL,
+                                        formatted_number);
+    }
+
 
     /// Returns whether the value of phoneContext follows the syntax defined in
     /// RFC3966.
