@@ -437,7 +437,8 @@ pub(super) fn test_number_length_with_unknown_type(
 /// which the phone number was created.
 /// These fields correspond to those set in `parse()` rather than
 /// `parse_and_keep_raw_input()`.
-pub(crate) fn copy_core_fields_only(from_number: &PhoneNumber, to_number: &mut PhoneNumber) {
+pub(crate) fn copy_core_fields_only(from_number: &PhoneNumber) -> PhoneNumber {
+    let mut to_number = PhoneNumber::new();
     to_number.set_country_code(from_number.country_code());
     to_number.set_national_number(from_number.national_number());
     if let Some(extension) = &from_number.extension {
@@ -448,6 +449,7 @@ pub(crate) fn copy_core_fields_only(from_number: &PhoneNumber, to_number: &mut P
         // This field is only relevant if there are leading zeros at all.
         to_number.set_number_of_leading_zeros(from_number.number_of_leading_zeros());
     }
+    to_number
 }
 
 /// Determines whether the given number is a national number match for the given

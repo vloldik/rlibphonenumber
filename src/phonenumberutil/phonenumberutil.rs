@@ -5,11 +5,11 @@ use std::{
 use super::phone_number_regexps_and_mappings::PhoneNumberRegExpsAndMappings;
 use crate::{
     i18n, interfaces::MatcherApi, macros::owned_from_cow_or, phonenumberutil::{
-        errors::{ExtractNumberError, GetExampleNumberError, ParseError, PhoneNumberUtilError}, helper_constants::{
+        errors::{ExtractNumberError, GetExampleNumberError, ParseError, PhoneNumberUtilError, MatchError}, helper_constants::{
             DEFAULT_EXTN_PREFIX, MAX_LENGTH_COUNTRY_CODE, MAX_LENGTH_FOR_NSN, MIN_LENGTH_FOR_NSN, NANPA_COUNTRY_CODE, PLUS_SIGN, REGION_CODE_FOR_NON_GEO_ENTITY, RFC3966_EXTN_PREFIX, RFC3966_ISDN_SUBADDRESS, RFC3966_PHONE_CONTEXT, RFC3966_PREFIX
         }, helper_functions::{
-            self, get_number_desc_by_type, get_supported_types_for_metadata, load_compiled_metadata, normalize_helper, prefix_number_with_country_calling_code, test_number_length, test_number_length_with_unknown_type
-        }, helper_types::{PhoneNumberAndCarrierCode, PhoneNumberWithCountryCodeSource}, PhoneNumberFormat, PhoneNumberType, ValidNumberLenType, ValidationResultErr
+            self, copy_core_fields_only, get_number_desc_by_type, get_supported_types_for_metadata, is_national_number_suffix_of_the_other, load_compiled_metadata, normalize_helper, prefix_number_with_country_calling_code, test_number_length, test_number_length_with_unknown_type
+        }, helper_types::{PhoneNumberAndCarrierCode, PhoneNumberWithCountryCodeSource}, MatchType, PhoneNumberFormat, PhoneNumberType, ValidNumberLenType, ValidationResultErr
     }, proto_gen::{
         phonemetadata::{NumberFormat, PhoneMetadata, PhoneNumberDesc},
         phonenumber::{phone_number::CountryCodeSource, PhoneNumber},
@@ -2125,7 +2125,7 @@ impl PhoneNumberUtil {
     ///   - Wide-ascii digits are converted to normal ASCII (European) digits.
     ///   - Arabic-Indic numerals are converted to European numerals.
     ///   - Spurious alpha characters are stripped.
-    fn normalize<'a>(&self, phone_number: &'a str) -> String {
+    fn normalize(&self, phone_number: &str) -> String {
         if self.reg_exps.valid_alpha_phone_pattern.is_match(phone_number) {
             normalize_helper(
                 &self.reg_exps.alpha_phone_mappings, 
@@ -2382,5 +2382,138 @@ impl PhoneNumberUtil {
         }
     
         Some(zero_count)
+    }
+    
+    fn convert_alpha_characters_in_number(&self, phone_number: &str) -> String {
+        normalize_helper(
+                &self.reg_exps.alpha_phone_mappings, 
+                false, 
+            phone_number
+        )
+    }
+
+    fn is_number_match(
+        &self,
+        first_number_in: &PhoneNumber,
+        second_number_in: &PhoneNumber,
+    ) -> MatchType {
+         // Early exit if both had extensions and these are different.
+        if first_number_in.has_extension() && second_number_in.has_extension()
+            && first_number_in.extension() != second_number_in.extension() {
+            return MatchType::NoMatch
+        }
+        
+        // We only are about the fields that uniquely define a number, so we copy
+        // these across explicitly.
+        let mut first_number = copy_core_fields_only(&first_number_in);
+        let second_number = copy_core_fields_only(&second_number_in);
+
+        let first_number_country_code = first_number.country_code();
+        let second_number_country_code = second_number.country_code();
+        // Both had country calling code specified.
+        if first_number_country_code != 0 && second_number_country_code != 0 {
+            if first_number == second_number {
+                return MatchType::ExactMatch;
+            } else if first_number_country_code == second_number_country_code && 
+                    is_national_number_suffix_of_the_other(&first_number, &second_number) {
+                // A SHORT_NSN_MATCH occurs if there is a difference because of the
+                // presence or absence of an 'Italian leading zero', the presence or
+                // absence of an extension, or one NSN being a shorter variant of the
+                // other.
+                return MatchType::ShortNsnMatch
+            }
+            // This is not a match.
+            return MatchType::NoMatch
+        }
+        // Checks cases where one or both country calling codes were not specified. To
+        // make equality checks easier, we first set the country_code fields to be
+        // equal.
+        first_number.set_country_code(second_number_country_code);
+        // If all else was the same, then this is an NSN_MATCH.
+        if first_number == second_number {
+            return MatchType::NsnMatch
+        }
+        if is_national_number_suffix_of_the_other(&first_number, &second_number) {
+            return MatchType::ShortNsnMatch
+        }
+        return MatchType::NoMatch
+    }
+
+    fn is_number_match_with_two_strings(
+        &self,
+        first_number: &str,
+        second_number: &str
+    ) -> std::result::Result<MatchType, MatchError> {
+        match self.parse(first_number, i18n::RegionCode::get_unknown()) {
+            Ok(first_number_as_proto) => return self.is_number_match_with_one_string(&first_number_as_proto, second_number),
+            Err(err) => {
+                if !matches!(err, ParseError::InvalidCountryCodeError) {
+                    return Err(MatchError::InvalidNumber(err))
+                }
+            }
+        }
+        match self.parse(second_number, i18n::RegionCode::get_unknown()) {
+            Ok(second_number_as_proto) => return self.is_number_match_with_one_string(&second_number_as_proto, first_number),
+            Err(err) => {
+                if !matches!(err, ParseError::InvalidCountryCodeError) {
+                    return Err(MatchError::InvalidNumber(err))
+                }
+                let first_number_as_proto = self.parse_helper(
+                    first_number, i18n::RegionCode::get_unknown(), 
+                    false, false
+                )?;
+                let second_number_as_proto = self.parse_helper(
+                    second_number, i18n::RegionCode::get_unknown(), 
+                    false, false
+                )?;
+                return Ok(
+                    self.is_number_match(&first_number_as_proto, &second_number_as_proto)
+                )
+            }
+        }
+    }
+
+    fn is_number_match_with_one_string(
+        &self,
+        first_number: &PhoneNumber,
+        second_number: &str
+    ) -> std::result::Result<MatchType, MatchError> {
+        // First see if the second number has an implicit country calling code, by
+        // attempting to parse it.
+        match self.parse(second_number, i18n::RegionCode::get_unknown()) {
+            Ok(second_number_as_proto) => return Ok(self.is_number_match(
+                first_number, &second_number_as_proto 
+            )),
+            Err(err) => {
+                if !matches!(err, ParseError::InvalidCountryCodeError) {
+                    return Err(MatchError::InvalidNumber(err));
+                }
+            }
+        }
+        // The second number has no country calling code. EXACT_MATCH is no longer
+        // possible.  We parse it as if the region was the same as that for the
+        // first number, and if EXACT_MATCH is returned, we replace this with
+        // NSN_MATCH.
+        let first_number_region = self
+            .get_region_code_for_country_code(first_number.country_code());
+        if first_number_region != i18n::RegionCode::get_unknown() {
+            let second_number_with_first_number_region = self.parse(
+                second_number, first_number_region,
+            )?;
+            return Ok(
+                match self.is_number_match(first_number, &second_number_with_first_number_region) {
+                    MatchType::ExactMatch => MatchType::NsnMatch,
+                    m => m  
+                }
+            )
+        } else {
+            // If the first number didn't have a valid country calling code, then we
+            // parse the second number without one as well.
+            let second_number_as_proto = self.parse_helper(
+                second_number, i18n::RegionCode::get_unknown(), 
+                false, false
+            )?;
+            return Ok(self.is_number_match(first_number, &second_number_as_proto));
+        }
     }
 }

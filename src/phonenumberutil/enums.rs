@@ -52,14 +52,14 @@ pub enum PhoneNumberType {
     Unknown,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Hash)]
 pub enum MatchType {
-    InvalidNumber, // NOT_A_NUMBER in the java version.
     NoMatch,
     ShortNsnMatch,
     NsnMatch,
     ExactMatch,
 }
+
 
 // Separated enum ValidationResult into ValidationResult err and 
 // ValidationResultOk for using Result<Ok, Err>

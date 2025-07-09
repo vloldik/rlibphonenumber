@@ -58,3 +58,10 @@ pub enum GetExampleNumberError {
     #[error("Invalid metadata")]
     InvalidMetadataError
 }
+
+
+#[derive(Error, Debug, PartialEq)]
+pub enum MatchError {
+    #[error("Invalid number given")]
+    InvalidNumber(#[from] ParseError), // NOT_A_NUMBER in the java version.
+}
