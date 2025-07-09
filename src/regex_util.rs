@@ -1,6 +1,4 @@
-use std::borrow::Cow;
-
-use regex::{Captures, Regex};
+use regex::{Captures, Match, Regex};
 
 pub trait RegexFullMatch {
     /// Eq of C fullMatch
@@ -8,18 +6,12 @@ pub trait RegexFullMatch {
 }
 
 pub trait RegexConsume {
-    /// Eq of C Consume
-    fn consume_start<'a>(&self, s: &'a str) -> Option<Cow<'a, str>> {
-        self.consume_start_capturing(s).map(| res| res.0)
+    fn matches_start<'a>(&self, s: &'a str) -> bool {
+        self.find_start(s).is_some()
     }
 
-    fn consume_start_capturing<'a>(&self, s: &'a str) -> Option<(Cow<'a, str>, Captures<'a>)>;
-    
-    fn find_and_consume<'a>(&self, s: &'a str) -> Option<Cow<'a, str>> {
-        self.find_and_consume_capturing(s).map(| res| res.0)
-    }
-    
-    fn find_and_consume_capturing<'a>(&self, s: &'a str) -> Option<(Cow<'a, str>, Captures<'a>)>;
+    fn captures_start<'a>(&self, s: &'a str) -> Option<Captures<'a>>;
+    fn find_start<'a>(&self, s: &'a str) -> Option<Match<'a>>;
 }
 
 trait RegexMatchStart {
@@ -48,24 +40,21 @@ impl RegexMatchStart for Regex {
 }
 
 impl RegexConsume for Regex {
-    fn consume_start_capturing<'a>(&self, s: &'a str) -> Option<(Cow<'a, str>, Captures<'a>)> {
-        _consume(self, s, true)
+    fn captures_start<'a>(&self, s: &'a str) -> Option<Captures<'a>> {
+        let captures = self.captures(s)?;
+        let full_capture = captures.get(0)?;
+        if full_capture.start() != 0 {
+            return None
+        }
+
+        Some(captures)
     }
 
-    fn find_and_consume_capturing<'a>(&self, s: &'a str) -> Option<(Cow<'a, str>, Captures<'a>)> {
-        _consume(self, s, false)
+    fn find_start<'a>(&self, s: &'a str) -> Option<Match<'a>> {
+        let found = self.find(s)?;
+        if found.start() != 0 {
+            return None
+        }
+        Some(found)
     }
-}
-
-fn _consume<'a>(
-    r: &Regex, input: &'a str, 
-    anchor_at_start: bool
-) -> Option<(Cow<'a, str>, Captures<'a>)> {
-    let captures = r.captures(input)?;
-    let full_capture = captures.get(0)?;
-    if anchor_at_start && full_capture.start() != 0 {
-        return None
-    }
-
-    Some((Cow::Borrowed(&input[full_capture.end()..]), captures))
 }

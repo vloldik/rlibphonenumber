@@ -6,7 +6,8 @@ mod phonenumberutil;
 mod regexp_cache;
 mod regex_based_matcher;
 pub mod i18n;
-pub mod regex_util;
+pub(crate) mod regex_util;
+pub(crate) mod string_util;
 
 /// I decided to create this module because there are many 
 /// boilerplate places in the code that can be replaced with macros, 

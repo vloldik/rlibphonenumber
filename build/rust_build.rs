@@ -72,6 +72,7 @@ fn parse_prefixes(path: &str, prefixes: &mut BTreeMap<i32, String>) -> Result<()
 
 fn main() -> Result<(), BuildError> {
     protobuf_codegen::Codegen::new()
+        .pure()
         .includes(["resources"])
         .input("resources/phonemetadata.proto")
         .input("resources/phonenumber.proto")

@@ -21,7 +21,7 @@ impl RegexBasedMatcher {
 
         // find first occurrence
         if allow_prefix_match {
-            Ok(regexp.consume_start(phone_number).is_some())
+            Ok(regexp.matches_start(phone_number))
         } else {
             Ok(regexp.full_match(phone_number))
         }
