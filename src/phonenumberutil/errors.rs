@@ -32,7 +32,9 @@ pub enum ParseError {
     #[error("{0}")]
     InvalidRegexError(#[from] ErrorInvalidRegex),
     #[error("{0}")]
-    ParseNumberAsIntError(#[from] ParseIntError)
+    ParseNumberAsIntError(#[from] ParseIntError),
+    #[error("{0}")]
+    ExtractNumberError(#[from] ExtractNumberError),
 }
 
 #[derive(Debug, PartialEq, Error)]
@@ -43,3 +45,16 @@ pub enum ExtractNumberError {
     NotANumber,
 }
 
+#[derive(Debug, PartialEq, Error)]
+pub enum GetExampleNumberError {
+    #[error("Parse error: {0}")]
+    ParseError(#[from] ParseError),
+    #[error("{0}")]
+    InvalidRegexError(#[from] ErrorInvalidRegex),
+    #[error("No example number")]
+    NoExampleNumberError,
+    #[error("Could not get number")]
+    CouldNotGetNumberError,
+    #[error("Invalid metadata")]
+    InvalidMetadataError
+}
