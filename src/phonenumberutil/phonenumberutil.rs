@@ -828,7 +828,7 @@ impl PhoneNumberUtil {
         }
     }
 
-    fn get_number_type(&self, phone_number: &PhoneNumber) -> Result<PhoneNumberType> {
+    fn get_number_type(&self, phone_number: &PhoneNumber) -> RegexResult<PhoneNumberType> {
         let region_code = self.get_region_code_for_number(phone_number)?;
         let Some(metadata) = self
             .get_metadata_for_region_or_calling_code(phone_number.country_code(), region_code)
@@ -2156,6 +2156,30 @@ impl PhoneNumberUtil {
             return None;
         }
         Some(&phone_number[captured_range_end..])
+    }
+
+    fn is_number_geographical(
+        &self,
+        phone_number: &PhoneNumber
+    ) -> RegexResult<bool> {
+        Ok(self.is_number_geographical_by_country_code_and_type(
+            self.get_number_type(phone_number)?,
+            phone_number.country_code()
+        ))
+    }
+
+    fn is_number_geographical_by_country_code_and_type(
+        &self,
+        phone_number_type: PhoneNumberType,
+        country_calling_code: i32
+    ) -> bool {
+        matches!(phone_number_type, PhoneNumberType::FixedLine | PhoneNumberType::FixedLineOrMobile) 
+        ||
+        (
+            self.reg_exps.geo_mobile_countries.contains(&country_calling_code)
+            && 
+            matches!(phone_number_type, PhoneNumberType::Mobile)
+        )
     }
 
     /// Extracts country calling code from national_number, and returns tuple
