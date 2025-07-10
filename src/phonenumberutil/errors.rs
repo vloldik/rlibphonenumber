@@ -1,4 +1,3 @@
-use core::error;
 use std::num::ParseIntError;
 
 use thiserror::Error;

@@ -14,26 +14,11 @@ pub trait RegexConsume {
     fn find_start<'a>(&self, s: &'a str) -> Option<Match<'a>>;
 }
 
-trait RegexMatchStart {
-    // Eq of looking_at
-    fn match_start(&self, s: &str) -> bool;
-}
-
 impl RegexFullMatch for Regex {
     fn full_match(&self, s: &str) -> bool {
         let found = self.find(s);
         if let Some(matched) = found {
             return matched.start() == 0 && matched.end() == s.len();
-        }
-        false
-    }
-}
-
-impl RegexMatchStart for Regex {
-    fn match_start(&self, s: &str) -> bool {
-        let found = self.find(s);
-        if let Some(matched) = found {
-            return matched.start() == 0;
         }
         false
     }

@@ -12,12 +12,7 @@ pub struct RegexCache {
 }
 
 impl RegexCache {
-    pub fn new() -> Self {
-        Self {
-            cache: DashMap::new(),
-        }
-    }
-
+    
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
             cache: DashMap::with_capacity(capacity),

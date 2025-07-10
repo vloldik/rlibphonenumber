@@ -1,5 +1,4 @@
 use strum::EnumIter;
-use thiserror::Error;
 
 /// INTERNATIONAL and NATIONAL formats are consistent with the definition
 /// in ITU-T Recommendation E.123. However we follow local conventions such as

@@ -14,3 +14,19 @@ pub(crate) mod string_util;
 /// the name of which will describe what is happening more 
 /// clearly than a few lines of code.
 mod macros;
+
+pub use phonenumberutil::{
+    PHONE_NUMBER_UTIL,
+    phonenumberutil::{
+        RegexResult,
+        MatchResult,
+        ParseResult,
+        ValidationResult,
+        ExampleNumberResult,
+        InternalLogicResult,
+        ExtractNumberResult,
+        PhoneNumberUtil
+    },
+    errors,
+    enums
+};

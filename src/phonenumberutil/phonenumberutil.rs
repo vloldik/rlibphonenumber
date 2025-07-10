@@ -1,5 +1,5 @@
 use std::{
-    borrow::Cow, cmp::max, collections::{hash_map, HashMap, HashSet, VecDeque}, sync::Arc
+    borrow::Cow, cmp::max, collections::{HashMap, HashSet, VecDeque}, sync::Arc
 };
 
 use super::phone_number_regexps_and_mappings::PhoneNumberRegExpsAndMappings;
@@ -136,13 +136,13 @@ impl PhoneNumberUtil {
         self.country_code_to_non_geographical_metadata_map.keys().map(| k | *k)
     }
 
-    fn get_supported_calling_codes(&self) -> impl Iterator<Item=i32> {
+    pub fn get_supported_calling_codes(&self) -> impl Iterator<Item=i32> {
         self.country_calling_code_to_region_code_map
             .iter()
             .map(| (k, _) | *k)
     }
 
-    fn get_supported_types_for_region(
+    pub fn get_supported_types_for_region(
         &self,
         region_code: &str,
     ) -> Option<HashSet<PhoneNumberType>> {
@@ -155,7 +155,7 @@ impl PhoneNumberUtil {
             })
     }
 
-    fn get_supported_types_for_non_geo_entity(
+    pub fn get_supported_types_for_non_geo_entity(
         &self,
         country_calling_code: i32,
     ) -> Option<HashSet<PhoneNumberType>> {
