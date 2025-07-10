@@ -164,7 +164,10 @@ pub(super) struct PhoneNumberRegExpsAndMappings {
     /// followed by a single digit, separated by valid phone number punctuation.
     /// This prevents invalid punctuation (such as the star sign in Israeli star
     /// numbers) getting into the output of the AYTF. 
-    pub is_format_eligible_as_you_type_formatting_regex: Regex
+    pub is_format_eligible_as_you_type_formatting_regex: Regex,
+
+    /// Added for function `formatting_rule_has_first_group_only`
+    pub formatting_rule_has_first_group_only_regex: Regex
 }
 
 impl PhoneNumberRegExpsAndMappings {
@@ -323,8 +326,17 @@ impl PhoneNumberRegExpsAndMappings {
             is_format_eligible_as_you_type_formatting_regex: Regex::new(
                 &format!("[{}]*\\$1[{}]*(\\$\\d[{}]*)*",VALID_PUNCTUATION, VALID_PUNCTUATION, VALID_PUNCTUATION)
             ).unwrap(),
+            formatting_rule_has_first_group_only_regex: Regex::new("\\(?\\$1\\)?").unwrap()
         };
         instance.initialize_regexp_mappings();
         instance
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn check_regexps_are_compiling() {
+        super::PhoneNumberRegExpsAndMappings::new();
     }
 }

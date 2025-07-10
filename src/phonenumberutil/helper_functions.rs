@@ -20,14 +20,14 @@ use super::{
 };
 
 /// Loads metadata from helper constants METADATA array
-pub(super) fn load_compiled_metadata() -> Result<PhoneMetadataCollection, protobuf::Error> {
+pub fn load_compiled_metadata() -> Result<PhoneMetadataCollection, protobuf::Error> {
     let result = PhoneMetadataCollection::parse_from_bytes(&METADATA)?;
     Ok(result)
 }
 
 /// Returns a pointer to the description inside the metadata of the appropriate
 /// type.
-pub(super) fn get_number_desc_by_type(
+pub fn get_number_desc_by_type(
     metadata: &PhoneMetadata,
     phone_number_type: PhoneNumberType,
 ) -> &PhoneNumberDesc {
@@ -48,7 +48,7 @@ pub(super) fn get_number_desc_by_type(
 }
 
 /// A helper function that is used by Format and FormatByPattern.
-pub(super) fn prefix_number_with_country_calling_code(
+pub fn prefix_number_with_country_calling_code(
     country_calling_code: i32,
     number_format: PhoneNumberFormat,
     formatted_number: &mut String,
@@ -91,7 +91,7 @@ pub(super) fn prefix_number_with_country_calling_code(
 
 // Returns true when one national number is the suffix of the other or both are
 // the same.
-pub(super) fn is_national_number_suffix_of_the_other(
+pub fn is_national_number_suffix_of_the_other(
     first_number: &PhoneNumber,
     second_number: &PhoneNumber,
 ) -> bool {
@@ -106,7 +106,7 @@ pub(super) fn is_national_number_suffix_of_the_other(
 
 /// Helper method for constructing regular expressions for parsing. Creates an
 /// expression that captures up to max_length digits.
-pub(super) fn extn_digits(max_length: u32) -> String {
+pub fn extn_digits(max_length: u32) -> String {
     let mut buf = itoa::Buffer::new();
     let max_length_str = buf.format(max_length);
     const HELPER_STR_LEN: usize = 2 + 4 + 2;
@@ -131,7 +131,7 @@ pub(super) fn extn_digits(max_length: u32) -> String {
 // number is changed, MaybeStripExtension needs to be updated.
 // - The only capturing groups should be around the digits that you want to
 // capture as part of the extension, or else parsing will fail!
-pub(super) fn create_extn_pattern(for_parsing: bool) -> String {
+pub fn create_extn_pattern(for_parsing: bool) -> String {
     // We cap the maximum length of an extension based on the ambiguity of the
     // way the extension is prefixed. As per ITU, the officially allowed
     // length for extensions is actually 40, but we don't support this since we
@@ -255,7 +255,7 @@ pub(super) fn create_extn_pattern(for_parsing: bool) -> String {
 ///   left unchanged in the number.
 /// 
 /// Returns: normalized_string
-pub(super) fn normalize_helper(
+pub fn normalize_helper(
     normalization_replacements: &HashMap<char, char>,
     remove_non_matches: bool,
     phone_number: &str
@@ -276,7 +276,7 @@ pub(super) fn normalize_helper(
 
 /// Returns `true` if there is any possible number data set for a particular
 /// PhoneNumberDesc.
-pub(super) fn desc_has_possible_number_data(desc: &PhoneNumberDesc) -> bool {
+pub fn desc_has_possible_number_data(desc: &PhoneNumberDesc) -> bool {
     // If this is empty, it means numbers of this type inherit from the "general
     // desc" -> the value "-1" means that no numbers exist for this type.
     return desc.possible_length.len() != 1
@@ -296,7 +296,7 @@ pub(super) fn desc_has_possible_number_data(desc: &PhoneNumberDesc) -> bool {
 /// mention why during a review without needing to change MetadataFilter.
 ///
 /// Returns `true` if there is any data set for a particular PhoneNumberDesc.
-pub(super) fn desc_has_data(desc: &PhoneNumberDesc) -> bool {
+pub fn desc_has_data(desc: &PhoneNumberDesc) -> bool {
     // Checking most properties since we don't know what's present, since a custom
     // build may have stripped just one of them (e.g. USE_METADATA_LITE strips
     // exampleNumber). We don't bother checking the PossibleLengthsLocalOnly,
@@ -309,7 +309,7 @@ pub(super) fn desc_has_data(desc: &PhoneNumberDesc) -> bool {
 
 /// Returns the types we have metadata for based on the PhoneMetadata object
 /// passed in.
-pub(super) fn populate_supported_types_for_metadata(
+pub fn populate_supported_types_for_metadata(
     metadata: &PhoneMetadata,
     types: &mut HashSet<PhoneNumberType>,
 ) {
@@ -329,7 +329,7 @@ pub(super) fn populate_supported_types_for_metadata(
         });
 }
 
-pub(super) fn get_supported_types_for_metadata(metadata: &PhoneMetadata) -> HashSet<PhoneNumberType> {
+pub fn get_supported_types_for_metadata(metadata: &PhoneMetadata) -> HashSet<PhoneNumberType> {
     const EFFECTIVE_NUMBER_TYPES: usize = 11 /* count */ - 2 /* filter type or unknown */;
     let mut types = HashSet::with_capacity(EFFECTIVE_NUMBER_TYPES);
     populate_supported_types_for_metadata(metadata, &mut types);
@@ -338,7 +338,7 @@ pub(super) fn get_supported_types_for_metadata(metadata: &PhoneMetadata) -> Hash
 
 /// Helper method to check a number against possible lengths for this number
 /// type, and determine whether it matches, or is too short or too long.
-pub(super) fn test_number_length(
+pub fn test_number_length(
     phone_number: &str,
     phone_metadata: &PhoneMetadata,
     phone_number_type: PhoneNumberType,
@@ -425,7 +425,7 @@ pub(super) fn test_number_length(
 /// Helper method to check a number against possible lengths for this region,
 /// based on the metadata being passed in, and determine whether it matches, or
 /// is too short or too long.
-pub(super) fn test_number_length_with_unknown_type(
+pub fn test_number_length_with_unknown_type(
     phone_number: &str,
     phone_metadata: &PhoneMetadata,
 ) -> Result<ValidNumberLenType, ValidationResultErr> {
@@ -454,7 +454,7 @@ pub(crate) fn copy_core_fields_only(from_number: &PhoneNumber) -> PhoneNumber {
 
 /// Determines whether the given number is a national number match for the given
 /// PhoneNumberDesc. Does not check against possible lengths!
-pub(super) fn is_match(
+pub fn is_match(
     matcher_api: &Box<dyn MatcherApi>,
     number: &str,
     number_desc: &PhoneNumberDesc,

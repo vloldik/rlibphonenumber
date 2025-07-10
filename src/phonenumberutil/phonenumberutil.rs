@@ -1,5 +1,5 @@
 use std::{
-    borrow::Cow, cmp::max, collections::{HashMap, HashSet, VecDeque}, sync::Arc
+    borrow::Cow, cmp::max, collections::{hash_map, HashMap, HashSet, VecDeque}, sync::Arc
 };
 
 use super::phone_number_regexps_and_mappings::PhoneNumberRegExpsAndMappings;
@@ -126,29 +126,18 @@ impl PhoneNumberUtil {
         instance
     }
 
-    pub fn get_supported_regions(&self) -> Vec<&str> {
-        let mut regions = Vec::new();
-        for (k, _) in self.region_to_metadata_map.iter() {
-            regions.push(k.as_str());
-        }
-        regions
+    pub fn get_supported_regions(&self) -> impl Iterator<Item=&str> {
+        self.region_to_metadata_map.keys().map(| k | k.as_str())
     }
 
-    pub fn get_supported_global_network_calling_codes(&self) -> HashSet<i32> {
-        let mut codes = HashSet::new();
-        for (k, _) in self.country_code_to_non_geographical_metadata_map.iter() {
-            codes.insert(*k);
-        }
-        codes
+    pub fn get_supported_global_network_calling_codes(&self) -> impl Iterator<Item=i32> {
+        self.country_code_to_non_geographical_metadata_map.keys().map(| k | *k)
     }
 
-    pub fn get_supported_calling_codes(&self) -> HashSet<i32> {
-        let mut codes = HashSet::new();
-
-        for (k, _) in self.country_calling_code_to_region_code_map.iter() {
-            codes.insert(*k);
-        }
-        codes
+    pub fn get_supported_calling_codes(&self) -> impl Iterator<Item=i32> {
+        self.country_calling_code_to_region_code_map
+            .iter()
+            .map(| (k, _) | *k)
     }
 
     pub fn get_supported_types_for_region(
@@ -1991,7 +1980,7 @@ impl PhoneNumberUtil {
         &self,
         phone_number_type: PhoneNumberType,
     ) -> ExampleNumberResult {
-        if let Some(number) = self.get_supported_regions().iter()
+        if let Some(number) = self.get_supported_regions()
             .find_map(| region_code | 
                 self.get_example_number_for_type_and_region_code(region_code, phone_number_type).ok()
             ) {

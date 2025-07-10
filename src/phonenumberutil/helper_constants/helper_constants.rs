@@ -15,7 +15,7 @@ pub const PLUS_CHARS: &'static str = "+\u{FF0B}";
 pub const VALID_PUNCTUATION: &'static str = "-x\
 \u{2010}-\u{2015}\u{2212}\u{30FC}\u{FF0D}-\u{FF0F} \u{00A0}\
 \u{00AD}\u{200B}\u{2060}\u{3000}()\u{FF08}\u{FF09}\u{FF3B}\
-\u{FF3D}.[]/~\u{2053}\u{223C}";
+\u{FF3D}.\\[\\]/~\u{2053}\u{223C}";
 
 // Regular expression of characters typically used to start a second phone
 // number for the purposes of parsing. This allows us to strip off parts of
