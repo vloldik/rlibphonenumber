@@ -975,10 +975,7 @@ impl PhoneNumberUtil {
     }
 
     pub fn normalize_digits_only<'a>(&self, phone_number: &'a str) -> String {
-        phone_number.chars()
-            .filter_map(| c | c.to_decimal_utf8())
-            .filter_map(| i | char::from_u32(b'0' as u32 + i) )
-            .collect()
+        dec_from_char::normalize_decimals_filtering(phone_number)
     }
 
     pub fn format_out_of_country_calling_number<'a>(
