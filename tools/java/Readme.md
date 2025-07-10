@@ -1,0 +1,1 @@
+## This directory contains script for autogeneration of metadata in rust
