@@ -1,5 +1,5 @@
 [package]
-name = "rlibphonenumbers"
+name = "rlibphonenumber"
 version = "0.1.0"
 edition = "2024"
 
@@ -21,11 +21,17 @@ itoa = "1.0.15"
 # simple macro for single allocation 
 # concatenation of strings
 fast-cat = "0.1.1"
+
+# lib for derive enum iteration
 strum = { version = "0.27.1", features = ["derive"] }
-icu_normalizer = "2.0.0"
-tinystr = "0.8.1"
-dec_from_char = "0.1.1"
+
+# Simple lib to converts any unicode valid chars into decimals 
+dec_from_char = "0.2.0"
 
 [build-dependencies]
 thiserror = "2.0.12"
 protobuf-codegen = "3.7.2"
+
+[dev-dependencies]
+colog = "1.3.0"
+env_logger = "0.11.8"

@@ -28,5 +28,8 @@ pub use phonenumberutil::{
         PhoneNumberUtil
     },
     errors,
-    enums
+    enums,
 };
+pub use proto_gen::phonemetadata;
+pub use proto_gen::phonenumber;
+mod tests;
