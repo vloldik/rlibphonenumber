@@ -6,13 +6,12 @@ use thiserror::Error;
 use crate::regexp_cache::ErrorInvalidRegex;
 
 #[derive(Debug, PartialEq, Error)]
-pub enum PhoneNumberUtilError {
+pub enum InternalLogicError {
     #[error("{0}")]
     InvalidRegexError(#[from] ErrorInvalidRegex),
-    #[error("Parse error: {0}")]
-    ParseError(#[from] ParseError),
-    #[error("Extract number error: {0}")]
-    ExtractNumberError(#[from] ExtractNumberError)
+    
+    #[error("{0}")]
+    InvalidMetadataForValidRegionError(#[from] InvalidMetadataForValidRegionError)
 }   
 
 #[derive(Debug, PartialEq, Error)]
@@ -50,7 +49,7 @@ pub enum GetExampleNumberError {
     #[error("Parse error: {0}")]
     ParseError(#[from] ParseError),
     #[error("{0}")]
-    InvalidRegexError(#[from] ErrorInvalidRegex),
+    InternalLogicError(#[from] InternalLogicError),
     #[error("No example number")]
     NoExampleNumberError,
     #[error("Could not get number")]
@@ -61,7 +60,35 @@ pub enum GetExampleNumberError {
 
 
 #[derive(Error, Debug, PartialEq)]
-pub enum MatchError {
-    #[error("Invalid number given")]
-    InvalidNumber(#[from] ParseError), // NOT_A_NUMBER in the java version.
+#[error("Invalid number given")]
+pub struct InvalidNumberError(#[from] pub ParseError);  // NOT_A_NUMBER in the java version
+
+#[derive(Debug, Error, PartialEq)]
+#[error("Metadata for valid region MUST not be null")]
+pub struct InvalidMetadataForValidRegionError;
+
+/// Possible outcomes when testing if a PhoneNumber is possible.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Error)]
+pub enum ValidationResultErr {
+    /// The number has an invalid country calling code.
+    #[error("The number has an invalid country calling code")]
+    InvalidCountryCode,
+    /// The number is shorter than all valid numbers for this region.
+    #[error("The number is shorter than all valid numbers for this region")]
+    TooShort,
+    /// The number is longer than the shortest valid numbers for this region,
+    /// shorter than the longest valid numbers for this region, and does not
+    /// itself have a number length that matches valid numbers for this region.
+    /// This can also be returned in the case where
+    /// IsPossibleNumberForTypeWithReason was called, and there are no numbers of
+    /// this type at all for this region.
+    #[error("\
+    The number is longer than the shortest valid numbers for this region,\
+    shorter than the longest valid numbers for this region, and does not\
+    itself have a number length that matches valid numbers for this region\
+    ")]
+    InvalidLength,
+    /// The number is longer than all valid numbers for this region.
+    #[error("The number is longer than all valid numbers for this region")]
+    TooLong,
 }

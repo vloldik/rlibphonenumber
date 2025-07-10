@@ -65,32 +65,6 @@ pub enum MatchType {
 // ValidationResultOk for using Result<Ok, Err>
 
 /// Possible outcomes when testing if a PhoneNumber is possible.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Error)]
-pub enum ValidationResultErr {
-    /// The number has an invalid country calling code.
-    #[error("The number has an invalid country calling code")]
-    InvalidCountryCode,
-    /// The number is shorter than all valid numbers for this region.
-    #[error("The number is shorter than all valid numbers for this region")]
-    TooShort,
-    /// The number is longer than the shortest valid numbers for this region,
-    /// shorter than the longest valid numbers for this region, and does not
-    /// itself have a number length that matches valid numbers for this region.
-    /// This can also be returned in the case where
-    /// IsPossibleNumberForTypeWithReason was called, and there are no numbers of
-    /// this type at all for this region.
-    #[error("\
-    The number is longer than the shortest valid numbers for this region,\
-    shorter than the longest valid numbers for this region, and does not\
-    itself have a number length that matches valid numbers for this region\
-    ")]
-    InvalidLength,
-    /// The number is longer than all valid numbers for this region.
-    #[error("The number is longer than all valid numbers for this region")]
-    TooLong,
-}
-
-/// Possible outcomes when testing if a PhoneNumber is possible.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ValidNumberLenType {
     /// The number length matches that of valid numbers for this region.

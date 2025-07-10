@@ -12,7 +12,8 @@ use crate::{
 };
 
 use super::{
-    PhoneNumberFormat, PhoneNumberType, ValidNumberLenType, ValidationResultErr,
+    PhoneNumberFormat, PhoneNumberType, ValidNumberLenType,
+    errors::ValidationResultErr,
     helper_constants::{
         METADATA, OPTIONAL_EXT_SUFFIX, PLUS_SIGN, POSSIBLE_CHARS_AFTER_EXT_LABEL,
         POSSIBLE_SEPARATORS_BETWEEN_NUMBER_AND_EXT_LABEL, RFC3966_EXTN_PREFIX, RFC3966_PREFIX,
