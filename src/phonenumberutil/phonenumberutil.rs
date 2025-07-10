@@ -21,7 +21,6 @@ use log::{error, trace, warn};
 use regex::Regex;
 
 // Helper type for Result
-pub type Result<T> = std::result::Result<T, PhoneNumberUtilError>;
 
 pub type RegexResult<T> = std::result::Result<T, ErrorInvalidRegex>;
 
@@ -29,6 +28,8 @@ pub type ParseResult<T> = std::result::Result<T, ParseError>;
 
 pub type ExampleNumberResult = std::result::Result<PhoneNumber, GetExampleNumberError>;
 pub type ValidationResult = std::result::Result<ValidNumberLenType, ValidationResultErr>;
+pub type MatchResult = std::result::Result<MatchType, MatchError>;
+pub type ExtractNumberResult<T> = std::result::Result<T, ExtractNumberError>;
 
 pub struct PhoneNumberUtil {
     /// An API for validation checking.
@@ -216,16 +217,10 @@ impl PhoneNumberUtil {
     }
 
     fn formatting_rule_has_first_group_only(&self, national_prefix_formatting_rule: &str) -> bool {
-        // A pattern that is used to determine if the national prefix formatting rule
-        // has the first group only, i.e., does not start with the national prefix.
-        // Note that the pattern explicitly allows for unbalanced parentheses.
-        let first_group_only_prefix_pattern = self
-            .reg_exps
-            .regexp_cache
-            .get_regex("\\(?\\$1\\)?")
-            .expect("Invalid constant pattern!");
         return national_prefix_formatting_rule.is_empty()
-            || first_group_only_prefix_pattern.full_match(national_prefix_formatting_rule);
+            || self.reg_exps
+                    .formatting_rule_has_first_group_only_regex
+                    .full_match(national_prefix_formatting_rule);
     }
 
     fn get_ndd_prefix_for_region(
@@ -330,32 +325,30 @@ impl PhoneNumberUtil {
     fn get_region_code_for_country_code(&self, country_calling_code: i32) -> &str {
         let region_codes = self.get_region_codes_for_country_calling_code(country_calling_code);
         return region_codes
-            .first()
-            .map(|v| *v)
+            .and_then(| mut codes | codes.next())
+            .map(|v| v)
             .unwrap_or(i18n::RegionCode::get_unknown());
     }
 
-    // Returns the region codes that matches the specific country calling code. In
-    // the case of no region code being found, region_codes will be left empty.
+    /// Returns the region codes that matches the specific country calling code. In
+    /// the case of no region code being found, region_codes will be left empty.
     fn get_region_codes_for_country_calling_code(
         &self,
         country_calling_code: i32,
-    ) -> Vec<&str> {
-        let mut acc = Vec::with_capacity(10);
+    ) -> Option<impl Iterator<Item=&str>> {
         // Create a IntRegionsPair with the country_code passed in, and use it to
         // locate the pair with the same country_code in the sorted vector.
         self.country_calling_code_to_region_code_map
             .binary_search_by_key(&country_calling_code, |(code, _)| *code)
+            .ok()
             .map(|index| {
                 self.country_calling_code_to_region_code_map[index]
                     .1
                     .iter()
-                    .for_each(|v| {
-                        acc.push(v.as_str());
-                    });
-            }) /* suppress Result ignoring */
-            .ok();
-        acc
+                    .map(|v| 
+                        v.as_str()
+                    )
+            })
     }
 
     fn get_metadata_for_region_or_calling_code(
@@ -629,7 +622,7 @@ impl PhoneNumberUtil {
         &self,
         phone_number: &PhoneNumber,
         carrier_code: &str,
-    ) -> Result<String> {
+    ) -> RegexResult<String> {
         let country_calling_code = phone_number.country_code();
         let national_significant_number = Self::get_national_significant_number(phone_number);
         let region_code = self.get_region_code_for_country_code(country_calling_code);
@@ -666,7 +659,7 @@ impl PhoneNumberUtil {
         &self,
         phone_number: &PhoneNumber,
         fallback_carrier_code: &str,
-    ) -> Result<String> {
+    ) -> RegexResult<String> {
         let carrier_code = if !phone_number.preferred_domestic_carrier_code().is_empty() {
             phone_number.preferred_domestic_carrier_code()
         } else {
@@ -691,7 +684,7 @@ impl PhoneNumberUtil {
         phone_number: &'b PhoneNumber,
         calling_from: &str,
         with_formatting: bool,
-    ) -> Result<Cow<'b, str>> {
+    ) -> RegexResult<Cow<'b, str>> {
         let country_calling_code = phone_number.country_code();
         if !self.has_valid_country_calling_code(country_calling_code) {
             return if phone_number.has_raw_input() {
@@ -831,10 +824,13 @@ impl PhoneNumberUtil {
     fn get_region_code_for_number(&self, phone_number: &PhoneNumber) -> RegexResult<&str>{
         let country_calling_code = phone_number.country_code();
         let region_codes = self.get_region_codes_for_country_calling_code(country_calling_code);
-        if region_codes.len() == 0 {
-            log::trace!("Missing/invalid country calling code ({})", country_calling_code);
+        let Some(region_codes) = region_codes
+            .map(| codes | codes.collect::<Vec<_>>())
+            .filter(| codes | codes.len() > 0)
+        else {
+            trace!("Missing/invalid country calling code ({})", country_calling_code);
             return Ok(i18n::RegionCode::get_unknown())
-        }
+        };
         if region_codes.len() == 1 {
             return Ok(region_codes[0])
         } else {
@@ -955,7 +951,7 @@ impl PhoneNumberUtil {
     fn can_be_internationally_dialled(
             &self,
             phone_number: &PhoneNumber
-        ) -> Result<bool> {
+        ) -> RegexResult<bool> {
         let region_code = self.get_region_code_for_number(phone_number)?;
         let Some(metadata) = self.region_to_metadata_map.get(region_code) else {
             // Note numbers belonging to non-geographical entities (e.g. +800 numbers)
@@ -1503,7 +1499,7 @@ impl PhoneNumberUtil {
     /// second extension here makes this actually two phone numbers, (530) 583-6985
     /// x302 and (530) 583-6985 x2303. We remove the second extension so that the
     /// first number is parsed correctly.
-    fn extract_possible_number<'a>(&self, phone_number: &'a str) -> std::result::Result<&'a str, ExtractNumberError> {
+    fn extract_possible_number<'a>(&self, phone_number: &'a str) -> ExtractNumberResult<&'a str> {
         // Rust note: skip UTF-8 validation since in rust strings are already UTF-8 valid
         let mut i: usize = 0;
         for c in phone_number.chars() {
@@ -1784,7 +1780,10 @@ impl PhoneNumberUtil {
             return (phone_number, None);
         };
         
-        let full_capture = captures.get(0).expect("first capture MUST always be not None");
+        // first capture is always not None, this should not happen, but use this for safety.
+        let Some(full_capture) = captures.get(0) else {
+            return (phone_number, None);   
+        };
         // Replace the extensions in the original string here.
         let phone_number_no_extn = &phone_number[..full_capture.start()];
         // If we find a potential extension, and the number preceding this is a
@@ -1825,7 +1824,7 @@ impl PhoneNumberUtil {
         keep_raw_input: bool,
         national_number: &'a str,
         phone_number: &mut PhoneNumber
-    ) -> std::result::Result<Cow<'a, str>, ParseError> {
+    ) -> ParseResult<Cow<'a, str>> {
         // Set the default prefix to be something that will never match if there is no
         // default region.
         let possible_country_idd_prefix = if let Some(default_region_metadata) = default_region_metadata {
@@ -2432,7 +2431,7 @@ impl PhoneNumberUtil {
         &self,
         first_number: &str,
         second_number: &str
-    ) -> std::result::Result<MatchType, MatchError> {
+    ) -> MatchResult {
         match self.parse(first_number, i18n::RegionCode::get_unknown()) {
             Ok(first_number_as_proto) => return self.is_number_match_with_one_string(&first_number_as_proto, second_number),
             Err(err) => {
@@ -2466,7 +2465,7 @@ impl PhoneNumberUtil {
         &self,
         first_number: &PhoneNumber,
         second_number: &str
-    ) -> std::result::Result<MatchType, MatchError> {
+    ) -> MatchResult {
         // First see if the second number has an implicit country calling code, by
         // attempting to parse it.
         match self.parse(second_number, i18n::RegionCode::get_unknown()) {

@@ -167,6 +167,9 @@ pub(super) struct PhoneNumberRegExpsAndMappings {
     pub is_format_eligible_as_you_type_formatting_regex: Regex,
 
     /// Added for function `formatting_rule_has_first_group_only`
+    /// A pattern that is used to determine if the national prefix formatting rule
+    /// has the first group only, i.e., does not start with the national prefix.
+    /// Note that the pattern explicitly allows for unbalanced parentheses.
     pub formatting_rule_has_first_group_only_regex: Regex
 }
 
