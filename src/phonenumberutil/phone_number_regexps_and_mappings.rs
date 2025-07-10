@@ -268,10 +268,12 @@ impl PhoneNumberRegExpsAndMappings {
         let alphanum = fast_cat::concat_str!(VALID_ALPHA_INCL_UPPERCASE, DIGITS);
         let extn_patterns_for_parsing = create_extn_pattern(true);
         let valid_phone_number = format!(
-                "{}{{{}}}|[{}]*(?:[{}{}]*{}){{3,}}[{}{}{}{}]*",
-                DIGITS, MIN_LENGTH_FOR_NSN, PLUS_CHARS,
+                // moved 2-digits pattern to an end for match full number first
+                "[{}]*(?:[{}{}]*{}){{3,}}[{}{}{}{}]*|{}{{{}}}",
+                PLUS_CHARS,
                 VALID_PUNCTUATION, STAR_SIGN, DIGITS,
-                VALID_PUNCTUATION, STAR_SIGN, VALID_ALPHA, DIGITS
+                VALID_PUNCTUATION, STAR_SIGN, DIGITS, VALID_ALPHA,
+                DIGITS, MIN_LENGTH_FOR_NSN, 
             );
 
         let rfc3966_phone_digit = format!("({}|{})", DIGITS, RFC3966_VISUAL_SEPARATOR);
