@@ -2319,12 +2319,15 @@ impl PhoneNumberUtil {
         let first_capture = captures.as_ref().and_then(| c | c.get(1));
         let second_capture = captures.as_ref().and_then(| c | c.get(2));
 
-        if !transform_rule.is_empty() && 
-        (second_capture.is_some_and(| c | !c.is_empty() && first_capture.is_some())
-        || first_capture.is_some_and(| c | !c.is_empty() && second_capture.is_none())) {
+        let condition = |first_capture: &regex::Match<'_>| {
+            !transform_rule.is_empty() && 
+            (second_capture.is_some_and(| c | !c.is_empty()) ||
+            !first_capture.is_empty() && second_capture.is_none())
+        };
+
+        if let Some(first_capture) = first_capture.filter(condition) {
 
             // here we can safe unwrap because first_capture.is_some() anyway
-            let first_capture = first_capture.unwrap();
             let carrier_code_temp = if second_capture.is_some() {
                 Some(first_capture.as_str())
             } else {
