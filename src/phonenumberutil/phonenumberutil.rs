@@ -4,7 +4,7 @@ use std::{
 
 use super::phone_number_regexps_and_mappings::PhoneNumberRegExpsAndMappings;
 use crate::{
-    i18n, interfaces::MatcherApi, macros::owned_from_cow_or, phonenumberutil::{
+    i18n, interfaces::MatcherApi, macros::owned_from_cow_or, phonemetadata::PhoneMetadataCollection, phonenumberutil::{
         errors::{ExtractNumberError, GetExampleNumberError, InternalLogicError, InvalidMetadataForValidRegionError, InvalidNumberError, ParseError, ValidationResultErr}, helper_constants::{
             DEFAULT_EXTN_PREFIX, MAX_LENGTH_COUNTRY_CODE, MAX_LENGTH_FOR_NSN, MIN_LENGTH_FOR_NSN, NANPA_COUNTRY_CODE, PLUS_SIGN, REGION_CODE_FOR_NON_GEO_ENTITY, RFC3966_EXTN_PREFIX, RFC3966_ISDN_SUBADDRESS, RFC3966_PHONE_CONTEXT, RFC3966_PREFIX
         }, helper_functions::{
@@ -59,7 +59,7 @@ pub struct PhoneNumberUtil {
 }
 
 impl PhoneNumberUtil {
-    pub(super) fn new() -> Self {
+    pub(crate) fn new_for_metadata(metadata_collection: PhoneMetadataCollection) -> Self {
         let mut instance = Self {
             matcher_api: Box::new(RegexBasedMatcher::new()),
             reg_exps: PhoneNumberRegExpsAndMappings::new(),
@@ -68,14 +68,7 @@ impl PhoneNumberUtil {
             region_to_metadata_map: Default::default(),
             country_code_to_non_geographical_metadata_map: Default::default(),
         };
-        let metadata_collection = match load_compiled_metadata() {
-            Err(err) => {
-                let err_message = format!("Could not parse compiled-in metadata: {:?}", err);
-                log::error!("{}", err_message);
-                panic!("{}", err_message);
-            }
-            Ok(metadata) => metadata,
-        };
+
         // that share a country calling code when inserting data.
         let mut country_calling_code_to_region_map = HashMap::<i32, VecDeque<String>>::new();
         for metadata in metadata_collection.metadata {
@@ -128,7 +121,19 @@ impl PhoneNumberUtil {
         instance
     }
 
-    fn get_supported_regions(&self) -> impl Iterator<Item=&str> {
+    pub(crate) fn new() -> Self {
+        let metadata_collection = match load_compiled_metadata() {
+            Err(err) => {
+                let err_message = format!("Could not parse compiled-in metadata: {:?}", err);
+                log::error!("{}", err_message);
+                panic!("{}", err_message);
+            }
+            Ok(metadata) => metadata,
+        };
+        Self::new_for_metadata(metadata_collection)
+    }
+
+    pub(crate) fn get_supported_regions(&self) -> impl Iterator<Item=&str> {
         self.region_to_metadata_map.keys().map(| k | k.as_str())
     }
 
@@ -1527,7 +1532,7 @@ impl PhoneNumberUtil {
             self.reg_exps.capture_up_to_second_number_start_pattern
             .find(&extracted_number)
             .map(move | m | m.as_str() )
-            .unwrap_or("")
+            .unwrap_or(extracted_number)
         )
     }
 
@@ -1624,7 +1629,7 @@ impl PhoneNumberUtil {
     ) -> ParseResult<PhoneNumber> {
         let national_number = self.build_national_number_for_parsing(number_to_parse)?;
         if !self.is_viable_phone_number(&national_number) {
-            trace!("The string supplied did not seem to be a phone number {national_number}.");
+            trace!("The string supplied did not seem to be a phone number '{national_number}'.");
             return Err(ParseError::NotANumber)
         }
 
