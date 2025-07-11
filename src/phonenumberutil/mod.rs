@@ -6,6 +6,7 @@ pub mod phonenumberutil;
 mod phone_number_regexps_and_mappings;
 pub(self) mod helper_types;
 pub(self) mod comparisons;
+pub(crate) mod generated;
 
 use std::sync::LazyLock;
 

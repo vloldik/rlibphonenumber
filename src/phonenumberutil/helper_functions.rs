@@ -4,18 +4,17 @@ use protobuf::Message;
 use strum::IntoEnumIterator;
 
 use crate::{
-    interfaces::MatcherApi,
-    proto_gen::{
+    interfaces::MatcherApi, phonenumberutil::generated::metadata::METADATA, proto_gen::{
         phonemetadata::{PhoneMetadata, PhoneMetadataCollection, PhoneNumberDesc},
         phonenumber::PhoneNumber,
-    },
+    }
 };
 
 use super::{
     PhoneNumberFormat, PhoneNumberType, ValidNumberLenType,
     errors::ValidationResultErr,
     helper_constants::{
-        METADATA, OPTIONAL_EXT_SUFFIX, PLUS_SIGN, POSSIBLE_CHARS_AFTER_EXT_LABEL,
+        OPTIONAL_EXT_SUFFIX, PLUS_SIGN, POSSIBLE_CHARS_AFTER_EXT_LABEL,
         POSSIBLE_SEPARATORS_BETWEEN_NUMBER_AND_EXT_LABEL, RFC3966_EXTN_PREFIX, RFC3966_PREFIX,
     },
 };

@@ -1,5 +1,6 @@
 /*
  *  Copyright (C) 2011 The Libphonenumber Authors
+ *  Copyright (C) 2025 The Kashin Vladislav (modified)
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -21,9 +22,9 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import com.google.i18n.phonenumbers.BuildMetadataCppFromXml.Options;
-import com.google.i18n.phonenumbers.BuildMetadataCppFromXml.Variant;
-import com.google.i18n.phonenumbers.CppMetadataGenerator.Type;
+import com.google.i18n.phonenumbers.BuildMetadataRustFromXml.Options;
+import com.google.i18n.phonenumbers.BuildMetadataRustFromXml.Variant;
+import com.google.i18n.phonenumbers.RustMetadataGenerator.Type;
 
 import org.junit.Test;
 
@@ -36,7 +37,7 @@ import java.nio.charset.Charset;
  * Tests the BuildMetadataCppFromXml implementation to make sure it parses command line options and
  * generates code correctly.
  */
-public class BuildMetadataCppFromXmlTest {
+public class BuildMetadataRustFromXmlTest {
 
   // Various repeated test strings and data.
   private static final String IGNORED = "IGNORED";
@@ -44,7 +45,9 @@ public class BuildMetadataCppFromXmlTest {
   private static final String INPUT_PATH_XML = "input/path.xml";
   private static final byte[] TEST_DATA =
       new byte[] { (byte) 0xCA, (byte) 0xFE, (byte) 0xBA, (byte) 0xBE };
-  private static final String CPP_TEST_DATA = "0xCA, 0xFE, 0xBA, 0xBE";
+  private static final int TEST_DATA_LEN = TEST_DATA.length;
+  private static final String TEST_CONSTANT_NAME = "METADATA";
+  private static final String OUTPUT_DATA = "0xCA, 0xFE, 0xBA, 0xBE";
 
   @Test
   public void parseVariant() {
@@ -60,7 +63,7 @@ public class BuildMetadataCppFromXmlTest {
   @Test
   public void parseBadOptions() {
     try {
-      BuildMetadataCppFromXml.Options.parse("MyCommand", new String[] { IGNORED });
+      BuildMetadataRustFromXml.Options.parse("MyCommand", new String[] { IGNORED });
       fail("Expected exception not thrown");
     } catch (IllegalArgumentException e) {
       assertTrue(e.getMessage().contains("MyCommand"));
@@ -69,93 +72,58 @@ public class BuildMetadataCppFromXmlTest {
 
   @Test
   public void parseGoodOptions() {
-    Options opt = BuildMetadataCppFromXml.Options.parse("MyCommand",
-        new String[] { IGNORED, INPUT_PATH_XML, OUTPUT_DIR, "test_alternate_format" });
+    Options opt = BuildMetadataRustFromXml.Options.parse("MyCommand",
+        new String[] { IGNORED, INPUT_PATH_XML, OUTPUT_DIR, "test_alternate_format", "--const-name=" + TEST_CONSTANT_NAME });
     assertEquals(Type.ALTERNATE_FORMAT, opt.getType());
     assertEquals(Variant.TEST, opt.getVariant());
     assertEquals(INPUT_PATH_XML, opt.getInputFilePath());
     assertEquals(OUTPUT_DIR, opt.getOutputDir());
+    assertEquals(TEST_CONSTANT_NAME, opt.getConstantName());
   }
 
   @Test
   public void generateMetadata() {
     String[] args = new String[] {
-        IGNORED, INPUT_PATH_XML, OUTPUT_DIR, "metadata" };
+        IGNORED, INPUT_PATH_XML, OUTPUT_DIR, "metadata", "--const-name " + TEST_CONSTANT_NAME };
     // Most of the useful asserts are done in the mock class.
     MockedCommand command = new MockedCommand(
-        INPUT_PATH_XML, false, OUTPUT_DIR, Type.METADATA, Variant.FULL);
+        INPUT_PATH_XML, false, OUTPUT_DIR, Type.METADATA, Variant.FULL, TEST_CONSTANT_NAME
+    );
     command.setArgs(args);
     command.start();
     // Sanity check the captured data (asserting implicitly that the mocked methods were called).
-    String headerString = command.capturedHeaderFile();
-    assertTrue(headerString.contains("const void* metadata_get()"));
-    assertTrue(headerString.contains("int metadata_size()"));
     String sourceString = command.capturedSourceFile();
-    assertTrue(sourceString.contains("const void* metadata_get()"));
-    assertTrue(sourceString.contains("int metadata_size()"));
-    assertTrue(sourceString.contains(CPP_TEST_DATA));
+    assertTrue(sourceString.contains("pub const "+TEST_CONSTANT_NAME+": [u8; " + TEST_DATA_LEN + "] ="));
+    assertTrue(sourceString.contains(OUTPUT_DATA));
+    assertTrue(sourceString.contains("];"));
   }
 
-  @Test
-  public void generateLiteMetadata() {
-    String[] args = new String[] {
-        IGNORED, INPUT_PATH_XML, OUTPUT_DIR, "lite_metadata" };
-    // Most of the useful asserts are done in the mock class.
-    MockedCommand command = new MockedCommand(
-        INPUT_PATH_XML, true, OUTPUT_DIR, Type.METADATA, Variant.LITE);
-    command.setArgs(args);
-    command.start();
-    // Sanity check the captured data (asserting implicitly that the mocked methods were called).
-    String headerString = command.capturedHeaderFile();
-    assertTrue(headerString.contains("const void* metadata_get()"));
-    assertTrue(headerString.contains("int metadata_size()"));
-    String sourceString = command.capturedSourceFile();
-    assertTrue(sourceString.contains("const void* metadata_get()"));
-    assertTrue(sourceString.contains("int metadata_size()"));
-    assertTrue(sourceString.contains(CPP_TEST_DATA));
-  }
-
-  @Test
-  public void generateAlternateFormat() {
-    String[] args = new String[] {
-        IGNORED, INPUT_PATH_XML, OUTPUT_DIR, "alternate_format" };
-    // Most of the useful asserts are done in the mock class.
-    MockedCommand command = new MockedCommand(
-        INPUT_PATH_XML, false, OUTPUT_DIR, Type.ALTERNATE_FORMAT, Variant.FULL);
-    command.setArgs(args);
-    command.start();
-    // Sanity check the captured data (asserting implicitly that the mocked methods were called).
-    String headerString = command.capturedHeaderFile();
-    assertTrue(headerString.contains("const void* alternate_format_get()"));
-    assertTrue(headerString.contains("int alternate_format_size()"));
-    String sourceString = command.capturedSourceFile();
-    assertTrue(sourceString.contains("const void* alternate_format_get()"));
-    assertTrue(sourceString.contains("int alternate_format_size()"));
-    assertTrue(sourceString.contains(CPP_TEST_DATA));
-  }
+  // no need test for metadata with other names since it's set with parameter
 
   /**
    * Manually mocked subclass of BuildMetadataCppFromXml which overrides all file related behavior
    * while asserting the validity of any parameters passed to the mocked methods. After starting
    * this command, the captured header and source file contents can be retrieved for testing.
    */
-  static class MockedCommand extends BuildMetadataCppFromXml {
+  static class MockedCommand extends BuildMetadataRustFromXml {
     private static final Charset UTF_8 = Charset.forName("UTF-8");
     private final String expectedInputFilePath;
     private final boolean expectedLiteMetadata;
     private final String expectedOutputDirPath;
     private final Type expectedType;
     private final Variant expectedVariant;
-    private final ByteArrayOutputStream headerOut = new ByteArrayOutputStream();
+    private final String expectedConstantName;
     private final ByteArrayOutputStream sourceOut = new ByteArrayOutputStream();
 
     public MockedCommand(String expectedInputFilePath, boolean expectedLiteMetadata,
-        String expectedOutputDirPath, Type expectedType, Variant expectedVariant) {
+        String expectedOutputDirPath, Type expectedType, Variant expectedVariant,
+        String expectedConstantName) {
 
       this.expectedInputFilePath = expectedInputFilePath;
       this.expectedLiteMetadata = expectedLiteMetadata;
       this.expectedOutputDirPath = expectedOutputDirPath;
       this.expectedType = expectedType;
+      this.expectedConstantName = expectedConstantName;
       this.expectedVariant = expectedVariant;
     }
     @Override void writePhoneMetadataCollection(
@@ -164,20 +132,11 @@ public class BuildMetadataCppFromXmlTest {
       assertEquals(expectedLiteMetadata, liteMetadata);
       out.write(TEST_DATA, 0, TEST_DATA.length);
     }
-    @Override OutputStream openHeaderStream(File dir, Type type) {
+    @Override OutputStream openSourceStream(File dir) {
       assertEquals(expectedOutputDirPath, dir.getPath());
-      assertEquals(expectedType, type);
-      return headerOut;
-    }
-    @Override OutputStream openSourceStream(File dir, Type type, Variant variant) {
-      assertEquals(expectedOutputDirPath, dir.getPath());
-      assertEquals(expectedType, type);
-      assertEquals(expectedVariant, variant);
       return sourceOut;
     }
-    String capturedHeaderFile() {
-      return new String(headerOut.toByteArray(), UTF_8);
-    }
+    
     String capturedSourceFile() {
       return new String(sourceOut.toByteArray(), UTF_8);
     }

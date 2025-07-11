@@ -1,5 +1,7 @@
 /*
  *  Copyright (C) 2011 The Libphonenumber Authors
+ *  Copyright (C) 2025 The Kashin Vladislav (modified)
+
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -20,12 +22,14 @@ package com.google.i18n.phonenumbers;
  * Entry point class for C++ build tools.
  *
  * @author Philippe Liard
+ * 
+ * @author Kashin Vladislav (modified for Rust code generation)
  */
 public class EntryPoint {
 
   public static void main(String[] args) {
     boolean status = new CommandDispatcher(args, new Command[] {
-      new BuildMetadataCppFromXml()
+      new BuildMetadataRustFromXml()
     }).start();
 
     System.exit(status ? 0 : 1);

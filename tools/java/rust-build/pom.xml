@@ -10,12 +10,13 @@
   </parent>
 
   <groupId>com.google.i18n.phonenumbers.tools</groupId>
-  <artifactId>cpp-build</artifactId>
+  <artifactId>rust-build</artifactId>
   <version>1.0-SNAPSHOT</version>
-  <name>Libphonenumber C++ build tools</name>
+  <name>Libphonenumber Rust build tools</name>
   <description>
-    C++ build tools that download dependencies under base/ from the Chromium source repository, and
-    generate the C++ metadata code needed to build the libphonenumber library.
+    Rust build tools that download dependencies under base/ from the Chromium source repository, and
+    generate the Rust metadata code needed to build the libphonenumber library.
+    It depends on libphonenumber original Java library.
   </description>
 
   <build>
@@ -115,8 +116,6 @@
           </archive>
         </configuration>
       </plugin>
-      <!-- Build a JAR with its dependencies (protocol buffers and common library). This JAR
-           contains the C++ build tools invoked by CMake during the libphonenumber C++ build. -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-assembly-plugin</artifactId>

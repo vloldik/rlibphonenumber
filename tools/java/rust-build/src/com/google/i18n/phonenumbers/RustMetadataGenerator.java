@@ -1,5 +1,6 @@
 /*
  *  Copyright (C) 2012 The Libphonenumber Authors
+ *  Copyright (C) 2025 The Kashin Vladislav (modified)
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -27,8 +28,10 @@ import java.util.Locale;
  *
  * @author David Beaumont
  * @author Philippe Liard
+ * 
+ * @author Kashin Vladislav (modified for Rust code generation)
  */
-public final class CppMetadataGenerator {
+public final class RustMetadataGenerator {
 
   /**
    * The metadata type represents the known types of metadata and includes additional information
@@ -37,18 +40,18 @@ public final class CppMetadataGenerator {
    */
   public enum Type {
     /** The basic phone number metadata (expected to be written to metadata.[h/cc]). */
-    METADATA("metadata", 2011),
+    METADATA(2011, 2025),
     /** The alternate format metadata (expected to be written to alternate_format.[h/cc]). */
-    ALTERNATE_FORMAT("alternate_format", 2012),
+    ALTERNATE_FORMAT(2012, 2025),
     /** Metadata for short numbers (expected to be written to short_metadata.[h/cc]). */
-    SHORT_NUMBERS("short_metadata", 2013);
+    SHORT_NUMBERS(2013, 2025);
 
-    private final String typeName;
     private final int copyrightYear;
+    private final int copyrightSecondYear;
 
-    private Type(String typeName, int copyrightYear) {
-      this.typeName = typeName;
+    private Type(int copyrightYear, int CopyrightSecondYear) {
       this.copyrightYear = copyrightYear;
+      this.copyrightSecondYear = CopyrightSecondYear;
     }
 
     /** Returns the year in which this metadata type was first introduced. */
@@ -56,12 +59,9 @@ public final class CppMetadataGenerator {
       return copyrightYear;
     }
 
-    /**
-     * Returns the name of this type for use in C++ source/header files. Use this in preference to
-     * using {@link #name}.
-     */
-    @Override public String toString() {
-      return typeName;
+     /** Returns the year in which this metadata type was modified for RUST. */
+    public int getCopyrightSecondYear() {
+      return copyrightSecondYear;
     }
 
     /**
@@ -88,93 +88,39 @@ public final class CppMetadataGenerator {
    * retained by the newly created CppXmlMetadata instance, so the caller should treat the array as
    * immutable after making this call.
    */
-  public static CppMetadataGenerator create(Type type, byte[] data) {
-    return new CppMetadataGenerator(type, data);
+  public static RustMetadataGenerator create(Type type, byte[] data, String constantName) {
+    return new RustMetadataGenerator(type, data, constantName);
   }
 
   private final Type type;
   private final byte[] data;
-  private final String guardName;      // e.g. "I18N_PHONENUMBERS_<TYPE>_H_"
-  private final String headerInclude;  // e.g. "phonenumbers/<type>.h"
+  private final String constantName;
 
-  private CppMetadataGenerator(Type type, byte[] data) {
+  private RustMetadataGenerator(Type type, byte[] data, String variableName) {
     this.type = type;
     this.data = data;
-    this.guardName = createGuardName(type);
-    this.headerInclude = createHeaderInclude(type);
+    this.constantName = variableName;
   }
 
   /**
-   * Writes the header file for the C++ representation of the metadata to the given writer. Note
-   * that this method does not close the given writer.
-   */
-  public void outputHeaderFile(Writer out) throws IOException {
-    PrintWriter pw = new PrintWriter(out);
-    CopyrightNotice.writeTo(pw, type.getCopyrightYear());
-    pw.println("#ifndef " + guardName);
-    pw.println("#define " + guardName);
-    pw.println();
-    emitNamespaceStart(pw);
-    pw.println();
-    pw.println("int " + type + "_size();");
-    pw.println("const void* " + type + "_get();");
-    pw.println();
-    emitNamespaceEnd(pw);
-    pw.println();
-    pw.println("#endif  // " + guardName);
-    pw.flush();
-  }
-
-  /**
-   * Writes the source file for the C++ representation of the metadata, including a static array
+   * Writes the source file for the Rust representation of the metadata - a static array
    * containing the data itself, to the given writer. Note that this method does not close the given
    * writer.
    */
   public void outputSourceFile(Writer out) throws IOException {
     // TODO: Consider outputting a load method to return the parsed proto directly.
+    String dataLength = String.valueOf(data.length);
+
+
     PrintWriter pw = new PrintWriter(out);
-    CopyrightNotice.writeTo(pw, type.getCopyrightYear());
-    pw.println("#include \"" + headerInclude + "\"");
-    pw.println();
-    emitNamespaceStart(pw);
-    pw.println();
-    pw.println("namespace {");
-    pw.println("static const unsigned char data[] = {");
+    CopyrightNotice.writeTo(pw, type.getCopyrightYear(), type.getCopyrightSecondYear());
+    pw.println("pub const "+constantName+": [u8; "+dataLength+"] = [");
     emitStaticArrayData(pw, data);
-    pw.println("};");
-    pw.println("}  // namespace");
-    pw.println();
-    pw.println("int " + type + "_size() {");
-    pw.println("  return sizeof(data) / sizeof(data[0]);");
-    pw.println("}");
-    pw.println();
-    pw.println("const void* " + type + "_get() {");
-    pw.println("  return data;");
-    pw.println("}");
-    pw.println();
-    emitNamespaceEnd(pw);
+    pw.println("];");
     pw.flush();
   }
 
-  private static String createGuardName(Type type) {
-    return String.format("I18N_PHONENUMBERS_%s_H_", type.toString().toUpperCase(Locale.ENGLISH));
-  }
-
-  private static String createHeaderInclude(Type type) {
-    return String.format("phonenumbers/%s.h", type);
-  }
-
-  private static void emitNamespaceStart(PrintWriter pw) {
-    pw.println("namespace i18n {");
-    pw.println("namespace phonenumbers {");
-  }
-
-  private static void emitNamespaceEnd(PrintWriter pw) {
-    pw.println("}  // namespace phonenumbers");
-    pw.println("}  // namespace i18n");
-  }
-
-  /** Emits the C++ code corresponding to the binary metadata as a static byte array. */
+  /** Emits the Rust code corresponding to the binary metadata as a static byte array. */
   // @VisibleForTesting
   static void emitStaticArrayData(PrintWriter pw, byte[] data) {
     String separator = "  ";

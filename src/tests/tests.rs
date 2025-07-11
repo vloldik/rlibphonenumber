@@ -10,13 +10,13 @@ use protobuf::Message;
 
 use crate::{errors::ParseError, phonemetadata::PhoneMetadataCollection, phonenumber::PhoneNumber, PhoneNumberUtil};
 
-use super::test_metadata::METADATA;
+use crate::phonenumberutil::generated::test_metadata::TEST_METADATA;
 
 
 
 // This setup function simulates getting the PhoneNumberUtil instance for each test.
 fn get_phone_util() -> PhoneNumberUtil {
-    let metadata = PhoneMetadataCollection::parse_from_bytes(&METADATA)
+    let metadata = PhoneMetadataCollection::parse_from_bytes(&TEST_METADATA)
         .expect("Metadata should be valid");
     // In a real scenario, this would likely return a singleton instance.
     return PhoneNumberUtil::new_for_metadata(metadata);

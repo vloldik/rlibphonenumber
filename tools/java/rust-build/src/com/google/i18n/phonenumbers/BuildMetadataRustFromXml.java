@@ -1,6 +1,7 @@
 /*
  *  Copyright (C) 2011 The Libphonenumber Authors
- *
+ *  Copyright (C) 2025 The Kashin Vladislav (modified)
+ * 
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
  *  You may obtain a copy of the License at
@@ -16,7 +17,7 @@
 
 package com.google.i18n.phonenumbers;
 
-import com.google.i18n.phonenumbers.CppMetadataGenerator.Type;
+import com.google.i18n.phonenumbers.RustMetadataGenerator.Type;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -26,19 +27,22 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * This class generates the C++ code representation of the provided XML metadata file. It lets us
+ * This class generates the Rust code representation of the provided XML metadata file. It lets us
  * embed metadata directly in a native binary. We link the object resulting from the compilation of
- * the code emitted by this class with the C++ phonenumber library.
+ * the code emitted by this class with the Rust rlibphonenumber library.
  *
  * @author Philippe Liard
  * @author David Beaumont
+ * 
+ * @author Kashin Vladislav (modified for Rust code generation)
  */
-public class BuildMetadataCppFromXml extends Command {
+public class BuildMetadataRustFromXml extends Command {
 
   /** An enum encapsulating the variations of metadata that we can produce. */
   public enum Variant {
@@ -93,22 +97,38 @@ public class BuildMetadataCppFromXml extends Command {
   static final class Options {
     private static final Pattern BASENAME_PATTERN =
         Pattern.compile("(?:(test|lite)_)?([a-z_]+)");
-
-    public static Options parse(String commandName, String[] args) {
-      if (args.length == 4) {
-        String inputXmlFilePath = args[1];
-        String outputDirPath = args[2];
-        Matcher basenameMatcher = BASENAME_PATTERN.matcher(args[3]);
+    private static final Pattern CONSTANT_NAME_PATTERN = 
+        Pattern.compile("--const-name[ =]([a-zA-Z_]+)");
+    private static final String DEFAULT_METADATA_CONSTANT_NAME = "METADATA";
+    public static Options parse(String commandName, String[] argsArray) {
+      ArrayList args = new ArrayList(Arrays.asList(argsArray));
+      String constantName = DEFAULT_METADATA_CONSTANT_NAME;
+      if (args.size() == 5) {
+        for (int i = 0; i < args.size(); i++) {
+          String arg = args.get(i).toString();
+          Matcher matcher = CONSTANT_NAME_PATTERN.matcher(arg.toString());
+          if (matcher.matches()) {
+            constantName = matcher.group(1);
+            args.remove(arg);
+            break;
+          }
+        }
+      }
+      if (args.size() == 4) {
+        String inputXmlFilePath = args.get(1).toString();
+        String outputDirPath = args.get(2).toString();
+        Matcher basenameMatcher = BASENAME_PATTERN.matcher(args.get(3).toString());
         if (basenameMatcher.matches()) {
           Variant variant = Variant.parse(basenameMatcher.group(1));
           Type type = Type.parse(basenameMatcher.group(2));
           if (type != null && variant != null) {
-            return new Options(inputXmlFilePath, outputDirPath, type, variant);
+            return new Options(inputXmlFilePath, outputDirPath, type, variant, constantName);
           }
         }
       }
       throw new IllegalArgumentException(String.format(
-          "Usage: %s <inputXmlFile> <outputDir> ( <type> | test_<type> | lite_<type> )\n" +
+          "Usage: %s <inputXmlFile> <outputDir> <output ( <type> | test_<type> | lite_<type> ) " +
+          "[--const-name <nameOfMetadataConstant>] \n" +
           "       where <type> is one of: %s",
           commandName, Arrays.asList(Type.values())));
     }
@@ -119,12 +139,14 @@ public class BuildMetadataCppFromXml extends Command {
     private final String outputDirPath;
     private final Type type;
     private final Variant variant;
+    private final String constantName;
 
-    private Options(String inputXmlFilePath, String outputDirPath, Type type, Variant variant) {
+    private Options(String inputXmlFilePath, String outputDirPath, Type type, Variant variant, String constantName) {
       this.inputXmlFilePath = inputXmlFilePath;
       this.outputDirPath = outputDirPath;
       this.type = type;
       this.variant = variant;
+      this.constantName = constantName;
     }
 
     public String getInputFilePath() {
@@ -142,17 +164,21 @@ public class BuildMetadataCppFromXml extends Command {
     public Variant getVariant() {
       return variant;
     }
+
+    public String getConstantName() {
+      return constantName;
+    }
   }
 
   @Override
   public String getCommandName() {
-    return "BuildMetadataCppFromXml";
+    return "BuildMetadataRustFromXml";
   }
 
   /**
-   * Generates C++ header and source files to represent the metadata specified by this command's
+   * Generates Rust source file to represent the metadata specified by this command's
    * arguments. The metadata XML file is read and converted to a byte array before being written
-   * into a C++ source file as a static data array.
+   * into a Rust source file as a static data array.
    *
    * @return  true if the generation succeeded.
    */
@@ -161,16 +187,14 @@ public class BuildMetadataCppFromXml extends Command {
     try {
       Options opt = Options.parse(getCommandName(), getArgs());
       byte[] data = loadMetadataBytes(opt.getInputFilePath(), opt.getVariant() == Variant.LITE);
-      CppMetadataGenerator metadata = CppMetadataGenerator.create(opt.getType(), data);
+      RustMetadataGenerator metadata = RustMetadataGenerator.create(opt.getType(), data, opt.constantName);
 
       // TODO: Consider adding checking for correctness of file paths and access.
       OutputStream headerStream = null;
       OutputStream sourceStream = null;
       try {
         File dir = new File(opt.getOutputDir());
-        headerStream = openHeaderStream(dir, opt.getType());
-        sourceStream = openSourceStream(dir, opt.getType(), opt.getVariant());
-        metadata.outputHeaderFile(new OutputStreamWriter(headerStream, UTF_8));
+        sourceStream = openSourceStream(dir);
         metadata.outputSourceFile(new OutputStreamWriter(sourceStream, UTF_8));
       } finally {
         FileUtils.closeFiles(headerStream, sourceStream);
@@ -206,13 +230,8 @@ public class BuildMetadataCppFromXml extends Command {
   }
 
   // @VisibleForTesting
-  OutputStream openHeaderStream(File dir, Type type) throws FileNotFoundException {
-    return new FileOutputStream(new File(dir, type + ".h"));
-  }
-
-  // @VisibleForTesting
-  OutputStream openSourceStream(File dir, Type type, Variant variant) throws FileNotFoundException {
-    return new FileOutputStream(new File(dir, variant.getBasename(type) + ".cc"));
+  OutputStream openSourceStream(File file) throws FileNotFoundException {
+    return new FileOutputStream(file);
   }
 
   /** The charset in which our source and header files will be written. */

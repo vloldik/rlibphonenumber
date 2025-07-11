@@ -1,5 +1,6 @@
 /*
  *  Copyright (C) 2011 The Libphonenumber Authors
+ *  Copyright (C) %d Vladislav Kashin (modified)
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -24,18 +25,16 @@ import java.util.Formatter;
  * Class containing the Apache copyright notice used by code generators.
  *
  * @author Philippe Liard
+ * @author Kashin Vladislav (modified for Rust code generation)
  */
 public class CopyrightNotice {
 
   private static final String TEXT_OPENING =
     "/*\n";
 
-  private static final String TEXT_OPENING_FOR_JAVASCRIPT =
-    "/**\n" +
-    " * @license\n";
-
   private static final String TEXT =
     " * Copyright (C) %d The Libphonenumber Authors\n" +
+    " * Copyright (C) %d Vladislav Kashin (modified)\n" +
     " *\n" +
     " * Licensed under the Apache License, Version 2.0 (the \"License\");\n" +
     " * you may not use this file except in compliance with the License.\n" +
@@ -50,17 +49,9 @@ public class CopyrightNotice {
     " * limitations under the License.\n" +
     " */\n\n";
 
-  static final void writeTo(Writer writer, int year) throws IOException {
-    writeTo(writer, year, false);
-  }
-
-  static final void writeTo(Writer writer, int year, boolean isJavascript) throws IOException {
-    if (isJavascript) {
-      writer.write(TEXT_OPENING_FOR_JAVASCRIPT);
-    } else {
-      writer.write(TEXT_OPENING);
-    }
+  static final void writeTo(Writer writer, int year, int yearSecondAuthor) throws IOException {
+    writer.write(TEXT_OPENING);
     Formatter formatter = new Formatter(writer);
-    formatter.format(TEXT, year);
+    formatter.format(TEXT, year, yearSecondAuthor);
   }
 }
