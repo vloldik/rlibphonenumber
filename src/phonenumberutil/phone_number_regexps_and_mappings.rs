@@ -307,13 +307,12 @@ impl PhoneNumberRegExpsAndMappings {
             separator_pattern: Regex::new(&format!("[{}]+", VALID_PUNCTUATION)).unwrap(),
             extn_patterns_for_matching: create_extn_pattern(false),
             extn_pattern: Regex::new(&format!("(?i)(?:{})$", &extn_patterns_for_parsing)).unwrap(),
-            valid_phone_number_pattern: Regex::new(&format!("(?i){}(?:{})?", 
+            valid_phone_number_pattern: Regex::new(&format!("(?i)(?:{})(?:{})?", 
                 &valid_phone_number,
-                extn_patterns_for_parsing
+                &extn_patterns_for_parsing
             )).unwrap(),
-            valid_alpha_phone_pattern: Regex::new(&format!("(?i)(?:.*?[{}]){{3}}",
-                VALID_ALPHA
-            )).unwrap(),
+            // from java
+            valid_alpha_phone_pattern: Regex::new("(?:.*?[A-Za-z]){3}.*").unwrap(),
             // The first_group_capturing_pattern was originally set to $1 but there
             // are some countries for which the first group is not used in the
             // national pattern (e.g. Argentina) so the $1 group does not match

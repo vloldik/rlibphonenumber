@@ -10,7 +10,7 @@ build = "build/rust_build.rs"
 log = "0.4.27"
 # helpful error package
 thiserror = "2.0.12"
-# google protobuf lib required to use .proto files from assets
+# protobuf lib required to use .proto files from assets
 protobuf = "3.7.2"
 # optimized concurrent map
 dashmap = "6.1.0"

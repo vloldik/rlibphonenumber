@@ -50,11 +50,11 @@ pub const VALID_ALPHA_INCL_UPPERCASE: &'static str = "A-Za-z";
 // prefix. This can be overridden by region-specific preferences.
 pub const DEFAULT_EXTN_PREFIX: &'static str = " ext. ";
 
-pub const POSSIBLE_SEPARATORS_BETWEEN_NUMBER_AND_EXT_LABEL: &'static str = "0001";
+pub const POSSIBLE_SEPARATORS_BETWEEN_NUMBER_AND_EXT_LABEL: &'static str = "[ \u{00A0}\\t,]*";
 
 // Optional full stop (.) or colon, followed by zero or more
 // spaces/tabs/commas.
-pub const POSSIBLE_CHARS_AFTER_EXT_LABEL: &'static str = "[ \u{00A0}\\t,]*";
-pub const OPTIONAL_EXT_SUFFIX: &'static str = "[:\\.\u{FF0E}]?[ \u{00A0}\\t,-]*";
+pub const POSSIBLE_CHARS_AFTER_EXT_LABEL: &'static str = "[:\\.\u{FF0E}]?[ \u{00A0}\\t,-]*";
+pub const OPTIONAL_EXT_SUFFIX: &'static str = "#?";
 
 pub const NANPA_COUNTRY_CODE: i32 = 1;
