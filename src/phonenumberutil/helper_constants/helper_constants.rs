@@ -28,7 +28,7 @@ pub const VALID_PUNCTUATION: &'static str = "-x\
 pub const CAPTURE_UP_TO_SECOND_NUMBER_START: &'static str = r"(.*)[\\/] *x";
 
 
-pub const REGION_CODE_FOR_NON_GEO_ENTITY: &'static str = "0001";
+pub const REGION_CODE_FOR_NON_GEO_ENTITY: &'static str = "001";
 
 pub const PLUS_SIGN: &'static str = "+";
 pub const STAR_SIGN: &'static str = "*";
