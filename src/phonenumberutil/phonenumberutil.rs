@@ -311,7 +311,10 @@ impl PhoneNumberUtil {
 
     pub fn get_national_significant_number(&self, phone_number: &PhoneNumber) -> String {
         let zeros_start = if phone_number.italian_leading_zero() {
-            "0".repeat(max(phone_number.number_of_leading_zeros() as usize, 0))
+            let zero_count = usize
+                ::try_from(phone_number.number_of_leading_zeros())
+                .unwrap_or(0);
+            "0".repeat(zero_count)
         } else {
             "".to_string()
         };
@@ -2513,5 +2516,18 @@ impl PhoneNumberUtil {
             )?;
             return Ok(self.is_number_match(first_number, &second_number_as_proto));
         }
+    }
+
+    pub fn is_alpha_number(&self, phone_number: &str) -> bool {
+        if !self.is_viable_phone_number(phone_number) {
+            // Number is too short, or doesn't match the basic phone number pattern.
+            return false;
+        }
+        // Copy the number, since we are going to try and strip the extension from it.
+        let (number, _extension) = self.maybe_strip_extension(&phone_number);
+        return self
+            .reg_exps
+            .valid_alpha_phone_pattern
+            .full_match(number);
     }
 }
