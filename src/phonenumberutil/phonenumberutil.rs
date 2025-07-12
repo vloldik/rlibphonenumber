@@ -133,11 +133,11 @@ impl PhoneNumberUtil {
         Self::new_for_metadata(metadata_collection)
     }
 
-    pub(crate) fn get_supported_regions(&self) -> impl Iterator<Item=&str> {
+    pub fn get_supported_regions(&self) -> impl Iterator<Item=&str> {
         self.region_to_metadata_map.keys().map(| k | k.as_str())
     }
 
-    fn get_supported_global_network_calling_codes(&self) -> impl Iterator<Item=i32> {
+    pub fn get_supported_global_network_calling_codes(&self) -> impl Iterator<Item=i32> {
         self.country_code_to_non_geographical_metadata_map.keys().map(| k | *k)
     }
 
@@ -271,7 +271,7 @@ impl PhoneNumberUtil {
             }
         }
         let country_calling_code = phone_number.country_code();
-        let mut formatted_number = Self::get_national_significant_number(phone_number);
+        let mut formatted_number = self.get_national_significant_number(phone_number);
 
         if matches!(number_format, PhoneNumberFormat::E164) {
             // Early exit for E164 case (even if the country calling code is invalid)
@@ -309,7 +309,7 @@ impl PhoneNumberUtil {
         Ok(Cow::Owned(formatted_number))
     }
 
-    pub fn get_national_significant_number(phone_number: &PhoneNumber) -> String {
+    pub fn get_national_significant_number(&self, phone_number: &PhoneNumber) -> String {
         let zeros_start = if phone_number.italian_leading_zero() {
             "0".repeat(max(phone_number.number_of_leading_zeros() as usize, 0))
         } else {
@@ -567,7 +567,7 @@ impl PhoneNumberUtil {
         let country_calling_code = phone_number.country_code();
         // Note GetRegionCodeForCountryCode() is used because formatting information
         // contained in the metadata for US.
-        let national_significant_number = Self::get_national_significant_number(phone_number);
+        let national_significant_number = self.get_national_significant_number(phone_number);
         let region_code = self.get_region_code_for_country_code(country_calling_code);
         let Some(metadata) =
             self.get_metadata_for_region_or_calling_code(country_calling_code, &region_code)
@@ -630,7 +630,7 @@ impl PhoneNumberUtil {
         carrier_code: &str,
     ) -> RegexResult<String> {
         let country_calling_code = phone_number.country_code();
-        let national_significant_number = Self::get_national_significant_number(phone_number);
+        let national_significant_number = self.get_national_significant_number(phone_number);
         let region_code = self.get_region_code_for_country_code(country_calling_code);
 
         // Note GetRegionCodeForCountryCode() is used because formatting information
@@ -738,7 +738,7 @@ impl PhoneNumberUtil {
                 let region_metadata = self.region_to_metadata_map
                     .get(calling_from)
                     .ok_or(InvalidMetadataForValidRegionError{})?;
-                let national_number = Self::get_national_significant_number(&number_no_extension);
+                let national_number = self.get_national_significant_number(&number_no_extension);
                 let format = if self.can_be_internationally_dialled(&number_no_extension)? 
                     && test_number_length_with_unknown_type(
                         &national_number, 
@@ -823,7 +823,7 @@ impl PhoneNumberUtil {
         else {
             return Ok(PhoneNumberType::Unknown)
         };
-        let national_significant_number = Self::get_national_significant_number(phone_number);
+        let national_significant_number = self.get_national_significant_number(phone_number);
         Ok(self.get_number_type_helper(&national_significant_number, metadata))
     }
 
@@ -849,7 +849,7 @@ impl PhoneNumberUtil {
         phone_number: &PhoneNumber, 
         region_codes: &[&'b str],
     ) -> InternalLogicResult<&'b str> {
-        let national_number = Self::get_national_significant_number(phone_number);
+        let national_number = self.get_national_significant_number(phone_number);
         for code in region_codes {
             // Metadata cannot be NULL because the region codes come from the country
             // calling code map.
@@ -966,7 +966,7 @@ impl PhoneNumberUtil {
             // are always internationally diallable, and will be caught here.
             return Ok(true)
         };
-        let national_significant_number = Self::get_national_significant_number(phone_number);
+        let national_significant_number = self.get_national_significant_number(phone_number);
         return Ok(!self.is_number_matching_desc(
             &national_significant_number, &metadata.no_international_dialling
         ));
@@ -994,7 +994,7 @@ impl PhoneNumberUtil {
             return Ok(self.format(phone_number, PhoneNumberFormat::International)?)
         };
         let country_code = phone_number.country_code();
-        let national_significant_number = Self::get_national_significant_number(
+        let national_significant_number = self.get_national_significant_number(
             phone_number,
         );
         if !self.has_valid_country_calling_code(country_code) {
@@ -1086,7 +1086,7 @@ impl PhoneNumberUtil {
         ) else {
             return Ok(false)
         };
-        let national_number = Self::get_national_significant_number(phone_number);
+        let national_number = self.get_national_significant_number(phone_number);
         let format_rule = self.choose_formatting_pattern_for_number(
             &metadata.number_format, 
             &national_number
@@ -1147,7 +1147,7 @@ impl PhoneNumberUtil {
                 }
                 // Metadata cannot be NULL here because GetNddPrefixForRegion() (above)
                 // leaves the prefix empty if there is no metadata for the region.
-                let national_number = Self::get_national_significant_number(phone_number);
+                let national_number = self.get_national_significant_number(phone_number);
                 // This shouldn't be NULL, because we have checked that above with
                 // HasFormattingPatternForNumber.
                 let format_rule = self.choose_formatting_pattern_for_number(
@@ -1249,7 +1249,7 @@ impl PhoneNumberUtil {
         if let Some(metadata) = metadata.filter(| metadata | 
             !(REGION_CODE_FOR_NON_GEO_ENTITY != region_code && country_code != metadata.country_code())
         ) {
-            let national_number = Self::get_national_significant_number(phone_number);
+            let national_number = self.get_national_significant_number(phone_number);
             !matches!(self.get_number_type_helper(&national_number, metadata), PhoneNumberType::Unknown)
         } else {
             false
@@ -1283,7 +1283,7 @@ impl PhoneNumberUtil {
         // We choose three because all valid alpha numbers have 3 digits at the start
         // - if it does not, then we don't trim anything at all. Similarly, if the
         // national number was less than three digits, we don't trim anything at all.
-        let national_number = Self::get_national_significant_number(phone_number);
+        let national_number = self.get_national_significant_number(phone_number);
         if national_number.len() > 3 {
             let first_national_number_digit = normalized_raw_input
                 .find(&national_number[0..3]);
@@ -1572,7 +1572,7 @@ impl PhoneNumberUtil {
     pub fn is_possible_number_for_type_with_reason(
         &self, phone_number: &PhoneNumber, phone_number_type: PhoneNumberType
     ) -> ValidationResult {
-        let national_number = Self::get_national_significant_number(phone_number);
+        let national_number = self.get_national_significant_number(phone_number);
         let country_code = phone_number.country_code();
         // Note: For regions that share a country calling code, like NANPA numbers, we
         // just use the rules from the default region (US in this case) since the
