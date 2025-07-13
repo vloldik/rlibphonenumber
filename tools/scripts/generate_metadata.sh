@@ -9,7 +9,7 @@ echo $generated_dir
 resources_dir="$project_home/resources"
 rust_build_jar="$javadir/rust-build/target/rust-build-1.0-SNAPSHOT-jar-with-dependencies.jar"
 
-# mvn -f "$javadir/pom.xml" install
+mvn -f "$javadir/pom.xml" install
 mkdir -p "$generated_dir"
 
 function generate {
@@ -24,9 +24,10 @@ function generate {
 # generate general metadata
 generate "PhoneNumberMetadata.xml" "metadata" "metadata" "METADATA"
 
-# generate short metadata
+# generate test metadata
 generate "PhoneNumberMetadataForTesting.xml" "test_metadata" "metadata" "TEST_METADATA"
 
+# remove unnecessary nesting with pub use
 echo "\
 mod metadata;
 mod test_metadata;
