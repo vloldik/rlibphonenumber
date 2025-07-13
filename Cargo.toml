@@ -1,47 +1,59 @@
 [package]
 name = "rlibphonenumber"
 version = "0.1.0"
-edition = "2024"
+edition = "2024"  # ВАЖНО: 2024 еще не выпущен, последняя стабильная версия - 2021
+
+authors = ["Vladislav K. https://t.me/vloldik"]
+description = "A high-performance Rust port of Google's libphonenumber for parsing, formatting, and validating international phone numbers."
+repository = "https://github.com/vloldik/rlibphonenumber"
+documentation = "https://docs.rs/rlibphonenumber"
+readme = "Readme.md"
+license = "Apache-2.0"
+keywords = ["phone", "phonenumber", "libphonenumber", "validation", "formatting"]
+categories = ["parser-implementations", "text-processing", "internationalization"]
+
 
 build = "build/rust_build.rs"
 
+[lib]
+name = "rlibphonenumber"
+path = "src/lib.rs"
+
+
 [dependencies]
 # logging standard in rust
-log = "0.4.27"
+log = "0.4"
 # helpful error package
-thiserror = "2.0.12"
+thiserror = "1.0"
 # protobuf lib required to use .proto files from assets
-protobuf = "3.7.2"
+protobuf = "3.7"
 # optimized concurrent map
-dashmap = "6.1.0"
+dashmap = "5.5"
 # just regex package
-regex = "1.11.1"
+regex = "1.10"
 # for fast 0-alloc int to string conversion
-itoa = "1.0.15"
-# simple macro for single allocation 
-# concatenation of strings
-fast-cat = "0.1.1"
-
+itoa = "1.0"
+# simple macro for single allocation concatenation of strings
+fast-cat = "0.1"
 # lib for derive enum iteration
-strum = { version = "0.27.1", features = ["derive"] }
-
+strum = { version = "0.26", features = ["derive"] }
 # Simple lib to converts any unicode valid chars into decimals 
-dec_from_char = "0.2.0"
+dec_from_char = "0.2"
 
 [build-dependencies]
-thiserror = "2.0.12"
-protobuf-codegen = "3.7.2"
+thiserror = "1.0"
+protobuf-codegen = "3.7"
 
 [dev-dependencies]
-colog = "1.3.0"
-env_logger = "0.11.8"
+colog = "1.3"
+env_logger = "0.11"
 criterion = "0.5"
-phonenumber = "0.3" 
+phonenumber = "0.3"
 
 [[bench]]
 name = "format_bench"
-harness = false 
+harness = false
 
 [[bench]]
 name = "parsing_bench"
-harness = false 
+harness = false
