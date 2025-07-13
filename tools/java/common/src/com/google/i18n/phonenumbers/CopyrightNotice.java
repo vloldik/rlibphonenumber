@@ -53,6 +53,5 @@ public class CopyrightNotice {
     writer.write(TEXT_OPENING);
     Formatter formatter = new Formatter(writer);
     formatter.format(TEXT, year, yearSecondAuthor);
-    formatter.close();
   }
 }
