@@ -1,8 +1,9 @@
+
+/** TODO: uncomment, move to macros and refactor
 /**
  * This file represents content of https://github.com/google/libphonenumber/tree/master/tools/cpp
  */
 
-use std::{collections::BTreeMap, fs::File, io::{BufRead, BufReader}, num::ParseIntError, path::Path};
 
 use thiserror::Error;
 
@@ -68,9 +69,9 @@ fn parse_prefixes(path: &str, prefixes: &mut BTreeMap<i32, String>) -> Result<()
     Ok(())
 }
 
+*/
 
-
-fn main() -> Result<(), BuildError> {
+fn main() {
     protobuf_codegen::Codegen::new()
         .pure()
         .includes(["resources"])
@@ -78,5 +79,4 @@ fn main() -> Result<(), BuildError> {
         .input("resources/phonenumber.proto")
         .cargo_out_dir("proto_gen")
         .run_from_script();
-    Ok(())
 }
