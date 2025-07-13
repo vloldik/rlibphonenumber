@@ -114,7 +114,8 @@ This script will:
 You can skip the Java build step by passing the `--skip-install` flag, which is useful if no changes were made to the generator itself.
 
 ```sh
-./tools/scripts/generate_metadata.sh --skip-install```
+./tools/scripts/generate_metadata.sh --skip-install
+```
 
 ## License
 
