@@ -26,10 +26,10 @@ The following benchmarks were run against the `rust-phonenumber` crate. All test
 
 | Format | rlibphonenumber (this crate) | rust-phonenumber | Performance Gain |
 |:---|:---:|:---:|:---:|
-| **E164** | **~78 ns** | ~2.59 µs | **~33x faster** |
-| **International** | **~1.34 µs** | ~3.21 µs | **~2.4x faster** |
-| **National** | **~2.33 µs** | ~4.87 µs | **~2.1x faster** |
-| **RFC3966** | **~1.62 µs** | ~3.47 µs | **~2.1x faster** |
+| **E164** | **~668 ns** | ~12.82 µs | **~19x faster** |
+| **International** | **~11.76 µs** | ~17.20 µs | **~1.5x faster** |
+| **National** | **~15.19 µs** | ~22.66 µs | **~1.5x faster** |
+| **RFC3966** | **~13.41 µs** | ~18.59 µs | **~1.4x faster** |
 
 ### Parsing
 

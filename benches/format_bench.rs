@@ -4,13 +4,22 @@ use rlibphonenumber::{PhoneNumberFormat, PHONE_NUMBER_UTIL};
 
 use phonenumber::{
     self as rlp,
-    country::Id::{self, AU}, Mode,
+    country::Id::{self, AR, AU, DE, GB, IT, US}, Mode,
 };
 
 type TestEntity = (&'static str, &'static str, Id);
 
 fn setup_numbers() -> Vec<TestEntity> {
-    vec![("0011 54 9 11 8765 4321 ext. 1234", "AU", AU)]
+    vec![
+        ("0011 54 9 11 8765 4321 ext. 1234", "AU", AU),
+        ("(650) 253-0000", "US", US),
+        ("+44 20 8765 4321", "GB", GB),
+        ("020 8765 4321", "GB", GB),
+        ("011 15-1234-5678", "AR", AR),
+        ("02 12345678", "IT", IT),
+        ("1-800-FLOWERS", "US", US),
+        ("12345", "DE", DE),
+    ]
 }
 
 fn convert_to_rlp_numbers(numbers: &[TestEntity]) -> Vec<rlp::PhoneNumber> {
