@@ -67,7 +67,7 @@ rlibphonenumber = "0.1.0" # Replace with the actual version
 Here is a basic example of how to parse and format a phone number:
 
 ```rust
-use rlibphonenumber::{enums::PhoneNumberFormat, PHONE_NUMBER_UTIL};
+use rlibphonenumber::{PhoneNumberFormat, PHONE_NUMBER_UTIL};
 
 fn main() {
     let number_to_parse = "+14155552671";
