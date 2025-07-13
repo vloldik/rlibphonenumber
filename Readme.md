@@ -1,4 +1,4 @@
-# libphonenumber-rust
+# Rlibphonenumber
 
 [![Crates.io](https://img.shields.io/crates/v/rlibphonenumber.svg)](https://crates.io/crates/rlibphonenumber)
 [![Docs.rs](https://docs.rs/phonenumber/badge.svg)](https://docs.rs/rlibphonenumber)
