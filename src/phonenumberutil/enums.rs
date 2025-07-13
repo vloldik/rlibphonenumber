@@ -65,7 +65,7 @@ pub enum MatchType {
 
 /// Possible outcomes when testing if a PhoneNumber is possible.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ValidNumberLenType {
+pub enum NumberLengthType {
     /// The number length matches that of valid numbers for this region.
     IsPossible,
     /// The number length matches that of local numbers for this region only

@@ -1,9 +1,9 @@
 use protobuf::{Message, MessageField};
 
 use crate::{
-    enums::{PhoneNumberFormat, PhoneNumberType, ValidNumberLenType},
-    errors::{ParseError, ValidationResultErr},
-    phonemetadata::{PhoneMetadata, PhoneMetadataCollection, PhoneNumberDesc},
+    enums::{PhoneNumberFormat, PhoneNumberType, NumberLengthType},
+    errors::{ParseError, ValidationError},
+    phonemetadata::{NumberFormat, PhoneMetadata, PhoneMetadataCollection, PhoneNumberDesc},
     phonenumber::{phone_number::CountryCodeSource, PhoneNumber},
     PhoneNumberUtil,
 };
@@ -680,6 +680,261 @@ fn format_with_preferred_carrier_code() {
 }
 
 #[test]
+fn format_number_for_mobile_dialing() {
+    let phone_util = get_phone_util();
+    let mut test_number = PhoneNumber::new();
+
+    // Номера обычно набираются в национальном формате внутри страны и
+    // в международном формате из-за пределов страны.
+    test_number.set_country_code(57);
+    test_number.set_national_number(6012345678);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "CO", false).unwrap();
+    assert_eq!("6012345678", formatted_number);
+
+    test_number.set_country_code(49);
+    test_number.set_national_number(30123456);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "DE", false).unwrap();
+    assert_eq!("030123456", formatted_number);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "CH", false).unwrap();
+    assert_eq!("+4930123456", formatted_number);
+
+    test_number.set_extension("1234".to_string());
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "DE", false).unwrap();
+    assert_eq!("030123456", formatted_number);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "CH", false).unwrap();
+    assert_eq!("+4930123456", formatted_number);
+
+    test_number.set_country_code(1);
+    test_number.clear_extension();
+    // Бесплатные номера США помечены как noInternationalDialing в тестовых метаданных
+    // для целей тестирования. Для таких номеров мы ожидаем, что ничего не будет
+    // возвращено, если код региона не совпадает.
+    test_number.set_national_number(8002530000);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "US", true).unwrap();
+    assert_eq!("800 253 0000", formatted_number);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "CN", true).unwrap();
+    assert_eq!("", formatted_number);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "US", false).unwrap();
+    assert_eq!("8002530000", formatted_number);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "CN", false).unwrap();
+    assert_eq!("", formatted_number);
+
+    test_number.set_national_number(6502530000);
+    let formatted_number = phone_util
+        .format_number_for_mobile_dialing(&test_number, "US", true)
+        .unwrap();
+    assert_eq!("+1 650 253 0000", formatted_number);
+    let formatted_number = phone_util
+        .format_number_for_mobile_dialing(&test_number, "US", false)
+        .unwrap();
+    assert_eq!("+16502530000", formatted_number);
+
+    test_number.set_extension("1234".to_string());
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "US", true).unwrap();
+    assert_eq!("+1 650 253 0000", formatted_number);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "US", false).unwrap();
+    assert_eq!("+16502530000", formatted_number);
+
+    // Невалидный номер США, который на одну цифру длиннее.
+    test_number.clear_extension();
+    test_number.set_national_number(65025300001);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "US", true).unwrap();
+    assert_eq!("+1 65025300001", formatted_number);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "US", false).unwrap();
+    assert_eq!("+165025300001", formatted_number);
+
+    // Номера со звёздочкой. В реальности они есть в Израиле, но в наших
+    // тестовых метаданных они есть для Японии (JP).
+    test_number.set_country_code(81);
+    test_number.set_national_number(2345);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "JP", true).unwrap();
+    assert_eq!("*2345", formatted_number);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "JP", false).unwrap();
+    assert_eq!("*2345", formatted_number);
+
+    test_number.set_country_code(800);
+    test_number.set_national_number(12345678);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "JP", false).unwrap();
+    assert_eq!("+80012345678", formatted_number);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "JP", true).unwrap();
+    assert_eq!("+800 1234 5678", formatted_number);
+
+    // Номера ОАЭ, начинающиеся с 600 (классифицируются как UAN), должны набираться
+    // без +971 на местном уровне.
+    test_number.set_country_code(971);
+    test_number.set_national_number(600123456);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "JP", false).unwrap();
+    assert_eq!("+971600123456", formatted_number);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "AE", true).unwrap();
+    assert_eq!("600123456", formatted_number);
+
+    test_number.set_country_code(52);
+    test_number.set_national_number(3312345678);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "MX", false).unwrap();
+    assert_eq!("+523312345678", formatted_number);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "US", false).unwrap();
+    assert_eq!("+523312345678", formatted_number);
+
+    // Проверяем, что узбекские номера возвращаются в международном формате, даже
+    // если набираются из того же региона или других регионов.
+    // Стационарный номер
+    test_number.set_country_code(998);
+    test_number.set_national_number(612201234);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "UZ", false).unwrap();
+    assert_eq!("+998612201234", formatted_number);
+    // Мобильный номер
+    test_number.set_national_number(950123456);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "UZ", false).unwrap();
+    assert_eq!("+998950123456", formatted_number);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "US", false).unwrap();
+    assert_eq!("+998950123456", formatted_number);
+
+    // Негеографические номера всегда должны набираться в международном формате.
+    test_number.set_country_code(800);
+    test_number.set_national_number(12345678);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "US", false).unwrap();
+    assert_eq!("+80012345678", formatted_number);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "001", false).unwrap();
+    assert_eq!("+80012345678", formatted_number);
+
+    // Тестируем, что короткий номер форматируется корректно для мобильного набора
+    // внутри региона и не может быть набран из-за его пределов.
+    test_number.set_country_code(49);
+    test_number.set_national_number(123);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "DE", false).unwrap();
+    assert_eq!("123", formatted_number);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "IT", false).unwrap();
+    assert_eq!("", formatted_number);
+
+    // Тестируем специальную логику для стран NANPA, где номера обычной длины
+    // всегда выводятся в международном формате, а короткие — в национальном.
+    test_number.set_country_code(1);
+    test_number.set_national_number(6502530000);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "US", false).unwrap();
+    assert_eq!("+16502530000", formatted_number);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "CA", false).unwrap();
+    assert_eq!("+16502530000", formatted_number);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "BR", false).unwrap();
+    assert_eq!("+16502530000", formatted_number);
+    test_number.set_national_number(911);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "US", false).unwrap();
+    assert_eq!("911", formatted_number);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "CA", false).unwrap();
+    assert_eq!("", formatted_number);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "BR", false).unwrap();
+    assert_eq!("", formatted_number);
+
+    // Тестируем, что австралийский номер экстренной службы 000 форматируется корректно.
+    test_number.set_country_code(61);
+    test_number.set_national_number(0);
+    test_number.set_italian_leading_zero(true);
+    test_number.set_number_of_leading_zeros(2);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "AU", false).unwrap();
+    assert_eq!("000", formatted_number);
+    let formatted_number = phone_util.format_number_for_mobile_dialing(&test_number, "NZ", false).unwrap();
+    assert_eq!("", formatted_number);
+}
+
+#[test]
+fn format_by_pattern() {
+    let phone_util = get_phone_util();
+    let mut test_number = PhoneNumber::new();
+    let mut number_format = NumberFormat::new();
+
+    test_number.set_country_code(1);
+    test_number.set_national_number(6502530000);
+
+    number_format.set_pattern("(\\d{3})(\\d{3})(\\d{4})".to_string());
+    number_format.set_format("($1) $2-$3".to_string());
+    
+    let number_formats = vec![number_format.clone()];
+
+    let formatted_number = phone_util
+        .format_by_pattern(&test_number, PhoneNumberFormat::National, &number_formats)
+        .unwrap();
+    assert_eq!("(650) 253-0000", formatted_number);
+
+    let formatted_number = phone_util
+        .format_by_pattern(&test_number, PhoneNumberFormat::International, &number_formats)
+        .unwrap();
+    assert_eq!("+1 (650) 253-0000", formatted_number);
+
+    let formatted_number = phone_util
+        .format_by_pattern(&test_number, PhoneNumberFormat::RFC3966, &number_formats)
+        .unwrap();
+    assert_eq!("tel:+1-650-253-0000", formatted_number);
+
+    // $NP устанавливается в '1' для США. Здесь мы проверяем, что для других стран
+    // NANPA (Североамериканский план нумерации) правила США соблюдаются.
+    number_format.set_national_prefix_formatting_rule("$NP ($FG)".to_string());
+    number_format.set_format("$1 $2-$3".to_string());
+    let number_formats = vec![number_format.clone()];
+    
+    test_number.set_country_code(1);
+    test_number.set_national_number(4168819999);
+
+    let formatted_number = phone_util
+        .format_by_pattern(&test_number, PhoneNumberFormat::National, &number_formats)
+        .unwrap();
+    assert_eq!("1 (416) 881-9999", formatted_number);
+
+    let formatted_number = phone_util
+        .format_by_pattern(&test_number, PhoneNumberFormat::International, &number_formats)
+        .unwrap();
+    assert_eq!("+1 416 881-9999", formatted_number);
+    
+    test_number.set_country_code(39);
+    test_number.set_national_number(236618300);
+    test_number.set_italian_leading_zero(true);
+
+    number_format.set_pattern("(\\d{2})(\\d{5})(\\d{3})".to_string());
+    number_format.set_format("$1-$2 $3".to_string());
+    number_format.clear_national_prefix_formatting_rule();
+    let number_formats = vec![number_format.clone()];
+
+    let formatted_number = phone_util
+        .format_by_pattern(&test_number, PhoneNumberFormat::National, &number_formats)
+        .unwrap();
+    assert_eq!("02-36618 300", formatted_number);
+
+    let formatted_number = phone_util
+        .format_by_pattern(&test_number, PhoneNumberFormat::International, &number_formats)
+        .unwrap();
+    assert_eq!("+39 02-36618 300", formatted_number);
+    
+    test_number.set_country_code(44);
+    test_number.set_national_number(2012345678);
+    test_number.set_italian_leading_zero(false);
+    
+    number_format.set_national_prefix_formatting_rule("$NP$FG".to_string());
+    number_format.set_pattern("(\\d{2})(\\d{4})(\\d{4})".to_string());
+    number_format.set_format("$1 $2 $3".to_string());
+    let mut number_formats = vec![number_format]; // mutable vec to modify the element inside
+
+    let formatted_number = phone_util
+        .format_by_pattern(&test_number, PhoneNumberFormat::National, &number_formats)
+        .unwrap();
+    assert_eq!("020 1234 5678", formatted_number);
+    
+    number_formats[0].set_national_prefix_formatting_rule("($NP$FG)".to_string());
+    let formatted_number = phone_util
+        .format_by_pattern(&test_number, PhoneNumberFormat::National, &number_formats)
+        .unwrap();
+    assert_eq!("(020) 1234 5678", formatted_number);
+    
+    number_formats[0].clear_national_prefix_formatting_rule();
+    let formatted_number = phone_util
+        .format_by_pattern(&test_number, PhoneNumberFormat::National, &number_formats)
+        .unwrap();
+    assert_eq!("20 1234 5678", formatted_number);
+
+    let formatted_number = phone_util
+        .format_by_pattern(&test_number, PhoneNumberFormat::International, &number_formats)
+        .unwrap();
+    assert_eq!("+44 20 1234 5678", formatted_number);
+}
+
+#[test]
 fn format_in_original_format() {
     let phone_util = get_phone_util();
 
@@ -1048,6 +1303,221 @@ fn format_number_with_extension() {
 }
 
 #[test]
+fn get_length_of_geographical_area_code() {
+    let phone_util = get_phone_util();
+    let mut number = PhoneNumber::new();
+
+    // Google MTV, с кодом города "650".
+    number.set_country_code(1);
+    number.set_national_number(6502530000);
+    assert_eq!(3, phone_util.get_length_of_geographical_area_code(&number).unwrap());
+
+    // Бесплатный номер в Северной Америке, без кода города.
+    number.set_country_code(1);
+    number.set_national_number(8002530000);
+    assert_eq!(0, phone_util.get_length_of_geographical_area_code(&number).unwrap());
+
+    // Невалидный номер США (на 1 цифру короче), без кода города.
+    number.set_country_code(1);
+    number.set_national_number(650253000);
+    assert_eq!(0, phone_util.get_length_of_geographical_area_code(&number).unwrap());
+
+    // Google London, с кодом города "20".
+    number.set_country_code(44);
+    number.set_national_number(2070313000);
+    assert_eq!(2, phone_util.get_length_of_geographical_area_code(&number).unwrap());
+
+    // Мобильный номер в Великобритании не имеет кода города.
+    number.set_country_code(44);
+    number.set_national_number(7912345678);
+    assert_eq!(0, phone_util.get_length_of_geographical_area_code(&number).unwrap());
+
+    // Google Buenos Aires, с кодом города "11".
+    number.set_country_code(54);
+    number.set_national_number(1155303000);
+    assert_eq!(2, phone_util.get_length_of_geographical_area_code(&number).unwrap());
+
+    // Мобильный номер в Аргентине также имеет код города.
+    number.set_country_code(54);
+    number.set_national_number(91187654321);
+    assert_eq!(3, phone_util.get_length_of_geographical_area_code(&number).unwrap());
+
+    // Google Sydney, с кодом города "2".
+    number.set_country_code(61);
+    number.set_national_number(293744000);
+    assert_eq!(1, phone_util.get_length_of_geographical_area_code(&number).unwrap());
+
+    // Номера Мексики - нет национального префикса, но есть код города.
+    number.set_country_code(52);
+    number.set_national_number(3312345678);
+    assert_eq!(2, phone_util.get_length_of_geographical_area_code(&number).unwrap());
+
+    // Итальянские номера - нет национального префикса, но есть код города.
+    number.set_country_code(39);
+    number.set_national_number(236618300);
+    number.set_italian_leading_zero(true);
+    assert_eq!(2, phone_util.get_length_of_geographical_area_code(&number).unwrap());
+
+    // Google Singapore. В Сингапуре нет кода города и национального префикса.
+    number.set_country_code(65);
+    number.set_national_number(65218000);
+    number.set_italian_leading_zero(false);
+    assert_eq!(0, phone_util.get_length_of_geographical_area_code(&number).unwrap());
+
+    // Международный бесплатный номер, без кода города.
+    number.set_country_code(800);
+    number.set_national_number(12345678);
+    assert_eq!(0, phone_util.get_length_of_geographical_area_code(&number).unwrap());
+
+    // Мобильный номер из Китая является географическим, но не имеет кода города.
+    let mut cn_mobile = PhoneNumber::new();
+    cn_mobile.set_country_code(86);
+    cn_mobile.set_national_number(18912341234);
+    assert_eq!(0, phone_util.get_length_of_geographical_area_code(&cn_mobile).unwrap());
+}
+
+#[test]
+fn get_length_of_national_destination_code() {
+    let phone_util = get_phone_util();
+    let mut number = PhoneNumber::new();
+
+    // Google MTV, с национальным кодом назначения (NDC) "650".
+    number.set_country_code(1);
+    number.set_national_number(6502530000);
+    assert_eq!(3, phone_util.get_length_of_national_destination_code(&number).unwrap());
+
+    // Бесплатный номер Северной Америки, с NDC "800".
+    number.set_country_code(1);
+    number.set_national_number(8002530000);
+    assert_eq!(3, phone_util.get_length_of_national_destination_code(&number).unwrap());
+
+    // Google London, с NDC "20".
+    number.set_country_code(44);
+    number.set_national_number(2070313000);
+    assert_eq!(2, phone_util.get_length_of_national_destination_code(&number).unwrap());
+
+    // Мобильный телефон в Великобритании, с NDC "7912".
+    number.set_country_code(44);
+    number.set_national_number(7912345678);
+    assert_eq!(4, phone_util.get_length_of_national_destination_code(&number).unwrap());
+
+    // Google Buenos Aires, с NDC "11".
+    number.set_country_code(54);
+    number.set_national_number(1155303000);
+    assert_eq!(2, phone_util.get_length_of_national_destination_code(&number).unwrap());
+
+    // Аргентинский мобильный, с NDC "911".
+    number.set_country_code(54);
+    number.set_national_number(91187654321);
+    assert_eq!(3, phone_util.get_length_of_national_destination_code(&number).unwrap());
+
+    // Google Sydney, с NDC "2".
+    number.set_country_code(61);
+    number.set_national_number(293744000);
+    assert_eq!(1, phone_util.get_length_of_national_destination_code(&number).unwrap());
+
+    // Google Singapore. Сингапур имеет NDC "6521".
+    number.set_country_code(65);
+    number.set_national_number(65218000);
+    assert_eq!(4, phone_util.get_length_of_national_destination_code(&number).unwrap());
+
+    // Невалидный номер США (на 1 цифру короче), без NDC.
+    number.set_country_code(1);
+    number.set_national_number(650253000);
+    assert_eq!(0, phone_util.get_length_of_national_destination_code(&number).unwrap());
+
+    // Номер с невалидным кодом страны, не должен иметь NDC.
+    number.set_country_code(123);
+    number.set_national_number(650253000);
+    assert_eq!(0, phone_util.get_length_of_national_destination_code(&number).unwrap());
+
+    // Номер, который имеет только одну группу цифр после кода страны при
+    // форматировании в международном формате.
+    number.set_country_code(376);
+    number.set_national_number(12345);
+    assert_eq!(0, phone_util.get_length_of_national_destination_code(&number).unwrap());
+
+    // Тот же номер, но с добавочным.
+    number.set_extension("321".to_string());
+    assert_eq!(0, phone_util.get_length_of_national_destination_code(&number).unwrap());
+    
+    // Международный бесплатный номер, с NDC "1234".
+    number = PhoneNumber::new();
+    number.set_country_code(800);
+    number.set_national_number(12345678);
+    assert_eq!(4, phone_util.get_length_of_national_destination_code(&number).unwrap());
+
+    // Мобильный номер из Китая является географическим, но не имеет кода города,
+    // однако у него может быть национальный код назначения.
+    let mut cn_mobile = PhoneNumber::new();
+    cn_mobile.set_country_code(86);
+    cn_mobile.set_national_number(18912341234);
+    assert_eq!(3, phone_util.get_length_of_national_destination_code(&cn_mobile).unwrap());
+}
+
+#[test]
+fn extract_possible_number() {
+    let phone_util = get_phone_util();
+
+    // Удаляет предшествующие знаки препинания и буквы, но оставляет остальное без изменений.
+    let extracted_number = phone_util
+        .extract_possible_number("Tel:0800-345-600")
+        .unwrap();
+    assert_eq!("0800-345-600", extracted_number);
+
+    let extracted_number = phone_util
+        .extract_possible_number("Tel:0800 FOR PIZZA")
+        .unwrap();
+    assert_eq!("0800 FOR PIZZA", extracted_number);
+
+    // Не должен удалять знак плюса.
+    let extracted_number = phone_util
+        .extract_possible_number("Tel:+800-345-600")
+        .unwrap();
+    assert_eq!("+800-345-600", extracted_number);
+
+    // Должен распознавать широкие цифры как возможные начальные значения.
+    let extracted_number = phone_util
+        .extract_possible_number("\u{FF10}\u{FF12}\u{FF13}")
+        .unwrap(); // "０２３"
+    assert_eq!("\u{FF10}\u{FF12}\u{FF13}", extracted_number);
+
+    // Дефисы не являются возможными начальными значениями и должны быть удалены.
+    let extracted_number = phone_util.
+        extract_possible_number("Num-\u{FF11}\u{FF12}\u{FF13}")
+        .unwrap(); // "Num-１２３"
+    assert_eq!("\u{FF11}\u{FF12}\u{FF13}", extracted_number);
+
+    // Если возможный номер отсутствует, возвращается пустая строка.
+    let extracted_number = phone_util
+        .extract_possible_number("Num-....");
+    assert!(extracted_number.is_err());
+
+    // Ведущие скобки удаляются - они не используются при парсинге.
+    let extracted_number = phone_util
+        .extract_possible_number("(650) 253-0000")
+        .unwrap();
+    assert_eq!("650) 253-0000", extracted_number);
+
+    // Конечные не-буквенно-цифровые символы должны быть удалены.
+    let extracted_number = phone_util
+        .extract_possible_number("(650) 253-0000..- ..")
+        .unwrap();
+    assert_eq!("650) 253-0000", extracted_number);
+
+    let extracted_number = phone_util
+        .extract_possible_number("(650) 253-0000.")
+        .unwrap();
+    assert_eq!("650) 253-0000", extracted_number);
+
+    // Этот случай имеет конечный символ RTL.
+    let extracted_number = phone_util
+        .extract_possible_number("(650) 253-0000\u{200F}")
+        .unwrap(); // "(650) 253-0000‏"
+    assert_eq!("650) 253-0000", extracted_number);
+}
+
+#[test]
 fn is_valid_number() {
     let phone_util = get_phone_util();
     let mut number = PhoneNumber::new();
@@ -1233,6 +1703,106 @@ fn is_possible_number() {
 }
 
 #[test]
+fn is_possible_number_for_type_different_type_lengths() {
+    let phone_util = get_phone_util();
+    // Мы используем аргентинские номера, так как у них разная возможная длина для
+    // разных типов.
+    let mut number = PhoneNumber::new();
+    number.set_country_code(54);
+    number.set_national_number(12345);
+
+    // Слишком короткий для любого аргентинского номера, включая стационарный.
+    assert!(!phone_util.is_possible_number_for_type(&number, PhoneNumberType::FixedLine));
+    assert!(!phone_util.is_possible_number_for_type(&number, PhoneNumberType::Unknown));
+
+    // 6-значные номера подходят для стационарных телефонов.
+    number.set_national_number(123456);
+    assert!(phone_util.is_possible_number_for_type(&number, PhoneNumberType::Unknown));
+    assert!(phone_util.is_possible_number_for_type(&number, PhoneNumberType::FixedLine));
+    // Но слишком короткие для мобильных.
+    assert!(!phone_util.is_possible_number_for_type(&number, PhoneNumberType::Mobile));
+    // И слишком короткие для бесплатных номеров.
+    assert!(!phone_util.is_possible_number_for_type(&number, PhoneNumberType::TollFree));
+
+    // То же самое относится к 9-значным номерам.
+    number.set_national_number(123456789);
+    assert!(phone_util.is_possible_number_for_type(&number, PhoneNumberType::Unknown));
+    assert!(phone_util.is_possible_number_for_type(&number, PhoneNumberType::FixedLine));
+    assert!(!phone_util.is_possible_number_for_type(&number, PhoneNumberType::Mobile));
+    assert!(!phone_util.is_possible_number_for_type(&number, PhoneNumberType::TollFree));
+
+    // 10-значные номера возможны для всех типов.
+    number.set_national_number(1234567890);
+    assert!(phone_util.is_possible_number_for_type(&number, PhoneNumberType::Unknown));
+    assert!(phone_util.is_possible_number_for_type(&number, PhoneNumberType::FixedLine));
+    assert!(phone_util.is_possible_number_for_type(&number, PhoneNumberType::Mobile));
+    assert!(phone_util.is_possible_number_for_type(&number, PhoneNumberType::TollFree));
+
+    // 11-значные номера возможны только для мобильных номеров. Обратите внимание, что мы не
+    // требуем ведущую 9, с которой начинаются все мобильные номера и которая
+    // была бы необходима для действительного мобильного номера.
+    number.set_national_number(12345678901);
+    assert!(phone_util.is_possible_number_for_type(&number, PhoneNumberType::Unknown));
+    assert!(!phone_util.is_possible_number_for_type(&number, PhoneNumberType::FixedLine));
+    assert!(phone_util.is_possible_number_for_type(&number, PhoneNumberType::Mobile));
+    assert!(!phone_util.is_possible_number_for_type(&number, PhoneNumberType::TollFree));
+}
+
+#[test]
+fn is_possible_number_for_type_local_only() {
+    let phone_util = get_phone_util();
+    let mut number = PhoneNumber::new();
+    // Здесь мы тестируем длину номера, которая соответствует длине только для местных номеров.
+    number.set_country_code(49);
+    number.set_national_number(12);
+    assert!(phone_util.is_possible_number_for_type(&number, PhoneNumberType::Unknown));
+    assert!(phone_util.is_possible_number_for_type(&number, PhoneNumberType::FixedLine));
+    // Мобильные номера должны состоять из 10 или 11 цифр, и для них нет длин,
+    // предназначенных только для местных номеров.
+    assert!(!phone_util.is_possible_number_for_type(&number, PhoneNumberType::Mobile));
+}
+
+#[test]
+fn is_possible_number_for_type_data_missing_for_size_reasons() {
+    let phone_util = get_phone_util();
+    let mut number = PhoneNumber::new();
+    // Здесь мы тестируем случай, когда возможные длины соответствуют возможным
+    // длинам страны в целом и, следовательно, отсутствуют в бинарных данных
+    // по соображениям размера - это все равно должно работать.
+    // Номер только для местного использования.
+    number.set_country_code(55);
+    number.set_national_number(12345678);
+    assert!(phone_util.is_possible_number_for_type(&number, PhoneNumberType::Unknown));
+    assert!(phone_util.is_possible_number_for_type(&number, PhoneNumberType::FixedLine));
+
+    number.set_national_number(1234567890);
+    assert!(phone_util.is_possible_number_for_type(&number, PhoneNumberType::Unknown));
+    assert!(phone_util.is_possible_number_for_type(&number, PhoneNumberType::FixedLine));
+}
+
+#[test]
+fn is_possible_number_for_type_number_type_not_supported_for_region() {
+    let phone_util = get_phone_util();
+    let mut number = PhoneNumber::new();
+    // Для этого региона вообще нет мобильных номеров, поэтому мы возвращаем false.
+    number.set_country_code(55);
+    number.set_national_number(12345678);
+    assert!(!phone_util.is_possible_number_for_type(&number, PhoneNumberType::Mobile));
+    // Однако это соответствует длине стационарного номера.
+    assert!(phone_util.is_possible_number_for_type(&number, PhoneNumberType::FixedLine));
+    assert!(phone_util.is_possible_number_for_type(&number, PhoneNumberType::FixedLineOrMobile));
+
+    // Для этого кода страны вообще нет ни стационарных, ни мобильных номеров,
+    // поэтому мы возвращаем false для них.
+    number.set_country_code(979);
+    number.set_national_number(123456789);
+    assert!(!phone_util.is_possible_number_for_type(&number, PhoneNumberType::Mobile));
+    assert!(!phone_util.is_possible_number_for_type(&number, PhoneNumberType::FixedLine));
+    assert!(!phone_util.is_possible_number_for_type(&number, PhoneNumberType::FixedLineOrMobile));
+    assert!(phone_util.is_possible_number_for_type(&number, PhoneNumberType::PremiumRate));
+}
+
+#[test]
 fn is_not_possible_number() {
     let phone_util = get_phone_util();
     let mut number = PhoneNumber::new();
@@ -1270,36 +1840,36 @@ fn is_possible_number_with_reason() {
 
     number.set_country_code(1);
     number.set_national_number(6502530000);
-    assert_eq!(Ok(ValidNumberLenType::IsPossible), phone_util.is_possible_number_with_reason(&number));
+    assert_eq!(Ok(NumberLengthType::IsPossible), phone_util.is_possible_number_with_reason(&number));
 
     number.set_national_number(2530000);
-    assert_eq!(Ok(ValidNumberLenType::IsPossibleLocalOnly), phone_util.is_possible_number_with_reason(&number));
+    assert_eq!(Ok(NumberLengthType::IsPossibleLocalOnly), phone_util.is_possible_number_with_reason(&number));
     
     number.set_country_code(0);
-    assert_eq!(Err(ValidationResultErr::InvalidCountryCode), phone_util.is_possible_number_with_reason(&number));
+    assert_eq!(Err(ValidationError::InvalidCountryCode), phone_util.is_possible_number_with_reason(&number));
 
     number.set_country_code(1);
     number.set_national_number(253000);
-    assert_eq!(Err(ValidationResultErr::TooShort), phone_util.is_possible_number_with_reason(&number));
+    assert_eq!(Err(ValidationError::TooShort), phone_util.is_possible_number_with_reason(&number));
 
     number.set_national_number(65025300000);
-    assert_eq!(Err(ValidationResultErr::TooLong), phone_util.is_possible_number_with_reason(&number));
+    assert_eq!(Err(ValidationError::TooLong), phone_util.is_possible_number_with_reason(&number));
 
     number.set_country_code(44);
     number.set_national_number(2070310000);
-    assert_eq!(Ok(ValidNumberLenType::IsPossible), phone_util.is_possible_number_with_reason(&number));
+    assert_eq!(Ok(NumberLengthType::IsPossible), phone_util.is_possible_number_with_reason(&number));
 
     number.set_country_code(49);
     number.set_national_number(30123456);
-    assert_eq!(Ok(ValidNumberLenType::IsPossible), phone_util.is_possible_number_with_reason(&number));
+    assert_eq!(Ok(NumberLengthType::IsPossible), phone_util.is_possible_number_with_reason(&number));
 
     number.set_country_code(65);
     number.set_national_number(1234567890);
-    assert_eq!(Ok(ValidNumberLenType::IsPossible), phone_util.is_possible_number_with_reason(&number));
+    assert_eq!(Ok(NumberLengthType::IsPossible), phone_util.is_possible_number_with_reason(&number));
 
     number.set_country_code(800);
     number.set_national_number(123456789);
-    assert_eq!(Err(ValidationResultErr::TooLong), phone_util.is_possible_number_with_reason(&number));
+    assert_eq!(Err(ValidationError::TooLong), phone_util.is_possible_number_with_reason(&number));
 }
 
 #[test]
@@ -1309,33 +1879,170 @@ fn is_possible_number_for_type_with_reason() {
     ar_number.set_country_code(54);
 
     ar_number.set_national_number(12345);
-    assert_eq!(Err(ValidationResultErr::TooShort), phone_util.is_possible_number_for_type_with_reason(&ar_number, PhoneNumberType::Unknown));
-    assert_eq!(Err(ValidationResultErr::TooShort), phone_util.is_possible_number_for_type_with_reason(&ar_number, PhoneNumberType::FixedLine));
+    assert_eq!(Err(ValidationError::TooShort), phone_util.is_possible_number_for_type_with_reason(&ar_number, PhoneNumberType::Unknown));
+    assert_eq!(Err(ValidationError::TooShort), phone_util.is_possible_number_for_type_with_reason(&ar_number, PhoneNumberType::FixedLine));
 
     ar_number.set_national_number(123456);
-    assert_eq!(Ok(ValidNumberLenType::IsPossible), phone_util.is_possible_number_for_type_with_reason(&ar_number, PhoneNumberType::Unknown));
-    assert_eq!(Ok(ValidNumberLenType::IsPossible), phone_util.is_possible_number_for_type_with_reason(&ar_number, PhoneNumberType::FixedLine));
-    assert_eq!(Err(ValidationResultErr::TooShort), phone_util.is_possible_number_for_type_with_reason(&ar_number, PhoneNumberType::Mobile));
-    assert_eq!(Err(ValidationResultErr::TooShort), phone_util.is_possible_number_for_type_with_reason(&ar_number, PhoneNumberType::TollFree));
+    assert_eq!(Ok(NumberLengthType::IsPossible), phone_util.is_possible_number_for_type_with_reason(&ar_number, PhoneNumberType::Unknown));
+    assert_eq!(Ok(NumberLengthType::IsPossible), phone_util.is_possible_number_for_type_with_reason(&ar_number, PhoneNumberType::FixedLine));
+    assert_eq!(Err(ValidationError::TooShort), phone_util.is_possible_number_for_type_with_reason(&ar_number, PhoneNumberType::Mobile));
+    assert_eq!(Err(ValidationError::TooShort), phone_util.is_possible_number_for_type_with_reason(&ar_number, PhoneNumberType::TollFree));
 
     ar_number.set_national_number(12345678901);
-    assert_eq!(Ok(ValidNumberLenType::IsPossible), phone_util.is_possible_number_for_type_with_reason(&ar_number, PhoneNumberType::Unknown));
-    assert_eq!(Err(ValidationResultErr::TooLong), phone_util.is_possible_number_for_type_with_reason(&ar_number, PhoneNumberType::FixedLine));
-    assert_eq!(Ok(ValidNumberLenType::IsPossible), phone_util.is_possible_number_for_type_with_reason(&ar_number, PhoneNumberType::Mobile));
-    assert_eq!(Err(ValidationResultErr::TooLong), phone_util.is_possible_number_for_type_with_reason(&ar_number, PhoneNumberType::TollFree));
+    assert_eq!(Ok(NumberLengthType::IsPossible), phone_util.is_possible_number_for_type_with_reason(&ar_number, PhoneNumberType::Unknown));
+    assert_eq!(Err(ValidationError::TooLong), phone_util.is_possible_number_for_type_with_reason(&ar_number, PhoneNumberType::FixedLine));
+    assert_eq!(Ok(NumberLengthType::IsPossible), phone_util.is_possible_number_for_type_with_reason(&ar_number, PhoneNumberType::Mobile));
+    assert_eq!(Err(ValidationError::TooLong), phone_util.is_possible_number_for_type_with_reason(&ar_number, PhoneNumberType::TollFree));
     
     let mut de_number = PhoneNumber::new();
     de_number.set_country_code(49);
     de_number.set_national_number(12);
-    assert_eq!(Ok(ValidNumberLenType::IsPossibleLocalOnly), phone_util.is_possible_number_for_type_with_reason(&de_number, PhoneNumberType::Unknown));
-    assert_eq!(Ok(ValidNumberLenType::IsPossibleLocalOnly), phone_util.is_possible_number_for_type_with_reason(&de_number, PhoneNumberType::FixedLine));
-    assert_eq!(Err(ValidationResultErr::TooShort), phone_util.is_possible_number_for_type_with_reason(&de_number, PhoneNumberType::Mobile));
+    assert_eq!(Ok(NumberLengthType::IsPossibleLocalOnly), phone_util.is_possible_number_for_type_with_reason(&de_number, PhoneNumberType::Unknown));
+    assert_eq!(Ok(NumberLengthType::IsPossibleLocalOnly), phone_util.is_possible_number_for_type_with_reason(&de_number, PhoneNumberType::FixedLine));
+    assert_eq!(Err(ValidationError::TooShort), phone_util.is_possible_number_for_type_with_reason(&de_number, PhoneNumberType::Mobile));
 
     let mut br_number = PhoneNumber::new();
     br_number.set_country_code(55);
     br_number.set_national_number(12345678);
-    assert_eq!(Err(ValidationResultErr::InvalidLength), phone_util.is_possible_number_for_type_with_reason(&br_number, PhoneNumberType::Mobile));
-    assert_eq!(Ok(ValidNumberLenType::IsPossibleLocalOnly), phone_util.is_possible_number_for_type_with_reason(&br_number, PhoneNumberType::FixedLineOrMobile));
+    assert_eq!(Err(ValidationError::InvalidLength), phone_util.is_possible_number_for_type_with_reason(&br_number, PhoneNumberType::Mobile));
+    assert_eq!(Ok(NumberLengthType::IsPossibleLocalOnly), phone_util.is_possible_number_for_type_with_reason(&br_number, PhoneNumberType::FixedLineOrMobile));
+}
+
+#[test]
+fn is_possible_number_for_type_with_reason_different_type_lengths() {
+    // Мы используем аргентинские номера, так как у них разная возможная длина для разных типов.
+    let phone_util = get_phone_util();
+    let mut number = PhoneNumber::new();
+    number.set_country_code(54);
+    number.set_national_number(12345);
+
+    assert_eq!(Err(ValidationError::TooShort), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::Unknown));
+    assert_eq!(Err(ValidationError::TooShort), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::FixedLine));
+
+    // 6-значные номера подходят для стационарных телефонов.
+    number.set_national_number(123456);
+    assert_eq!(Ok(NumberLengthType::IsPossible), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::Unknown));
+    assert_eq!(Ok(NumberLengthType::IsPossible), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::FixedLine));
+    // Но слишком коротки для мобильных.
+    assert_eq!(Err(ValidationError::TooShort), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::Mobile));
+    // И слишком коротки для бесплатных номеров.
+    assert_eq!(Err(ValidationError::TooShort), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::TollFree));
+
+    // То же самое касается 9-значных номеров.
+    number.set_national_number(123456789);
+    assert_eq!(Ok(NumberLengthType::IsPossible), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::Unknown));
+    assert_eq!(Ok(NumberLengthType::IsPossible), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::FixedLine));
+    assert_eq!(Err(ValidationError::TooShort), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::Mobile));
+    assert_eq!(Err(ValidationError::TooShort), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::TollFree));
+
+    // 10-значные номера возможны для всех типов.
+    number.set_national_number(1234567890);
+    assert_eq!(Ok(NumberLengthType::IsPossible), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::Unknown));
+    assert_eq!(Ok(NumberLengthType::IsPossible), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::FixedLine));
+    assert_eq!(Ok(NumberLengthType::IsPossible), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::Mobile));
+    assert_eq!(Ok(NumberLengthType::IsPossible), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::TollFree));
+
+    // 11-значные номера возможны для мобильных номеров. Обратите внимание, что мы не требуем ведущую 9,
+    // с которой начинаются все мобильные номера и которая была бы необходима для действительного мобильного номера.
+    number.set_national_number(12345678901);
+    assert_eq!(Ok(NumberLengthType::IsPossible), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::Unknown));
+    assert_eq!(Err(ValidationError::TooLong), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::FixedLine));
+    assert_eq!(Ok(NumberLengthType::IsPossible), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::Mobile));
+    assert_eq!(Err(ValidationError::TooLong), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::TollFree));
+}
+
+#[test]
+fn is_possible_number_for_type_with_reason_local_only() {
+    let phone_util = get_phone_util();
+    let mut number = PhoneNumber::new();
+    // Здесь мы тестируем длину номера, которая соответствует только местной длине.
+    number.set_country_code(49);
+    number.set_national_number(12);
+    assert_eq!(Ok(NumberLengthType::IsPossibleLocalOnly), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::Unknown));
+    assert_eq!(Ok(NumberLengthType::IsPossibleLocalOnly), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::FixedLine));
+    // Мобильные номера должны состоять из 10 или 11 цифр, и для них нет только местных длин.
+    assert_eq!(Err(ValidationError::TooShort), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::Mobile));
+}
+
+#[test]
+fn is_possible_number_for_type_with_reason_data_missing_for_size_reasons() {
+    let phone_util = get_phone_util();
+    let mut number = PhoneNumber::new();
+    // Здесь мы тестируем случай, когда возможные длины соответствуют возможным длинам страны в целом
+    // и поэтому отсутствуют в бинарных данных по соображениям размера - это все равно должно работать.
+    // Номер только для местного использования.
+    number.set_country_code(55);
+    number.set_national_number(12345678);
+    assert_eq!(Ok(NumberLengthType::IsPossibleLocalOnly), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::Unknown));
+    assert_eq!(Ok(NumberLengthType::IsPossibleLocalOnly), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::FixedLine));
+    // Номер нормальной длины.
+    number.set_national_number(1234567890);
+    assert_eq!(Ok(NumberLengthType::IsPossible), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::Unknown));
+    assert_eq!(Ok(NumberLengthType::IsPossible), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::FixedLine));
+}
+
+#[test]
+fn is_possible_number_for_type_with_reason_number_type_not_supported_for_region() {
+    let phone_util = get_phone_util();
+    let mut number = PhoneNumber::new();
+    // В этом регионе вообще *нет* мобильных номеров, поэтому мы возвращаем INVALID_LENGTH.
+    number.set_country_code(55);
+    number.set_national_number(12345678);
+    assert_eq!(Err(ValidationError::InvalidLength), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::Mobile));
+    // Однако это соответствует длине стационарного номера.
+    assert_eq!(Ok(NumberLengthType::IsPossibleLocalOnly), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::FixedLineOrMobile));
+    // Этот номер слишком короткий для стационарного, а мобильных номеров не существует.
+    number.set_national_number(1234567);
+    assert_eq!(Err(ValidationError::InvalidLength), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::Mobile));
+    assert_eq!(Err(ValidationError::TooShort), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::FixedLineOrMobile));
+    assert_eq!(Err(ValidationError::TooShort), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::FixedLine));
+    // Этот номер слишком короткий для мобильного, а стационарных номеров не существует.
+    number.set_country_code(882);
+    number.set_national_number(1234567);
+    assert_eq!(Err(ValidationError::TooShort), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::Mobile));
+    assert_eq!(Err(ValidationError::TooShort), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::FixedLineOrMobile));
+    assert_eq!(Err(ValidationError::InvalidLength), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::FixedLine));
+
+    // Для этого кода страны вообще *нет* ни стационарных, ни мобильных номеров,
+    // поэтому мы возвращаем INVALID_LENGTH.
+    number.set_country_code(979);
+    number.set_national_number(123456789);
+    assert_eq!(Err(ValidationError::InvalidLength), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::Mobile));
+    assert_eq!(Err(ValidationError::InvalidLength), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::FixedLine));
+    assert_eq!(Err(ValidationError::InvalidLength), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::FixedLineOrMobile));
+    assert_eq!(Ok(NumberLengthType::IsPossible), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::PremiumRate));
+}
+
+#[test]
+fn is_possible_number_for_type_with_reason_fixed_line_or_mobile() {
+    let phone_util = get_phone_util();
+    let mut number = PhoneNumber::new();
+    // Для FIXED_LINE_OR_MOBILE номер должен считаться действительным, если он соответствует
+    // возможным длинам для мобильных *или* стационарных номеров.
+    number.set_country_code(290);
+    number.set_national_number(1234);
+    assert_eq!(Err(ValidationError::TooShort), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::FixedLine));
+    assert_eq!(Ok(NumberLengthType::IsPossible), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::Mobile));
+    assert_eq!(Ok(NumberLengthType::IsPossible), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::FixedLineOrMobile));
+
+    number.set_national_number(12345);
+    assert_eq!(Err(ValidationError::TooShort), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::FixedLine));
+    assert_eq!(Err(ValidationError::TooLong), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::Mobile));
+    assert_eq!(Err(ValidationError::InvalidLength), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::FixedLineOrMobile));
+
+    number.set_national_number(123456);
+    assert_eq!(Ok(NumberLengthType::IsPossible), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::FixedLine));
+    assert_eq!(Err(ValidationError::TooLong), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::Mobile));
+    assert_eq!(Ok(NumberLengthType::IsPossible), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::FixedLineOrMobile));
+
+    number.set_national_number(1234567);
+    assert_eq!(Err(ValidationError::TooLong), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::FixedLine));
+    assert_eq!(Err(ValidationError::TooLong), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::Mobile));
+    assert_eq!(Err(ValidationError::TooLong), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::FixedLineOrMobile));
+
+    number.set_national_number(12345678);
+    assert_eq!(Ok(NumberLengthType::IsPossible), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::TollFree));
+    assert_eq!(Err(ValidationError::TooLong), phone_util.is_possible_number_for_type_with_reason(&number, PhoneNumberType::FixedLineOrMobile));
 }
 
 #[test]

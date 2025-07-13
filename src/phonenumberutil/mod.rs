@@ -9,7 +9,7 @@ pub(self) mod comparisons;
 
 use std::sync::LazyLock;
 
-pub use enums::{MatchType, PhoneNumberFormat, PhoneNumberType, ValidNumberLenType};
+pub use enums::{MatchType, PhoneNumberFormat, PhoneNumberType, NumberLengthType};
 use crate::phonenumberutil::phonenumberutil::PhoneNumberUtil;
 
 pub static PHONE_NUMBER_UTIL: LazyLock<PhoneNumberUtil> = LazyLock::new(|| {

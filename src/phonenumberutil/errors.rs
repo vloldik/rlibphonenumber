@@ -82,7 +82,7 @@ pub struct InvalidMetadataForValidRegionError;
 
 /// Possible outcomes when testing if a PhoneNumber is possible.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Error)]
-pub enum ValidationResultErr {
+pub enum ValidationError {
     /// The number has an invalid country calling code.
     #[error("The number has an invalid country calling code")]
     InvalidCountryCode,

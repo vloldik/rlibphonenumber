@@ -25,7 +25,7 @@ use crate::{
         errors::{
             ExtractNumberError, GetExampleNumberError, InternalLogicError,
             InvalidMetadataForValidRegionError, InvalidNumberError, ParseError,
-            ValidationResultErr,
+            ValidationError,
         }, helper_constants::{
             DEFAULT_EXTN_PREFIX, MAX_LENGTH_COUNTRY_CODE, MAX_LENGTH_FOR_NSN, MIN_LENGTH_FOR_NSN,
             NANPA_COUNTRY_CODE, PLUS_SIGN, REGION_CODE_FOR_NON_GEO_ENTITY, RFC3966_EXTN_PREFIX,
@@ -35,7 +35,7 @@ use crate::{
             is_national_number_suffix_of_the_other, load_compiled_metadata, normalize_helper,
             prefix_number_with_country_calling_code, test_number_length,
             test_number_length_with_unknown_type,
-        }, helper_types::{PhoneNumberWithCountryCodeSource}, MatchType, PhoneNumberFormat, PhoneNumberType, ValidNumberLenType
+        }, helper_types::{PhoneNumberWithCountryCodeSource}, MatchType, PhoneNumberFormat, PhoneNumberType, NumberLengthType
     }, 
     phonemetadata::{NumberFormat, PhoneMetadata, PhoneNumberDesc},
     phonenumber::{phone_number::CountryCodeSource, PhoneNumber},
@@ -53,7 +53,7 @@ pub type RegexResult<T> = std::result::Result<T, ErrorInvalidRegex>;
 pub type ParseResult<T> = std::result::Result<T, ParseError>;
 
 pub type ExampleNumberResult = std::result::Result<PhoneNumber, GetExampleNumberError>;
-pub type ValidationResult = std::result::Result<ValidNumberLenType, ValidationResultErr>;
+pub type ValidationResult = std::result::Result<NumberLengthType, ValidationError>;
 pub type MatchResult = std::result::Result<MatchType, InvalidNumberError>;
 pub type ExtractNumberResult<T> = std::result::Result<T, ExtractNumberError>;
 pub type InternalLogicResult<T> = std::result::Result<T, InternalLogicError>;
@@ -780,8 +780,8 @@ impl PhoneNumberUtil {
                     .ok_or(InvalidMetadataForValidRegionError {})?;
                 let national_number = self.get_national_significant_number(&number_no_extension);
                 let format = if self.can_be_internationally_dialled(&number_no_extension)?
-                    && test_number_length_with_unknown_type(&national_number, region_metadata)
-                        .is_err_and(|e| matches!(e, ValidationResultErr::TooShort))
+                    && !test_number_length_with_unknown_type(&national_number, region_metadata)
+                        .is_err_and(|e| matches!(e, ValidationError::TooShort))
                 {
                     PhoneNumberFormat::International
                 } else {
@@ -1686,14 +1686,14 @@ impl PhoneNumberUtil {
         // with this country calling code in the metadata for the default region in
         // this case.
         if !self.has_valid_country_calling_code(country_code) {
-            return Err(ValidationResultErr::InvalidCountryCode);
+            return Err(ValidationError::InvalidCountryCode);
         }
         let region_code = self.get_region_code_for_country_code(country_code);
         // Metadata cannot be NULL because the country calling code is valid.
         let Some(metadata) =
             self.get_metadata_for_region_or_calling_code(country_code, region_code)
         else {
-            return Err(ValidationResultErr::InvalidCountryCode);
+            return Err(ValidationError::InvalidCountryCode);
         };
         return test_number_length(&national_number, metadata, phone_number_type);
     }
@@ -1712,7 +1712,7 @@ impl PhoneNumberUtil {
             number_copy.set_national_number(national_number);
             if self
                 .is_possible_number_with_reason(&number_copy)
-                .is_err_and(|err| matches!(err, ValidationResultErr::TooShort))
+                .is_err_and(|err| matches!(err, ValidationError::TooShort))
                 || national_number == 0
             {
                 return Ok(false);
@@ -1831,11 +1831,11 @@ impl PhoneNumberUtil {
             let validation_result =
                 test_number_length_with_unknown_type(&potential_national_number, country_metadata);
             if !validation_result
-                .is_ok_and(|res| matches!(res, ValidNumberLenType::IsPossibleLocalOnly))
+                .is_ok_and(|res| matches!(res, NumberLengthType::IsPossibleLocalOnly))
                 && !validation_result.is_err_and(|err| {
                     matches!(
                         err,
-                        ValidationResultErr::TooShort | ValidationResultErr::InvalidLength
+                        ValidationError::TooShort | ValidationError::InvalidLength
                     )
                 })
             {
@@ -2040,7 +2040,7 @@ impl PhoneNumberUtil {
                     &national_number,
                     default_region_metadata,
                 )
-                .is_err_and(|e| matches!(e, ValidationResultErr::TooLong))
+                .is_err_and(|e| matches!(e, ValidationError::TooLong))
                 {
                     if keep_raw_input {
                         phone_number.set_country_code_source(
@@ -2379,11 +2379,10 @@ impl PhoneNumberUtil {
         }
 
         if (matches!(phone_number_type, PhoneNumberType::Mobile)
-            && !self
+            && self
                 .reg_exps
                 .geo_mobile_countries_without_mobile_area_codes
-                .contains(&country_calling_code))
-        {
+                .contains(&country_calling_code)) {
             return Ok(0);
         }
 

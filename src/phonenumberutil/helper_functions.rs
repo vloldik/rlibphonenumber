@@ -11,8 +11,8 @@ use crate::{
 };
 
 use super::{
-    PhoneNumberFormat, PhoneNumberType, ValidNumberLenType,
-    errors::ValidationResultErr,
+    PhoneNumberFormat, PhoneNumberType, NumberLengthType,
+    errors::ValidationError,
     helper_constants::{
         OPTIONAL_EXT_SUFFIX, PLUS_SIGN, POSSIBLE_CHARS_AFTER_EXT_LABEL,
         POSSIBLE_SEPARATORS_BETWEEN_NUMBER_AND_EXT_LABEL, RFC3966_EXTN_PREFIX, RFC3966_PREFIX,
@@ -342,7 +342,7 @@ pub fn test_number_length(
     phone_number: &str,
     phone_metadata: &PhoneMetadata,
     phone_number_type: PhoneNumberType,
-) -> Result<ValidNumberLenType, ValidationResultErr> {
+) -> Result<NumberLengthType, ValidationError> {
     let desc_for_type = get_number_desc_by_type(phone_metadata, phone_number_type);
     // There should always be "possibleLengths" set for every element. This is
     // declared in the XML schema which is verified by
@@ -394,31 +394,31 @@ pub fn test_number_length(
     // If the type is not suported at all (indicated by the possible lengths
     // containing -1 at this point) we return invalid length.
     if *possible_lengths.first().unwrap_or(&-1) == -1 {
-        return Err(ValidationResultErr::InvalidLength);
+        return Err(ValidationError::InvalidLength);
     }
 
     let actual_length = phone_number.len() as i32;
     // This is safe because there is never an overlap beween the possible lengths
     // and the local-only lengths; this is checked at build time.
     if local_lengths.contains(&actual_length) {
-        return Ok(ValidNumberLenType::IsPossibleLocalOnly);
+        return Ok(NumberLengthType::IsPossibleLocalOnly);
     }
 
     // here we can unwrap safe
     let minimum_length = possible_lengths[0];
 
     if minimum_length == actual_length {
-        return Ok(ValidNumberLenType::IsPossible);
+        return Ok(NumberLengthType::IsPossible);
     } else if minimum_length > actual_length {
-        return Err(ValidationResultErr::TooShort);
+        return Err(ValidationError::TooShort);
     } else if possible_lengths[possible_lengths.len() - 1] < actual_length {
-        return Err(ValidationResultErr::TooLong);
+        return Err(ValidationError::TooLong);
     }
     // We skip the first element; we've already checked it.
     return if possible_lengths[1..].contains(&actual_length) {
-        Ok(ValidNumberLenType::IsPossible)
+        Ok(NumberLengthType::IsPossible)
     } else {
-        Err(ValidationResultErr::InvalidLength)
+        Err(ValidationError::InvalidLength)
     };
 }
 
@@ -428,7 +428,7 @@ pub fn test_number_length(
 pub fn test_number_length_with_unknown_type(
     phone_number: &str,
     phone_metadata: &PhoneMetadata,
-) -> Result<ValidNumberLenType, ValidationResultErr> {
+) -> Result<NumberLengthType, ValidationError> {
     return test_number_length(phone_number, phone_metadata, PhoneNumberType::Unknown);
 }
 
