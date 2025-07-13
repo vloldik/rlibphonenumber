@@ -17,7 +17,7 @@
 use log::{error};
 use super::regex_util::{RegexFullMatch, RegexConsume};
 
-use crate::{interfaces, generated::proto::phonemetadata::PhoneNumberDesc, regexp_cache::{ErrorInvalidRegex, RegexCache}};
+use crate::{interfaces, generated::proto::phonemetadata::PhoneNumberDesc, regexp_cache::{InvalidRegexError, RegexCache}};
 
 pub struct RegexBasedMatcher {
     cache: RegexCache,   
@@ -32,7 +32,7 @@ impl RegexBasedMatcher {
         &self, phone_number: &str, 
         number_pattern: &str,
         allow_prefix_match: bool
-    ) -> Result<bool, ErrorInvalidRegex> {
+    ) -> Result<bool, InvalidRegexError> {
         let regexp = self.cache.get_regex(number_pattern)?;
 
         // find first occurrence

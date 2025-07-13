@@ -20,7 +20,7 @@ use thiserror::Error;
 
 #[derive(Debug, PartialEq, Error)]
 #[error("An error occurred while trying to create regex: {0}")]
-pub struct ErrorInvalidRegex(#[from] regex::Error);
+pub struct InvalidRegexError(#[from] regex::Error);
 
 pub struct RegexCache {
     cache: DashMap<String, Arc<regex::Regex>>
@@ -34,7 +34,7 @@ impl RegexCache {
         }
     }
 
-    pub fn get_regex(&self, pattern: &str) -> Result<Arc<regex::Regex>, ErrorInvalidRegex> {
+    pub fn get_regex(&self, pattern: &str) -> Result<Arc<regex::Regex>, InvalidRegexError> {
         if let Some(regex) = self.cache.get(pattern) {
             Ok(regex.value().clone())
         } else {

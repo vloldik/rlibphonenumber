@@ -45,7 +45,7 @@ use crate::{
         phonenumber::{phone_number::CountryCodeSource, PhoneNumber}
     },
     region_code::RegionCode, interfaces::MatcherApi, macros::owned_from_cow_or,
-    regex_based_matcher::RegexBasedMatcher, regex_util::{RegexConsume, RegexFullMatch}, regexp_cache::ErrorInvalidRegex, string_util::strip_cow_prefix
+    regex_based_matcher::RegexBasedMatcher, regex_util::{RegexConsume, RegexFullMatch}, regexp_cache::InvalidRegexError, string_util::strip_cow_prefix
 };
 
 use dec_from_char::DecimalExtended;
@@ -54,7 +54,7 @@ use regex::Regex;
 
 // Helper type for Result
 
-pub type RegexResult<T> = std::result::Result<T, ErrorInvalidRegex>;
+pub type RegexResult<T> = std::result::Result<T, InvalidRegexError>;
 
 pub type ParseResult<T> = std::result::Result<T, ParseError>;
 

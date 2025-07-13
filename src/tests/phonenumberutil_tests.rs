@@ -1,11 +1,22 @@
 use protobuf::{Message, MessageField};
 
 use crate::{
-    PhoneNumberFormat, PhoneNumberType, NumberLengthType,
-    ParseError, ValidationError,
-    NumberFormat, PhoneMetadata, PhoneMetadataCollection, PhoneNumberDesc,
-    CountryCodeSource, PhoneNumber,
-    PhoneNumberUtil,
+    phonenumberutil::{
+        enums::{
+            PhoneNumberFormat, PhoneNumberType, NumberLengthType,
+        },
+        errors::{
+            ParseError, ValidationError
+        }
+    },
+    generated::proto::{
+        phonemetadata::{
+            NumberFormat, PhoneMetadata, PhoneMetadataCollection, PhoneNumberDesc
+        },
+        phonenumber::phone_number::CountryCodeSource, 
+        phonenumber::PhoneNumber,
+    },
+    phonenumberutil::phonenumberutil::PhoneNumberUtil,
 };
 
 use super::region_code::RegionCode;

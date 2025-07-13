@@ -17,12 +17,12 @@ use std::num::ParseIntError;
 
 use thiserror::Error;
 
-use crate::regexp_cache::ErrorInvalidRegex;
+use crate::regexp_cache::InvalidRegexError;
 
 #[derive(Debug, PartialEq, Error)]
 pub enum InternalLogicError {
     #[error("{0}")]
-    InvalidRegex(#[from] ErrorInvalidRegex),
+    InvalidRegex(#[from] InvalidRegexError),
     
     #[error("{0}")]
     InvalidMetadataForValidRegion(#[from] InvalidMetadataForValidRegionError)
@@ -43,7 +43,7 @@ pub enum ParseError {
     #[error("Too long nsn")]
     TooLongNsn, // TOO_LONG in the java version.
     #[error("{0}")]
-    InvalidRegex(#[from] ErrorInvalidRegex),
+    InvalidRegex(#[from] InvalidRegexError),
 }
 
 #[derive(Debug, PartialEq, Error)]

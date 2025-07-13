@@ -44,7 +44,13 @@ pub use phonenumberutil::{
     errors::{*},
     enums::{*},
 };
-pub use generated::proto::phonemetadata::{*};
+pub use generated::proto::phonemetadata;
 pub use generated::proto::phonenumber::PhoneNumber;
 pub use generated::proto::phonenumber::phone_number::CountryCodeSource;
+pub use regexp_cache::InvalidRegexError;
 mod tests;
+
+#[cfg(test)]
+mod test {
+
+}
