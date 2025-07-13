@@ -1,3 +1,18 @@
+// Copyright (C) 2009 The Libphonenumber Authors
+// Copyright (C) 2025 The Kashin Vladislav (Rust adaptation author)
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use std::{
     borrow::Cow,
     cmp::max,
@@ -7,38 +22,25 @@ use std::{
 
 use super::phone_number_regexps_and_mappings::PhoneNumberRegExpsAndMappings;
 use crate::{
-    i18n,
-    interfaces::MatcherApi,
-    macros::owned_from_cow_or,
-    phonemetadata::PhoneMetadataCollection,
-    phonenumberutil::{
-        MatchType, PhoneNumberFormat, PhoneNumberType, ValidNumberLenType,
+    errors::NotANumberError, i18n, interfaces::MatcherApi, macros::owned_from_cow_or, phonemetadata::PhoneMetadataCollection, phonenumberutil::{
         errors::{
             ExtractNumberError, GetExampleNumberError, InternalLogicError,
             InvalidMetadataForValidRegionError, InvalidNumberError, ParseError,
             ValidationResultErr,
-        },
-        helper_constants::{
+        }, helper_constants::{
             DEFAULT_EXTN_PREFIX, MAX_LENGTH_COUNTRY_CODE, MAX_LENGTH_FOR_NSN, MIN_LENGTH_FOR_NSN,
             NANPA_COUNTRY_CODE, PLUS_SIGN, REGION_CODE_FOR_NON_GEO_ENTITY, RFC3966_EXTN_PREFIX,
             RFC3966_ISDN_SUBADDRESS, RFC3966_PHONE_CONTEXT, RFC3966_PREFIX,
-        },
-        helper_functions::{
+        }, helper_functions::{
             self, copy_core_fields_only, get_number_desc_by_type, get_supported_types_for_metadata,
             is_national_number_suffix_of_the_other, load_compiled_metadata, normalize_helper,
             prefix_number_with_country_calling_code, test_number_length,
             test_number_length_with_unknown_type,
-        },
-        helper_types::{PhoneNumberAndCarrierCode, PhoneNumberWithCountryCodeSource},
-    },
-    proto_gen::{
+        }, helper_types::{PhoneNumberAndCarrierCode, PhoneNumberWithCountryCodeSource}, MatchType, PhoneNumberFormat, PhoneNumberType, ValidNumberLenType
+    }, proto_gen::{
         phonemetadata::{NumberFormat, PhoneMetadata, PhoneNumberDesc},
-        phonenumber::{PhoneNumber, phone_number::CountryCodeSource},
-    },
-    regex_based_matcher::RegexBasedMatcher,
-    regex_util::{RegexConsume, RegexFullMatch},
-    regexp_cache::ErrorInvalidRegex,
-    string_util::strip_cow_prefix,
+        phonenumber::{phone_number::CountryCodeSource, PhoneNumber},
+    }, regex_based_matcher::RegexBasedMatcher, regex_util::{RegexConsume, RegexFullMatch}, regexp_cache::ErrorInvalidRegex, string_util::strip_cow_prefix
 };
 
 use dec_from_char::DecimalExtended;
@@ -1516,7 +1518,7 @@ impl PhoneNumberUtil {
                 Self::extract_phone_context(number_to_parse, index_of_phone_context);
             if !self.is_phone_context_valid(phone_context) {
                 trace!("The phone-context value for phone number {number_to_parse} is invalid.");
-                return Err(ParseError::NotANumber);
+                return Err(NotANumberError::InvalidPhoneContext.into());
             }
             // If the phone context contains a phone number prefix, we need to capture
             // it, whereas domains will be ignored.
@@ -1628,7 +1630,8 @@ impl PhoneNumberUtil {
         return Ok(self
             .reg_exps
             .capture_up_to_second_number_start_pattern
-            .find(&extracted_number)
+            .captures(&extracted_number)
+            .and_then(| c | c.get(1))
             .map(move |m| m.as_str())
             .unwrap_or(extracted_number));
     }
@@ -1736,7 +1739,7 @@ impl PhoneNumberUtil {
         let national_number = self.build_national_number_for_parsing(number_to_parse)?;
         if !self.is_viable_phone_number(&national_number) {
             trace!("The string supplied did not seem to be a phone number '{national_number}'.");
-            return Err(ParseError::NotANumber);
+            return Err(ParseError::NotANumber(NotANumberError::NotMatchedValidNumberPattern));
         }
 
         if check_region && !self.check_region_for_parsing(&national_number, default_region) {
@@ -1808,22 +1811,19 @@ impl PhoneNumberUtil {
             return Err(ParseError::TooShortNsn.into());
         }
         if let Some(country_metadata) = country_metadata {
-            let potential_national_number = normalized_national_number.clone();
+            let mut potential_national_number = normalized_national_number.clone();
 
-            let phone_number_and_carrier_code = self.maybe_strip_national_prefix_and_carrier_code(
+            let (phone_number, carrier_code) = self.maybe_strip_national_prefix_and_carrier_code(
                 country_metadata,
                 &potential_national_number,
             )?;
 
-            let carrier_code = phone_number_and_carrier_code
-                .as_ref()
-                .and_then(|p| p.carrier_code.map(|c| c.to_string()));
-            let potential_national_number =
-                if let Some(phone_number_and_carrier_code) = phone_number_and_carrier_code {
-                    Cow::Owned(phone_number_and_carrier_code.phone_number.to_string())
-                } else {
-                    potential_national_number
-                };
+            let carrier_code = carrier_code
+                .map(|c| c.to_string());
+
+            if potential_national_number != phone_number {
+                potential_national_number = Cow::Owned(phone_number.into_owned());
+            }
 
             // We require that the NSN remaining after stripping the national prefix
             // and carrier code be long enough to be a possible length for the region.
@@ -1864,15 +1864,16 @@ impl PhoneNumberUtil {
         temp_number.set_country_code(country_code);
 
         if let Some(zeroes_count) =
-            Self::get_italian_leading_zeros_for_phone_number(&normalized_national_number)
-        {
+            Self::get_italian_leading_zeros_for_phone_number(&normalized_national_number) {
             temp_number.set_italian_leading_zero(true);
-            temp_number.set_number_of_leading_zeros(zeroes_count as i32);
+            if zeroes_count > 1 {
+                temp_number.set_number_of_leading_zeros(zeroes_count as i32);
+            }
         }
         let number_as_int = u64::from_str_radix(&normalized_national_number, 10);
         match number_as_int {
             Ok(number_as_int) => temp_number.set_national_number(number_as_int),
-            Err(err) => return Err(ParseError::ParseNumberAsIntError(err).into()),
+            Err(err) => return Err(NotANumberError::ParseNumberAsIntError(err).into()),
         }
         return Ok(temp_number);
     }
@@ -2488,12 +2489,12 @@ impl PhoneNumberUtil {
         &self,
         metadata: &PhoneMetadata,
         phone_number: &'a str,
-    ) -> RegexResult<Option<PhoneNumberAndCarrierCode<'a>>> {
+    ) -> RegexResult<(Cow<'a, str>, Option<&'a str>)> {
         let possible_national_prefix = metadata.national_prefix_for_parsing();
         if phone_number.is_empty() || possible_national_prefix.is_empty() {
             // Early return for numbers of zero length or with no national prefix
             // possible.
-            return Ok(None);
+            return Ok((phone_number.into(), None));
         }
         let general_desc = &metadata.general_desc;
         // Check if the original number is viable.
@@ -2530,17 +2531,17 @@ impl PhoneNumberUtil {
             // have been some part of the prefix that we captured.
             // We make the transformation and check that the resultant number is still
             // viable. If so, replace the number and return.
+
+            // Rust note: There is no known transform rules containing $\d\d 
+            // But if any appears this should be handled with {} braces: {$\d}\d
             let replaced_number =
                 possible_national_prefix_pattern.replace(&phone_number, transform_rule);
             if is_viable_original_number
                 && !helper_functions::is_match(&self.matcher_api, &replaced_number, general_desc)
             {
-                return Ok(None);
+                return Ok((phone_number.into(), None));
             }
-            return Ok(Some(PhoneNumberAndCarrierCode::new(
-                carrier_code_temp,
-                replaced_number,
-            )));
+            return Ok((replaced_number, carrier_code_temp));
         } else if let Some(matched) = captures.and_then(|c| c.get(0)) {
             trace!(
                 "Parsed the first digits as a national prefix for number '{}'.",
@@ -2551,17 +2552,22 @@ impl PhoneNumberUtil {
             // transformation is necessary, and we just remove the national prefix.
             let stripped_number = &phone_number[matched.end()..];
             if is_viable_original_number
-                && !helper_functions::is_match(&self.matcher_api, stripped_number, general_desc)
-            {
-                return Ok(None);
+                && !helper_functions::is_match(&self.matcher_api, stripped_number, general_desc) {
+                return Ok((phone_number.into(), None));
             }
-            return Ok(Some(PhoneNumberAndCarrierCode::new_phone(stripped_number)));
+            let carrier_code_temp = if let Some(capture) = first_capture {
+                Some(capture.as_str())
+            } else {
+                None
+            };
+
+            return Ok((stripped_number.into(), carrier_code_temp));
         }
         trace!(
             "The first digits did not match the national prefix for number '{}'.",
             phone_number
         );
-        Ok(None)
+        Ok((phone_number.into(), None))
     }
 
     // A helper function to set the values related to leading zeros in a

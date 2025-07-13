@@ -19,8 +19,8 @@ pub enum ParseError {
     // NoParsingError,
     #[error("Invalid country code")]
     InvalidCountryCodeError, // INVALID_COUNTRY_CODE in the java version.
-    #[error("Not a number")]
-    NotANumber,
+    #[error("Not a number: {0}")]
+    NotANumber(#[from] NotANumberError),
     #[error("Too short after idd")]
     TooShortAfterIdd,
     #[error("Too short Nsn")]
@@ -29,6 +29,14 @@ pub enum ParseError {
     TooLongNsn, // TOO_LONG in the java version.
     #[error("{0}")]
     InvalidRegexError(#[from] ErrorInvalidRegex),
+}
+
+#[derive(Debug, PartialEq, Error)]
+pub enum NotANumberError {
+    #[error("Number not matched a valid number pattern")]
+    NotMatchedValidNumberPattern,
+    #[error("Invalid phone context")]
+    InvalidPhoneContext,
     #[error("{0}")]
     ParseNumberAsIntError(#[from] ParseIntError),
     #[error("{0}")]
@@ -41,6 +49,12 @@ pub enum ExtractNumberError {
     NoValidStartCharacter,
     #[error("Invalid number")]
     NotANumber,
+}
+
+impl From<ExtractNumberError> for ParseError {
+    fn from(value: ExtractNumberError) -> Self {
+        NotANumberError::ExtractNumberError(value).into()
+    }
 }
 
 #[derive(Debug, PartialEq, Error)]

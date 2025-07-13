@@ -307,7 +307,7 @@ impl PhoneNumberRegExpsAndMappings {
             separator_pattern: Regex::new(&format!("[{}]+", VALID_PUNCTUATION)).unwrap(),
             extn_patterns_for_matching: create_extn_pattern(false),
             extn_pattern: Regex::new(&format!("(?i)(?:{})$", &extn_patterns_for_parsing)).unwrap(),
-            valid_phone_number_pattern: Regex::new(&format!("(?i)(?:{})(?:{})?", 
+            valid_phone_number_pattern: Regex::new(&format!("(?i)^(?:{})(?:{})?$", 
                 &valid_phone_number,
                 &extn_patterns_for_parsing
             )).unwrap(),
