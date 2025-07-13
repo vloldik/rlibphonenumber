@@ -1,11 +1,10 @@
-mod shortnumberinfo;
 mod interfaces;
 /// This module is automatically generated from /resources/*.proto
 mod generated;
 mod phonenumberutil;
 mod regexp_cache;
 mod regex_based_matcher;
-pub mod i18n;
+pub mod region_code;
 pub(crate) mod regex_util;
 pub(crate) mod string_util;
 

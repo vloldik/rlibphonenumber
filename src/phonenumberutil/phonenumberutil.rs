@@ -21,7 +21,7 @@ use std::{
 
 use super::phone_number_regexps_and_mappings::PhoneNumberRegExpsAndMappings;
 use crate::{
-    errors::NotANumberError, i18n, interfaces::MatcherApi, macros::owned_from_cow_or, phonemetadata::PhoneMetadataCollection, phonenumberutil::{
+    errors::NotANumberError, region_code::RegionCode, interfaces::MatcherApi, macros::owned_from_cow_or, phonemetadata::PhoneMetadataCollection, phonenumberutil::{
         errors::{
             ExtractNumberError, GetExampleNumberError, InternalLogicError,
             InvalidMetadataForValidRegionError, InvalidNumberError, ParseError,
@@ -100,7 +100,7 @@ impl PhoneNumberUtil {
         for metadata in metadata_collection.metadata {
             let region_code = &metadata.id().to_string();
             let main_country_code = metadata.main_country_for_code();
-            if i18n::RegionCode::get_unknown() == region_code {
+            if RegionCode::get_unknown() == region_code {
                 continue;
             }
 
@@ -356,7 +356,7 @@ impl PhoneNumberUtil {
         return region_codes
             .and_then(|mut codes| codes.next())
             .map(|v| v)
-            .unwrap_or(i18n::RegionCode::get_unknown());
+            .unwrap_or(RegionCode::get_unknown());
     }
 
     /// Returns the region codes that matches the specific country calling code. In
@@ -873,7 +873,7 @@ impl PhoneNumberUtil {
                 "Missing/invalid country calling code ({})",
                 country_calling_code
             );
-            return Ok(i18n::RegionCode::get_unknown());
+            return Ok(RegionCode::get_unknown());
         };
         if region_codes.len() == 1 {
             return Ok(region_codes[0]);
@@ -910,7 +910,7 @@ impl PhoneNumberUtil {
                 return Ok(code);
             }
         }
-        return Ok(i18n::RegionCode::get_unknown());
+        return Ok(RegionCode::get_unknown());
     }
 
     fn get_number_type_helper(
@@ -2161,7 +2161,7 @@ impl PhoneNumberUtil {
                                 buf.format(country_calling_code),
                                 desc.example_number()
                             ),
-                            i18n::RegionCode::get_unknown(),
+                            RegionCode::get_unknown(),
                         )
                         .map_err(|err| GetExampleNumberError::FailedToParse(err)),
                     );
@@ -2216,7 +2216,7 @@ impl PhoneNumberUtil {
                     buf.format(country_calling_code),
                     number_type.example_number()
                 ),
-                i18n::RegionCode::get_unknown(),
+                RegionCode::get_unknown(),
             )?);
         }
         return Err(GetExampleNumberError::CouldNotGetNumber);
@@ -2460,7 +2460,7 @@ impl PhoneNumberUtil {
                 continue;
             };
             let region_code = self.get_region_code_for_country_code(potential_country_code);
-            if region_code != i18n::RegionCode::get_unknown() {
+            if region_code != RegionCode::get_unknown() {
                 return match national_number {
                     Cow::Borrowed(s) => Some((Cow::Borrowed(&s[i..]), potential_country_code)),
                     Cow::Owned(mut s) => {
@@ -2641,7 +2641,7 @@ impl PhoneNumberUtil {
         first_number: &str,
         second_number: &str,
     ) -> MatchResult {
-        match self.parse(first_number, i18n::RegionCode::get_unknown()) {
+        match self.parse(first_number, RegionCode::get_unknown()) {
             Ok(first_number_as_proto) => {
                 return self.is_number_match_with_one_string(&first_number_as_proto, second_number);
             }
@@ -2651,7 +2651,7 @@ impl PhoneNumberUtil {
                 }
             }
         }
-        match self.parse(second_number, i18n::RegionCode::get_unknown()) {
+        match self.parse(second_number, RegionCode::get_unknown()) {
             Ok(second_number_as_proto) => {
                 return self.is_number_match_with_one_string(&second_number_as_proto, first_number);
             }
@@ -2660,10 +2660,10 @@ impl PhoneNumberUtil {
                     return Err(InvalidNumberError(err));
                 }
                 let first_number_as_proto =
-                    self.parse_helper(first_number, i18n::RegionCode::get_unknown(), false, false)?;
+                    self.parse_helper(first_number, RegionCode::get_unknown(), false, false)?;
                 let second_number_as_proto = self.parse_helper(
                     second_number,
-                    i18n::RegionCode::get_unknown(),
+                    RegionCode::get_unknown(),
                     false,
                     false,
                 )?;
@@ -2679,7 +2679,7 @@ impl PhoneNumberUtil {
     ) -> MatchResult {
         // First see if the second number has an implicit country calling code, by
         // attempting to parse it.
-        match self.parse(second_number, i18n::RegionCode::get_unknown()) {
+        match self.parse(second_number, RegionCode::get_unknown()) {
             Ok(second_number_as_proto) => {
                 return Ok(self.is_number_match(first_number, &second_number_as_proto));
             }
@@ -2695,7 +2695,7 @@ impl PhoneNumberUtil {
         // NSN_MATCH.
         let first_number_region =
             self.get_region_code_for_country_code(first_number.country_code());
-        if first_number_region != i18n::RegionCode::get_unknown() {
+        if first_number_region != RegionCode::get_unknown() {
             let second_number_with_first_number_region =
                 self.parse(second_number, first_number_region)?;
             return Ok(
@@ -2708,7 +2708,7 @@ impl PhoneNumberUtil {
             // If the first number didn't have a valid country calling code, then we
             // parse the second number without one as well.
             let second_number_as_proto =
-                self.parse_helper(second_number, i18n::RegionCode::get_unknown(), false, false)?;
+                self.parse_helper(second_number, RegionCode::get_unknown(), false, false)?;
             return Ok(self.is_number_match(first_number, &second_number_as_proto));
         }
     }
