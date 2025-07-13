@@ -20,8 +20,8 @@ use strum::IntoEnumIterator;
 
 use crate::{
     interfaces::MatcherApi, generated::metadata::METADATA, 
-        phonemetadata::{PhoneMetadata, PhoneMetadataCollection, PhoneNumberDesc},
-        phonenumber::PhoneNumber,
+        PhoneMetadata, PhoneMetadataCollection, PhoneNumberDesc,
+        PhoneNumber,
     
 };
 

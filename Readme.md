@@ -18,6 +18,27 @@ This library gives you access to a wide range of functionalities, including:
 *   Determining the number type (e.g., Mobile, Fixed-line, Toll-free).
 *   Providing example numbers for every country.
 
+## Performance
+
+The following benchmarks were run against the `rust-phonenumber` crate. All tests were performed on the same machine and dataset. *Lower is better.*
+
+### Formatting
+
+| Format | rlibphonenumber (this crate) | rust-phonenumber | Performance Gain |
+|:---|:---:|:---:|:---:|
+| **E164** | **~78 ns** | ~2.59 µs | **~33x faster** |
+| **International** | **~1.34 µs** | ~3.21 µs | **~2.4x faster** |
+| **National** | **~2.33 µs** | ~4.87 µs | **~2.1x faster** |
+| **RFC3966** | **~1.62 µs** | ~3.47 µs | **~2.1x faster** |
+
+### Parsing
+
+| Task | rlibphonenumber (this crate) | rust-phonenumber | Performance Gain |
+|:--- |:---:|:---:|:---:|
+| **Parse** | **~11.60 µs** | ~13.45 µs | **~16% faster** |
+
+This significant performance advantage is achieved through a focus on minimizing allocations, a more direct implementation path, and the use of modern tooling for metadata generation.
+
 ## Current Status
 
 The project is currently in its initial phase of development. The core functionalities are being ported module by module to ensure quality and consistency.

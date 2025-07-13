@@ -1,10 +1,10 @@
 use protobuf::{Message, MessageField};
 
 use crate::{
-    enums::{PhoneNumberFormat, PhoneNumberType, NumberLengthType},
-    errors::{ParseError, ValidationError},
-    phonemetadata::{NumberFormat, PhoneMetadata, PhoneMetadataCollection, PhoneNumberDesc},
-    phonenumber::{phone_number::CountryCodeSource, PhoneNumber},
+    PhoneNumberFormat, PhoneNumberType, NumberLengthType,
+    ParseError, ValidationError,
+    NumberFormat, PhoneMetadata, PhoneMetadataCollection, PhoneNumberDesc,
+    CountryCodeSource, PhoneNumber,
     PhoneNumberUtil,
 };
 

@@ -17,7 +17,7 @@
 use log::{error};
 use super::regex_util::{RegexFullMatch, RegexConsume};
 
-use crate::{interfaces, phonemetadata::PhoneNumberDesc, regexp_cache::{ErrorInvalidRegex, RegexCache}};
+use crate::{interfaces, PhoneNumberDesc, regexp_cache::{ErrorInvalidRegex, RegexCache}};
 
 pub struct RegexBasedMatcher {
     cache: RegexCache,   
