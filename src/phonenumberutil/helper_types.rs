@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::proto_gen::phonenumber::phone_number::CountryCodeSource;
+use crate::phonenumber::phone_number::CountryCodeSource;
 
 #[derive(Debug)]
 pub struct PhoneNumberWithCountryCodeSource<'a> {

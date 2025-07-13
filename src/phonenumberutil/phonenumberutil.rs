@@ -37,10 +37,10 @@ use crate::{
             prefix_number_with_country_calling_code, test_number_length,
             test_number_length_with_unknown_type,
         }, helper_types::{PhoneNumberAndCarrierCode, PhoneNumberWithCountryCodeSource}, MatchType, PhoneNumberFormat, PhoneNumberType, ValidNumberLenType
-    }, proto_gen::{
-        phonemetadata::{NumberFormat, PhoneMetadata, PhoneNumberDesc},
-        phonenumber::{phone_number::CountryCodeSource, PhoneNumber},
-    }, regex_based_matcher::RegexBasedMatcher, regex_util::{RegexConsume, RegexFullMatch}, regexp_cache::ErrorInvalidRegex, string_util::strip_cow_prefix
+    }, 
+    phonemetadata::{NumberFormat, PhoneMetadata, PhoneNumberDesc},
+    phonenumber::{phone_number::CountryCodeSource, PhoneNumber},
+    regex_based_matcher::RegexBasedMatcher, regex_util::{RegexConsume, RegexFullMatch}, regexp_cache::ErrorInvalidRegex, string_util::strip_cow_prefix
 };
 
 use dec_from_char::DecimalExtended;

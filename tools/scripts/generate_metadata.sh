@@ -3,7 +3,7 @@
 filedir="./$(dirname "$0")"
 javadir="$filedir/../java"
 project_home="$filedir/../.."
-generated_dir="$project_home/src/phonenumberutil/generated"
+generated_dir="$project_home/src/generated/metadata"
 echo $generated_dir
 
 resources_dir="$project_home/resources"
@@ -28,6 +28,9 @@ generate "PhoneNumberMetadata.xml" "metadata" "metadata" "METADATA"
 generate "PhoneNumberMetadataForTesting.xml" "test_metadata" "metadata" "TEST_METADATA"
 
 echo "\
-pub mod metadata;
-pub mod test_metadata;
+mod metadata;
+mod test_metadata;
+
+pub use metadata::METADATA;
+pub use test_metadata::TEST_METADATA;
 " > "$generated_dir/mod.rs"

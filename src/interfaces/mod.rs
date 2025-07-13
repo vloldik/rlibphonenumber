@@ -1,5 +1,5 @@
 
-use crate::proto_gen::phonemetadata::PhoneNumberDesc;
+use crate::phonemetadata::PhoneNumberDesc;
 /// Internal phonenumber matching API used to isolate the underlying
 /// implementation of the matcher and allow different implementations to be
 /// swapped in easily.

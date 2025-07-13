@@ -17,7 +17,7 @@ use crate::{
 };
 
 use super::region_code::RegionCode;
-use crate::phonenumberutil::generated::test_metadata::TEST_METADATA;
+use crate::generated::metadata::TEST_METADATA;
 
 fn get_phone_util() -> PhoneNumberUtil {
     let metadata = PhoneMetadataCollection::parse_from_bytes(&TEST_METADATA)

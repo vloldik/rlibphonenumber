@@ -1,7 +1,7 @@
 mod shortnumberinfo;
 mod interfaces;
 /// This module is automatically generated from /resources/*.proto
-mod proto_gen;
+mod generated;
 mod phonenumberutil;
 mod regexp_cache;
 mod regex_based_matcher;
@@ -30,6 +30,6 @@ pub use phonenumberutil::{
     errors,
     enums,
 };
-pub use proto_gen::phonemetadata;
-pub use proto_gen::phonenumber;
+pub use generated::proto::phonemetadata;
+pub use generated::proto::phonenumber;
 mod tests;

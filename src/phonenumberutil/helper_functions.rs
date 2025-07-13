@@ -4,10 +4,10 @@ use protobuf::Message;
 use strum::IntoEnumIterator;
 
 use crate::{
-    interfaces::MatcherApi, phonenumberutil::generated::metadata::METADATA, proto_gen::{
+    interfaces::MatcherApi, generated::metadata::METADATA, 
         phonemetadata::{PhoneMetadata, PhoneMetadataCollection, PhoneNumberDesc},
         phonenumber::PhoneNumber,
-    }
+    
 };
 
 use super::{
