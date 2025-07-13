@@ -1,17 +1,9 @@
-#[cfg(test)]
-use std::{cell::LazyCell, sync::LazyLock};
-use std::collections::{BTreeSet, HashSet};
-
-use dec_from_char::DecimalExtended;
-#[cfg(test)]
-use env_logger::Logger;
-use log::trace;
 use protobuf::{Message, MessageField};
 
 use crate::{
     enums::{PhoneNumberFormat, PhoneNumberType, ValidNumberLenType},
     errors::{ParseError, ValidationResultErr},
-    phonemetadata::{NumberFormat, PhoneMetadata, PhoneMetadataCollection, PhoneNumberDesc},
+    phonemetadata::{PhoneMetadata, PhoneMetadataCollection, PhoneNumberDesc},
     phonenumber::{phone_number::CountryCodeSource, PhoneNumber},
     PhoneNumberUtil,
 };
@@ -19,7 +11,15 @@ use crate::{
 use super::region_code::RegionCode;
 use crate::generated::metadata::TEST_METADATA;
 
+static ONCE: std::sync::Once = std::sync::Once::new();
+
+#[cfg(test)]
 fn get_phone_util() -> PhoneNumberUtil {
+    ONCE.call_once(||colog::default_builder()
+        .filter_level(log::LevelFilter::Trace)
+        .init()
+    );
+
     let metadata = PhoneMetadataCollection::parse_from_bytes(&TEST_METADATA)
         .expect("Metadata should be valid");
     return PhoneNumberUtil::new_for_metadata(metadata);
@@ -27,10 +27,6 @@ fn get_phone_util() -> PhoneNumberUtil {
 
 #[test]
 fn interchange_invalid_codepoints() {
-    colog::default_builder()
-        .filter_level(log::LevelFilter::Trace)
-        .init();
-
     let phone_util = get_phone_util();
 
     let valid_inputs = vec![
@@ -39,7 +35,7 @@ fn interchange_invalid_codepoints() {
     for input in valid_inputs {
         assert_eq!(input, dec_from_char::normalize_decimals(input));
         assert!(phone_util.is_viable_phone_number(input));
-        phone_util.parse(input, "GB").unwrap();
+        phone_util.parse(input, RegionCode::gb()).unwrap();
     }
 
     let invalid_inputs = vec![
@@ -170,7 +166,7 @@ fn get_region_codes_for_country_calling_code() {
 fn get_instance_load_us_metadata() {
     let phone_util = get_phone_util();
     let metadata = phone_util.get_metadata_for_region(RegionCode::us()).unwrap();
-    assert_eq!("US", metadata.id());
+    assert_eq!(RegionCode::us(), metadata.id());
     assert_eq!(1, metadata.country_code());
     assert_eq!("011", metadata.international_prefix());
     assert!(metadata.has_national_prefix());
@@ -190,7 +186,7 @@ fn get_instance_load_us_metadata() {
 fn get_instance_load_de_metadata() {
     let phone_util = get_phone_util();
     let metadata = phone_util.get_metadata_for_region(RegionCode::de()).unwrap();
-    assert_eq!("DE", metadata.id());
+    assert_eq!(RegionCode::de(), metadata.id());
     assert_eq!(49, metadata.country_code());
     assert_eq!("00", metadata.international_prefix());
     assert_eq!("0", metadata.national_prefix());
@@ -213,7 +209,7 @@ fn get_instance_load_de_metadata() {
 fn get_instance_load_ar_metadata() {
     let phone_util = get_phone_util();
     let metadata = phone_util.get_metadata_for_region(RegionCode::ar()).unwrap();
-    assert_eq!("AR", metadata.id());
+    assert_eq!(RegionCode::ar(), metadata.id());
     assert_eq!(54, metadata.country_code());
     assert_eq!("00", metadata.international_prefix());
     assert_eq!("0", metadata.national_prefix());
@@ -305,6 +301,23 @@ fn get_example_number() {
     assert!(phone_util.get_example_number_for_type_and_region_code(RegionCode::cs(), PhoneNumberType::Mobile).is_err());
 
     assert!(phone_util.get_example_number(RegionCode::un001()).is_err());
+}
+
+#[test]
+fn get_example_number_without_region() {
+    let phone_util = get_phone_util();
+
+    // В наших тестовых метаданных мы не покрываем все типы; в реальных метаданных — покрываем.
+    // Проверяем, что вызов для получения примера номера завершился успешно,
+    // и что номер был изменен.
+    let test_number = phone_util.get_example_number_for_type(PhoneNumberType::FixedLine).unwrap();
+    assert_ne!(PhoneNumber::new(), test_number);
+
+    let test_number = phone_util.get_example_number_for_type(PhoneNumberType::Mobile).unwrap();
+    assert_ne!(PhoneNumber::new(), test_number);
+
+    let test_number = phone_util.get_example_number_for_type(PhoneNumberType::PremiumRate).unwrap();
+    assert_ne!(PhoneNumber::new(), test_number);
 }
 
 #[test]
@@ -670,132 +683,132 @@ fn format_with_preferred_carrier_code() {
 fn format_in_original_format() {
     let phone_util = get_phone_util();
 
-    let mut phone_number = phone_util.parse_and_keep_raw_input("+442087654321", "GB").unwrap();
-    let formatted_number = phone_util.format_in_original_format(&phone_number, "GB").unwrap();
+    let mut phone_number = phone_util.parse_and_keep_raw_input("+442087654321", RegionCode::gb()).unwrap();
+    let formatted_number = phone_util.format_in_original_format(&phone_number, RegionCode::gb()).unwrap();
     assert_eq!("+44 20 8765 4321", formatted_number);
 
-    phone_number = phone_util.parse_and_keep_raw_input("02087654321", "GB").unwrap();
-    let formatted_number = phone_util.format_in_original_format(&phone_number, "GB").unwrap();
+    phone_number = phone_util.parse_and_keep_raw_input("02087654321", RegionCode::gb()).unwrap();
+    let formatted_number = phone_util.format_in_original_format(&phone_number, RegionCode::gb()).unwrap();
     assert_eq!("(020) 8765 4321", formatted_number);
 
-    phone_number = phone_util.parse_and_keep_raw_input("011442087654321", "US").unwrap();
-    let formatted_number = phone_util.format_in_original_format(&phone_number, "US").unwrap();
+    phone_number = phone_util.parse_and_keep_raw_input("011442087654321", RegionCode::us()).unwrap();
+    let formatted_number = phone_util.format_in_original_format(&phone_number, RegionCode::us()).unwrap();
     assert_eq!("011 44 20 8765 4321", formatted_number);
 
-    phone_number = phone_util.parse_and_keep_raw_input("442087654321", "GB").unwrap();
-    let formatted_number = phone_util.format_in_original_format(&phone_number, "GB").unwrap();
+    phone_number = phone_util.parse_and_keep_raw_input("442087654321", RegionCode::gb()).unwrap();
+    let formatted_number = phone_util.format_in_original_format(&phone_number, RegionCode::gb()).unwrap();
     assert_eq!("44 20 8765 4321", formatted_number);
 
     // Если номер парсится без сохранения исходного ввода, `format_in_original_format`
     // должен вернуться к стандартному национальному формату.
-    phone_number = phone_util.parse("+442087654321", "GB").unwrap();
-    let formatted_number = phone_util.format_in_original_format(&phone_number, "GB").unwrap();
+    phone_number = phone_util.parse("+442087654321", RegionCode::gb()).unwrap();
+    let formatted_number = phone_util.format_in_original_format(&phone_number, RegionCode::gb()).unwrap();
     assert_eq!("(020) 8765 4321", formatted_number);
 
     // Невалидные номера, для которых есть шаблон форматирования, должны быть отформатированы
     // правильно. Примечание: коды регионов, начинающиеся с 7, намеренно исключены
     // из тестовых метаданных для целей тестирования.
-    phone_number = phone_util.parse_and_keep_raw_input("7345678901", "US").unwrap();
-    let formatted_number = phone_util.format_in_original_format(&phone_number, "US").unwrap();
+    phone_number = phone_util.parse_and_keep_raw_input("7345678901", RegionCode::us()).unwrap();
+    let formatted_number = phone_util.format_in_original_format(&phone_number, RegionCode::us()).unwrap();
     assert_eq!("734 567 8901", formatted_number);
 
     // США не является страной с ведущим нулём, и его наличие
     // заставляет нас форматировать номер с использованием raw_input.
-    phone_number = phone_util.parse_and_keep_raw_input("0734567 8901", "US").unwrap();
-    let formatted_number = phone_util.format_in_original_format(&phone_number, "US").unwrap();
+    phone_number = phone_util.parse_and_keep_raw_input("0734567 8901", RegionCode::us()).unwrap();
+    let formatted_number = phone_util.format_in_original_format(&phone_number, RegionCode::us()).unwrap();
     assert_eq!("0734567 8901", formatted_number);
 
     // Этот номер валиден, но у нас нет для него шаблона форматирования.
     // Возвращаемся к исходному вводу.
-    phone_number = phone_util.parse_and_keep_raw_input("02-4567-8900", "KR").unwrap();
-    let formatted_number = phone_util.format_in_original_format(&phone_number, "KR").unwrap();
+    phone_number = phone_util.parse_and_keep_raw_input("02-4567-8900", RegionCode::kr()).unwrap();
+    let formatted_number = phone_util.format_in_original_format(&phone_number, RegionCode::kr()).unwrap();
     assert_eq!("02-4567-8900", formatted_number);
 
-    phone_number = phone_util.parse_and_keep_raw_input("01180012345678", "US").unwrap();
-    let formatted_number = phone_util.format_in_original_format(&phone_number, "US").unwrap();
+    phone_number = phone_util.parse_and_keep_raw_input("01180012345678", RegionCode::us()).unwrap();
+    let formatted_number = phone_util.format_in_original_format(&phone_number, RegionCode::us()).unwrap();
     assert_eq!("011 800 1234 5678", formatted_number);
 
-    phone_number = phone_util.parse_and_keep_raw_input("+80012345678", "KR").unwrap();
-    let formatted_number = phone_util.format_in_original_format(&phone_number, "KR").unwrap();
+    phone_number = phone_util.parse_and_keep_raw_input("+80012345678", RegionCode::kr()).unwrap();
+    let formatted_number = phone_util.format_in_original_format(&phone_number, RegionCode::kr()).unwrap();
     assert_eq!("+800 1234 5678", formatted_number);
 
     // Местные номера США форматируются корректно, так как у нас есть для них шаблоны.
-    phone_number = phone_util.parse_and_keep_raw_input("2530000", "US").unwrap();
-    let formatted_number = phone_util.format_in_original_format(&phone_number, "US").unwrap();
+    phone_number = phone_util.parse_and_keep_raw_input("2530000", RegionCode::us()).unwrap();
+    let formatted_number = phone_util.format_in_original_format(&phone_number, RegionCode::us()).unwrap();
     assert_eq!("253 0000", formatted_number);
 
     // Номер с национальным префиксом в США.
-    phone_number = phone_util.parse_and_keep_raw_input("18003456789", "US").unwrap();
-    let formatted_number = phone_util.format_in_original_format(&phone_number, "US").unwrap();
+    phone_number = phone_util.parse_and_keep_raw_input("18003456789", RegionCode::us()).unwrap();
+    let formatted_number = phone_util.format_in_original_format(&phone_number, RegionCode::us()).unwrap();
     assert_eq!("1 800 345 6789", formatted_number);
 
     // Номер без национального префикса в Великобритании.
-    phone_number = phone_util.parse_and_keep_raw_input("2087654321", "GB").unwrap();
-    let formatted_number = phone_util.format_in_original_format(&phone_number, "GB").unwrap();
+    phone_number = phone_util.parse_and_keep_raw_input("2087654321", RegionCode::gb()).unwrap();
+    let formatted_number = phone_util.format_in_original_format(&phone_number, RegionCode::gb()).unwrap();
     assert_eq!("20 8765 4321", formatted_number);
 
     // Убедимся, что метаданные не были изменены в результате предыдущего вызова.
-    phone_number = phone_util.parse("+442087654321", "GB").unwrap();
-    let formatted_number = phone_util.format_in_original_format(&phone_number, "GB").unwrap();
+    phone_number = phone_util.parse("+442087654321", RegionCode::gb()).unwrap();
+    let formatted_number = phone_util.format_in_original_format(&phone_number, RegionCode::gb()).unwrap();
     assert_eq!("(020) 8765 4321", formatted_number);
 
     // Номер с национальным префиксом в Мексике.
-    phone_number = phone_util.parse_and_keep_raw_input("013312345678", "MX").unwrap();
-    let formatted_number = phone_util.format_in_original_format(&phone_number, "MX").unwrap();
+    phone_number = phone_util.parse_and_keep_raw_input("013312345678", RegionCode::mx()).unwrap();
+    let formatted_number = phone_util.format_in_original_format(&phone_number, RegionCode::mx()).unwrap();
     assert_eq!("01 33 1234 5678", formatted_number);
 
     // Номер без национального префикса в Мексике.
-    phone_number = phone_util.parse_and_keep_raw_input("3312345678", "MX").unwrap();
-    let formatted_number = phone_util.format_in_original_format(&phone_number, "MX").unwrap();
+    phone_number = phone_util.parse_and_keep_raw_input("3312345678", RegionCode::mx()).unwrap();
+    let formatted_number = phone_util.format_in_original_format(&phone_number, RegionCode::mx()).unwrap();
     assert_eq!("33 1234 5678", formatted_number);
 
     // Итальянский стационарный номер.
-    phone_number = phone_util.parse_and_keep_raw_input("0212345678", "IT").unwrap();
-    let formatted_number = phone_util.format_in_original_format(&phone_number, "IT").unwrap();
+    phone_number = phone_util.parse_and_keep_raw_input("0212345678", RegionCode::it()).unwrap();
+    let formatted_number = phone_util.format_in_original_format(&phone_number, RegionCode::it()).unwrap();
     assert_eq!("02 1234 5678", formatted_number);
 
     // Номер с национальным префиксом в Японии.
-    phone_number = phone_util.parse_and_keep_raw_input("00777012", "JP").unwrap();
-    let formatted_number = phone_util.format_in_original_format(&phone_number, "JP").unwrap();
+    phone_number = phone_util.parse_and_keep_raw_input("00777012", RegionCode::jp()).unwrap();
+    let formatted_number = phone_util.format_in_original_format(&phone_number, RegionCode::jp()).unwrap();
     assert_eq!("0077-7012", formatted_number);
 
     // Номер без национального префикса в Японии.
-    phone_number = phone_util.parse_and_keep_raw_input("0777012", "JP").unwrap();
-    let formatted_number = phone_util.format_in_original_format(&phone_number, "JP").unwrap();
+    phone_number = phone_util.parse_and_keep_raw_input("0777012", RegionCode::jp()).unwrap();
+    let formatted_number = phone_util.format_in_original_format(&phone_number, RegionCode::jp()).unwrap();
     assert_eq!("0777012", formatted_number);
 
     // Номер с кодом оператора в Бразилии.
-    phone_number = phone_util.parse_and_keep_raw_input("012 3121286979", "BR").unwrap();
-    let formatted_number = phone_util.format_in_original_format(&phone_number, "BR").unwrap();
+    phone_number = phone_util.parse_and_keep_raw_input("012 3121286979", RegionCode::br()).unwrap();
+    let formatted_number = phone_util.format_in_original_format(&phone_number, RegionCode::br()).unwrap();
     assert_eq!("012 3121286979", formatted_number);
 
     // Национальный префикс по умолчанию в этом случае — 045. Когда вводится номер
     // с префиксом 044, мы возвращаем исходный ввод, так как не хотим менять введенный номер.
-    phone_number = phone_util.parse_and_keep_raw_input("044(33)1234-5678", "MX").unwrap();
-    let formatted_number = phone_util.format_in_original_format(&phone_number, "MX").unwrap();
+    phone_number = phone_util.parse_and_keep_raw_input("044(33)1234-5678", RegionCode::mx()).unwrap();
+    let formatted_number = phone_util.format_in_original_format(&phone_number, RegionCode::mx()).unwrap();
     assert_eq!("044(33)1234-5678", formatted_number);
 
-    phone_number = phone_util.parse_and_keep_raw_input("045(33)1234-5678", "MX").unwrap();
-    let formatted_number = phone_util.format_in_original_format(&phone_number, "MX").unwrap();
+    phone_number = phone_util.parse_and_keep_raw_input("045(33)1234-5678", RegionCode::mx()).unwrap();
+    let formatted_number = phone_util.format_in_original_format(&phone_number, RegionCode::mx()).unwrap();
     assert_eq!("045 33 1234 5678", formatted_number);
 
     // Международный префикс по умолчанию в этом случае — 0011. Когда вводится номер
     // с префиксом 0012, мы возвращаем исходный ввод.
-    phone_number = phone_util.parse_and_keep_raw_input("0012 16502530000", "AU").unwrap();
-    let formatted_number = phone_util.format_in_original_format(&phone_number, "AU").unwrap();
+    phone_number = phone_util.parse_and_keep_raw_input("0012 16502530000", RegionCode::au()).unwrap();
+    let formatted_number = phone_util.format_in_original_format(&phone_number, RegionCode::au()).unwrap();
     assert_eq!("0012 16502530000", formatted_number);
 
-    phone_number = phone_util.parse_and_keep_raw_input("0011 16502530000", "AU").unwrap();
-    let formatted_number = phone_util.format_in_original_format(&phone_number, "AU").unwrap();
+    phone_number = phone_util.parse_and_keep_raw_input("0011 16502530000", RegionCode::au()).unwrap();
+    let formatted_number = phone_util.format_in_original_format(&phone_number, RegionCode::au()).unwrap();
     assert_eq!("0011 1 650 253 0000", formatted_number);
 
     // Проверяем, что знак звёздочки (*) не удаляется и не добавляется к исходному вводу.
-    phone_number = phone_util.parse_and_keep_raw_input("*1234", "JP").unwrap();
-    let formatted_number = phone_util.format_in_original_format(&phone_number, "JP").unwrap();
+    phone_number = phone_util.parse_and_keep_raw_input("*1234", RegionCode::jp()).unwrap();
+    let formatted_number = phone_util.format_in_original_format(&phone_number, RegionCode::jp()).unwrap();
     assert_eq!("*1234", formatted_number);
 
-    phone_number = phone_util.parse_and_keep_raw_input("1234", "JP").unwrap();
-    let formatted_number = phone_util.format_in_original_format(&phone_number, "JP").unwrap();
+    phone_number = phone_util.parse_and_keep_raw_input("1234", RegionCode::jp()).unwrap();
+    let formatted_number = phone_util.format_in_original_format(&phone_number, RegionCode::jp()).unwrap();
     assert_eq!("1234", formatted_number);
 
     // Проверяем, что невалидный национальный номер без исходного ввода просто
@@ -804,7 +817,7 @@ fn format_in_original_format() {
     phone_number.set_country_code_source(CountryCodeSource::FROM_DEFAULT_COUNTRY);
     phone_number.set_country_code(1);
     phone_number.set_national_number(650253000);
-    let formatted_number = phone_util.format_in_original_format(&phone_number, "US").unwrap();
+    let formatted_number = phone_util.format_in_original_format(&phone_number, RegionCode::us()).unwrap();
     assert_eq!("650253000", formatted_number);
 }
 
@@ -817,27 +830,27 @@ fn parse_and_keep_raw() {
     alpha_numeric_number.set_raw_input("800 six-flags".to_string());
     alpha_numeric_number.set_country_code_source(CountryCodeSource::FROM_DEFAULT_COUNTRY);
 
-    let test_number = phone_util.parse_and_keep_raw_input("800 six-flags", "US").unwrap();
+    let test_number = phone_util.parse_and_keep_raw_input("800 six-flags", RegionCode::us()).unwrap();
     assert_eq!(alpha_numeric_number, test_number);
     
     alpha_numeric_number.set_national_number(8007493524);
     alpha_numeric_number.set_raw_input("1800 six-flag".to_string());
     alpha_numeric_number.set_country_code_source(CountryCodeSource::FROM_NUMBER_WITHOUT_PLUS_SIGN);
-    let test_number = phone_util.parse_and_keep_raw_input("1800 six-flag", "US").unwrap();
+    let test_number = phone_util.parse_and_keep_raw_input("1800 six-flag", RegionCode::us()).unwrap();
     assert_eq!(alpha_numeric_number, test_number);
 
     alpha_numeric_number.set_raw_input("+1800 six-flag".to_string());
     alpha_numeric_number.set_country_code_source(CountryCodeSource::FROM_NUMBER_WITH_PLUS_SIGN);
-    let test_number = phone_util.parse_and_keep_raw_input("+1800 six-flag", "CN").unwrap();
+    let test_number = phone_util.parse_and_keep_raw_input("+1800 six-flag", RegionCode::cn()).unwrap();
     assert_eq!(alpha_numeric_number, test_number);
 
     alpha_numeric_number.set_raw_input("001800 six-flag".to_string());
     alpha_numeric_number.set_country_code_source(CountryCodeSource::FROM_NUMBER_WITH_IDD);
-    let test_number = phone_util.parse_and_keep_raw_input("001800 six-flag", "NZ").unwrap();
+    let test_number = phone_util.parse_and_keep_raw_input("001800 six-flag", RegionCode::nz()).unwrap();
     assert_eq!(alpha_numeric_number, test_number);
 
     // Попробуем с невалидным регионом - ожидаем ошибку.
-    let result = phone_util.parse("123 456 7890", "CS");
+    let result = phone_util.parse("123 456 7890", RegionCode::cs());
     assert!(result.is_err());
     
     let mut korean_number = PhoneNumber::new();
@@ -846,7 +859,7 @@ fn parse_and_keep_raw() {
     korean_number.set_raw_input("08122123456".to_string());
     korean_number.set_country_code_source(CountryCodeSource::FROM_DEFAULT_COUNTRY);
     korean_number.set_preferred_domestic_carrier_code("81".to_string());
-    let test_number = phone_util.parse_and_keep_raw_input("08122123456", "KR").unwrap();
+    let test_number = phone_util.parse_and_keep_raw_input("08122123456", RegionCode::kr()).unwrap();
     assert_eq!(korean_number, test_number);
 }
 
@@ -860,28 +873,28 @@ fn parse_italian_leading_zeros() {
     zeros_number.set_national_number(11);
     zeros_number.set_italian_leading_zero(true);
     // `number_of_leading_zeros` по умолчанию равен 1, поэтому его не устанавливаем.
-    let test_number = phone_util.parse("011", "AU").unwrap();
+    let test_number = phone_util.parse("011", RegionCode::au()).unwrap();
     assert_eq!(zeros_number, test_number);
 
     // Тестируем номер "001".
     zeros_number.set_national_number(1);
     zeros_number.set_italian_leading_zero(true);
     zeros_number.set_number_of_leading_zeros(2);
-    let test_number = phone_util.parse("001", "AU").unwrap();
+    let test_number = phone_util.parse("001", RegionCode::au()).unwrap();
     assert_eq!(zeros_number, test_number);
 
     // Тестируем номер "000". Этот номер имеет 2 ведущих нуля.
     zeros_number.set_national_number(0);
     zeros_number.set_italian_leading_zero(true);
     zeros_number.set_number_of_leading_zeros(2);
-    let test_number = phone_util.parse("000", "AU").unwrap();
+    let test_number = phone_util.parse("000", RegionCode::au()).unwrap();
     assert_eq!(zeros_number, test_number);
 
     // Тестируем номер "0000". Этот номер имеет 3 ведущих нуля.
     zeros_number.set_national_number(0);
     zeros_number.set_italian_leading_zero(true);
     zeros_number.set_number_of_leading_zeros(3);
-    let test_number = phone_util.parse("0000", "AU").unwrap();
+    let test_number = phone_util.parse("0000", RegionCode::au()).unwrap();
     assert_eq!(zeros_number, test_number);
 }
 
@@ -896,7 +909,7 @@ fn maybe_strip_national_prefix_and_carrier_code() {
         .map(| m | m.set_national_number_pattern("\\d{4,8}".to_string()));
     
     metadata.set_national_prefix_for_parsing("34".to_string());
-    let mut number_to_strip = "34356778".to_string();
+    let number_to_strip = "34356778".to_string();
     let phone_number_and_carrier_code = phone_util
         .maybe_strip_national_prefix_and_carrier_code(&metadata, &number_to_strip)
         .unwrap();
@@ -922,7 +935,7 @@ fn maybe_strip_national_prefix_and_carrier_code() {
 
     // Если результирующий номер не соответствует национальному правилу, он не должен быть удален.
     metadata.set_national_prefix_for_parsing("3".to_string());
-    let mut number_to_strip = "3123".to_string();
+    let number_to_strip = "3123".to_string();
     let phone_number_and_carrier_code = phone_util
         .maybe_strip_national_prefix_and_carrier_code(&metadata, &number_to_strip)
         .unwrap();
@@ -930,7 +943,7 @@ fn maybe_strip_national_prefix_and_carrier_code() {
 
     // Тестируем извлечение кода выбора оператора.
     metadata.set_national_prefix_for_parsing("0(81)?".to_string());
-    let mut number_to_strip = "08122123456".to_string();
+    let number_to_strip = "08122123456".to_string();
 let phone_number_and_carrier_code = phone_util
         .maybe_strip_national_prefix_and_carrier_code(&metadata, &number_to_strip)
         .unwrap();
@@ -944,7 +957,7 @@ let phone_number_and_carrier_code = phone_util
     metadata.set_national_prefix_transform_rule("5${1}5".to_string());
     // Обратите внимание, что здесь присутствует захватывающая группа.
     metadata.set_national_prefix_for_parsing("0(\\d{2})".to_string());
-    let mut number_to_strip = "031123".to_string();
+    let number_to_strip = "031123".to_string();
     let phone_number_and_carrier_code = phone_util
             .maybe_strip_national_prefix_and_carrier_code(&metadata, &number_to_strip)
             .unwrap();
@@ -952,16 +965,27 @@ let phone_number_and_carrier_code = phone_util
     assert_eq!("5315123", phone_number_and_carrier_code.0, "Was not successfully transformed.");
 }
 
+
 #[test]
 fn format_out_of_country_with_invalid_region() {
     let phone_util = get_phone_util();
     let mut test_number = PhoneNumber::new();
     test_number.set_country_code(1);
     test_number.set_national_number(6502530000);
-    // AQ/Antarctica is invalid, fall back to international format.
-    assert_eq!("+1 650 253 0000", phone_util.format_out_of_country_calling_number(&test_number, RegionCode::aq()).unwrap());
-    // For region 001, fall back to international format.
-    assert_eq!("+1 650 253 0000", phone_util.format_out_of_country_calling_number(&test_number, RegionCode::un001()).unwrap());
+
+    // AQ/Антарктида не является валидным кодом региона для форматирования номеров,
+    // поэтому используется международный формат.
+    let formatted_number = phone_util
+        .format_out_of_country_calling_number(&test_number, RegionCode::aq())
+        .unwrap();
+    assert_eq!("+1 650 253 0000", formatted_number);
+
+    // Для кода региона 001 формат для звонков из-за пределов страны всегда
+    // превращается в международный формат.
+    let formatted_number = phone_util
+        .format_out_of_country_calling_number(&test_number, RegionCode::un001())
+        .unwrap();
+    assert_eq!("+1 650 253 0000", formatted_number);
 }
 
 #[test]
@@ -972,13 +996,21 @@ fn format_out_of_country_with_preferred_intl_prefix() {
     test_number.set_national_number(236618300);
     test_number.set_italian_leading_zero(true);
 
-    // Should use 0011, preferred for AU.
-    assert_eq!("0011 39 02 3661 8300", phone_util.format_out_of_country_calling_number(&test_number, RegionCode::au()).unwrap());
-    
-    // Testing preferred international prefixes with ~ (wait).
-    assert_eq!("8~10 39 02 3661 8300", phone_util.format_out_of_country_calling_number(&test_number, RegionCode::uz()).unwrap());
-}
+    // Должен использоваться префикс 0011, так как это предпочтительный международный
+    // префикс для Австралии (в наших тестовых метаданных и 0011, и 0012 принимаются
+    // как возможные международные префиксы).
+    let formatted_number = phone_util
+        .format_out_of_country_calling_number(&test_number, RegionCode::au())
+        .unwrap();
+    assert_eq!("0011 39 02 3661 8300", formatted_number);
 
+    // Тестируем поддержку предпочтительных международных префиксов с символом ~,
+    // который обозначает ожидание.
+    let formatted_number = phone_util
+        .format_out_of_country_calling_number(&test_number, RegionCode::uz())
+        .unwrap();
+    assert_eq!("8~10 39 02 3661 8300", formatted_number);
+}
 
 #[test]
 fn format_e164_number() {
@@ -1440,103 +1472,103 @@ fn parse_national_number() {
     nz_number.set_national_number(33316005);
     
     // С национальным префиксом.
-    let test_number = phone_util.parse("033316005", "NZ").unwrap();
+    let test_number = phone_util.parse("033316005", RegionCode::nz()).unwrap();
     assert_eq!(nz_number, test_number);
 
     // Без национального префикса.
-    let test_number = phone_util.parse("33316005", "NZ").unwrap();
+    let test_number = phone_util.parse("33316005", RegionCode::nz()).unwrap();
     assert_eq!(nz_number, test_number);
 
     // С национальным префиксом и форматированием.
-    let test_number = phone_util.parse("03-331 6005", "NZ").unwrap();
+    let test_number = phone_util.parse("03-331 6005", RegionCode::nz()).unwrap();
     assert_eq!(nz_number, test_number);
-    let test_number = phone_util.parse("03 331 6005", "NZ").unwrap();
+    let test_number = phone_util.parse("03 331 6005", RegionCode::nz()).unwrap();
     assert_eq!(nz_number, test_number);
 
     // Тестирование парсинга формата RFC3966 с phone-context.
-    let test_number = phone_util.parse("tel:03-331-6005;phone-context=+64", "NZ").unwrap();
+    let test_number = phone_util.parse("tel:03-331-6005;phone-context=+64", RegionCode::nz()).unwrap();
     assert_eq!(nz_number, test_number);
-    let test_number = phone_util.parse("tel:331-6005;phone-context=+64-3", "NZ").unwrap();
+    let test_number = phone_util.parse("tel:331-6005;phone-context=+64-3", RegionCode::nz()).unwrap();
     assert_eq!(nz_number, test_number);
-    let test_number = phone_util.parse("tel:331-6005;phone-context=+64-3", "US").unwrap();
+    let test_number = phone_util.parse("tel:331-6005;phone-context=+64-3", RegionCode::us()).unwrap();
     assert_eq!(nz_number, test_number);
-    let test_number = phone_util.parse("My number is tel:03-331-6005;phone-context=+64", "NZ").unwrap();
+    let test_number = phone_util.parse("My number is tel:03-331-6005;phone-context=+64", RegionCode::nz()).unwrap();
     assert_eq!(nz_number, test_number);
 
     // Тестирование парсинга RFC3966 с опциональными параметрами.
-    let test_number = phone_util.parse("tel:03-331-6005;phone-context=+64;a=%A1", "NZ").unwrap();
+    let test_number = phone_util.parse("tel:03-331-6005;phone-context=+64;a=%A1", RegionCode::nz()).unwrap();
     assert_eq!(nz_number, test_number);
 
     // Тестирование парсинга RFC3966 с ISDN-субадресом.
-    let test_number = phone_util.parse("tel:03-331-6005;isub=12345;phone-context=+64", "NZ").unwrap();
+    let test_number = phone_util.parse("tel:03-331-6005;isub=12345;phone-context=+64", RegionCode::nz()).unwrap();
     assert_eq!(nz_number, test_number);
-    let test_number = phone_util.parse("tel:+64-3-331-6005;isub=12345", "US").unwrap();
+    let test_number = phone_util.parse("tel:+64-3-331-6005;isub=12345", RegionCode::us()).unwrap();
     assert_eq!(nz_number, test_number);
-    let test_number = phone_util.parse("03-331-6005;phone-context=+64", "NZ").unwrap();
+    let test_number = phone_util.parse("03-331-6005;phone-context=+64", RegionCode::nz()).unwrap();
     assert_eq!(nz_number, test_number);
 
     // Тестирование международных префиксов.
     // Код страны должен быть удалён.
-    let test_number = phone_util.parse("0064 3 d331 6005", "NZ").unwrap();
+    let test_number = phone_util.parse("0064 3 d331 6005", RegionCode::nz()).unwrap();
     assert_eq!(nz_number, test_number);
 
     // Попробуем снова, но на этот раз с международным номером для региона US.
     // Код страны должен быть распознан и обработан корректно.
-    let test_number = phone_util.parse("01164 3 331 6005", "US").unwrap();
+    let test_number = phone_util.parse("01164 3 331 6005", RegionCode::us()).unwrap();
     assert_eq!(nz_number, test_number);
-    let test_number = phone_util.parse("+64 3 331 6005", "US").unwrap();
+    let test_number = phone_util.parse("+64 3 331 6005", RegionCode::us()).unwrap();
     assert_eq!(nz_number, test_number);
 
     // Ведущий плюс должен игнорироваться, т.к. за ним следует не код страны, а IDD для США.
-    let test_number = phone_util.parse("+01164 3 331 6005", "US").unwrap();
+    let test_number = phone_util.parse("+01164 3 331 6005", RegionCode::us()).unwrap();
     assert_eq!(nz_number, test_number);
-    let test_number = phone_util.parse("+0064 3 331 6005", "NZ").unwrap();
+    let test_number = phone_util.parse("+0064 3 331 6005", RegionCode::nz()).unwrap();
     assert_eq!(nz_number, test_number);
-    let test_number = phone_util.parse("+ 00 64 3 331 6005", "NZ").unwrap();
+    let test_number = phone_util.parse("+ 00 64 3 331 6005", RegionCode::nz()).unwrap();
     assert_eq!(nz_number, test_number);
 
     let mut us_local_number = PhoneNumber::new();
     us_local_number.set_country_code(1);
     us_local_number.set_national_number(2530000);
-    let test_number = phone_util.parse("tel:253-0000;phone-context=www.google.com", "US").unwrap();
+    let test_number = phone_util.parse("tel:253-0000;phone-context=www.google.com", RegionCode::us()).unwrap();
     assert_eq!(us_local_number, test_number);
-    let test_number = phone_util.parse("tel:253-0000;isub=12345;phone-context=www.google.com", "US").unwrap();
+    let test_number = phone_util.parse("tel:253-0000;isub=12345;phone-context=www.google.com", RegionCode::us()).unwrap();
     assert_eq!(us_local_number, test_number);
-    let test_number = phone_util.parse("tel:2530000;isub=12345;phone-context=1234.com", "US").unwrap();
+    let test_number = phone_util.parse("tel:2530000;isub=12345;phone-context=1234.com", RegionCode::us()).unwrap();
     assert_eq!(us_local_number, test_number);
 
     // Тест для http://b/issue?id=2247493
     let mut nz_number_issue = PhoneNumber::new();
     nz_number_issue.set_country_code(64);
     nz_number_issue.set_national_number(64123456);
-    let test_number = phone_util.parse("+64(0)64123456", "US").unwrap();
+    let test_number = phone_util.parse("+64(0)64123456", RegionCode::us()).unwrap();
     assert_eq!(nz_number_issue, test_number);
 
     // Проверка, что "/" в номере телефона обрабатывается корректно.
     let mut de_number = PhoneNumber::new();
     de_number.set_country_code(49);
     de_number.set_national_number(12345678);
-    let test_number = phone_util.parse("123/45678", "DE").unwrap();
+    let test_number = phone_util.parse("123/45678", RegionCode::de()).unwrap();
     assert_eq!(de_number, test_number);
 
     let mut us_number = PhoneNumber::new();
     us_number.set_country_code(1);
     // Проверка, что '1' не используется как код страны при парсинге, если номер уже валиден.
     us_number.set_national_number(1234567890);
-    let test_number = phone_util.parse("123-456-7890", "US").unwrap();
+    let test_number = phone_util.parse("123-456-7890", RegionCode::us()).unwrap();
     assert_eq!(us_number, test_number);
 
     // Тестирование номеров со звездочкой.
     let mut star_number = PhoneNumber::new();
     star_number.set_country_code(81);
     star_number.set_national_number(2345);
-    let test_number = phone_util.parse("+81 *2345", "JP").unwrap();
+    let test_number = phone_util.parse("+81 *2345", RegionCode::jp()).unwrap();
     assert_eq!(star_number, test_number);
 
     let mut short_number = PhoneNumber::new();
     short_number.set_country_code(64);
     short_number.set_national_number(12);
-    let test_number = phone_util.parse("12", "NZ").unwrap();
+    let test_number = phone_util.parse("12", RegionCode::nz()).unwrap();
     assert_eq!(short_number, test_number);
 
     // Тест для короткого номера с ведущим нулём для страны, где 0 - национальный префикс.
@@ -1546,14 +1578,14 @@ fn parse_national_number() {
     short_number.set_country_code(44);
     short_number.set_national_number(123456);
     short_number.set_italian_leading_zero(true);
-    let test_number = phone_util.parse("0123456", "GB").unwrap();
+    let test_number = phone_util.parse("0123456", RegionCode::gb()).unwrap();
     assert_eq!(short_number, test_number);
 }
 
 #[test]
 fn parse_with_phone_context() {
     fn assert_throws_for_invalid_phone_context(phone_util: &PhoneNumberUtil, number_to_parse: &str) {
-        let result = phone_util.parse(number_to_parse, "ZZ");
+        let result = phone_util.parse(number_to_parse, RegionCode::zz());
         assert!(result.is_err(), "Expected an error for: {}", number_to_parse);
     }
     let phone_util = get_phone_util();
@@ -1565,42 +1597,42 @@ fn parse_with_phone_context() {
     // descriptor = domainname / global-number-digits
     
     // Валидные global-phone-digits
-    let mut actual_number = phone_util.parse("tel:033316005;phone-context=+64", "ZZ").unwrap();
+    let mut actual_number = phone_util.parse("tel:033316005;phone-context=+64", RegionCode::zz()).unwrap();
     assert_eq!(expected_number, actual_number);
 
-    actual_number = phone_util.parse("tel:033316005;phone-context=+64;{this isn't part of phone-context anymore!}", "ZZ").unwrap();
+    actual_number = phone_util.parse("tel:033316005;phone-context=+64;{this isn't part of phone-context anymore!}", RegionCode::zz()).unwrap();
     assert_eq!(expected_number, actual_number);
 
     expected_number.set_national_number(3033316005);
-    actual_number = phone_util.parse("tel:033316005;phone-context=+64-3", "ZZ").unwrap();
+    actual_number = phone_util.parse("tel:033316005;phone-context=+64-3", RegionCode::zz()).unwrap();
     assert_eq!(expected_number, actual_number);
     
     expected_number.set_country_code(55);
     expected_number.set_national_number(5033316005);
-    actual_number = phone_util.parse("tel:033316005;phone-context=+(555)", "ZZ").unwrap();
+    actual_number = phone_util.parse("tel:033316005;phone-context=+(555)", RegionCode::zz()).unwrap();
     assert_eq!(expected_number, actual_number);
 
     expected_number.set_country_code(1);
     expected_number.set_national_number(23033316005);
-    actual_number = phone_util.parse("tel:033316005;phone-context=+-1-2.3()", "ZZ").unwrap();
+    actual_number = phone_util.parse("tel:033316005;phone-context=+-1-2.3()", RegionCode::zz()).unwrap();
     assert_eq!(expected_number, actual_number);
 
     // Валидный domainname
     expected_number.set_country_code(64);
     expected_number.set_national_number(33316005);
-    actual_number = phone_util.parse("tel:033316005;phone-context=abc.nz", "NZ").unwrap();
+    actual_number = phone_util.parse("tel:033316005;phone-context=abc.nz", RegionCode::nz()).unwrap();
     assert_eq!(expected_number, actual_number);
 
-    actual_number = phone_util.parse("tel:033316005;phone-context=www.PHONE-numb3r.com", "NZ").unwrap();
+    actual_number = phone_util.parse("tel:033316005;phone-context=www.PHONE-numb3r.com", RegionCode::nz()).unwrap();
     assert_eq!(expected_number, actual_number);
 
-    actual_number = phone_util.parse("tel:033316005;phone-context=a", "NZ").unwrap();
+    actual_number = phone_util.parse("tel:033316005;phone-context=a", RegionCode::nz()).unwrap();
     assert_eq!(expected_number, actual_number);
 
-    actual_number = phone_util.parse("tel:033316005;phone-context=3phone.J.", "NZ").unwrap();
+    actual_number = phone_util.parse("tel:033316005;phone-context=3phone.J.", RegionCode::nz()).unwrap();
     assert_eq!(expected_number, actual_number);
     
-    actual_number = phone_util.parse("tel:033316005;phone-context=a--z", "NZ").unwrap();
+    actual_number = phone_util.parse("tel:033316005;phone-context=a--z", RegionCode::nz()).unwrap();
     assert_eq!(expected_number, actual_number);
 
     // Невалидный descriptor
@@ -1621,87 +1653,87 @@ fn failed_parse_on_invalid_numbers() {
 
     // Проверяем, что парсинг невалидных номеров завершается ошибкой.
     assert!(matches!(
-        phone_util.parse("This is not a phone number", "NZ").unwrap_err(),
+        phone_util.parse("This is not a phone number", RegionCode::nz()).unwrap_err(),
         ParseError::NotANumber(_)
     ));
     assert!(matches!(
-        phone_util.parse("1 Still not a number", "NZ").unwrap_err(),
+        phone_util.parse("1 Still not a number", RegionCode::nz()).unwrap_err(),
         ParseError::NotANumber(_)
     ));
     assert!(matches!(
-        phone_util.parse("1 MICROSOFT", "NZ").unwrap_err(),
+        phone_util.parse("1 MICROSOFT", RegionCode::nz()).unwrap_err(),
         ParseError::NotANumber(_)
     ));
     assert!(matches!(
-        phone_util.parse("12 MICROSOFT", "NZ").unwrap_err(),
+        phone_util.parse("12 MICROSOFT", RegionCode::nz()).unwrap_err(),
         ParseError::NotANumber(_)
     ));
     assert_eq!(
-        phone_util.parse("01495 72553301873 810104", "GB").unwrap_err(),
+        phone_util.parse("01495 72553301873 810104", RegionCode::gb()).unwrap_err(),
         ParseError::TooLongNsn
     );
     assert!(matches!(
-        phone_util.parse("+---", "DE").unwrap_err(),
+        phone_util.parse("+---", RegionCode::de()).unwrap_err(),
         ParseError::NotANumber(_)
     ));
     assert!(matches!(
-        phone_util.parse("+***", "DE").unwrap_err(),
+        phone_util.parse("+***", RegionCode::de()).unwrap_err(),
         ParseError::NotANumber(_)
     ));
     assert!(matches!(
-        phone_util.parse("+*******91", "DE").unwrap_err(),
+        phone_util.parse("+*******91", RegionCode::de()).unwrap_err(),
         ParseError::NotANumber(_)
     ));
     assert_eq!(
-        phone_util.parse("+49 0", "DE").unwrap_err(),
+        phone_util.parse("+49 0", RegionCode::de()).unwrap_err(),
         ParseError::TooShortNsn
     );
     assert_eq!(
-        phone_util.parse("+210 3456 56789", "NZ").unwrap_err(),
+        phone_util.parse("+210 3456 56789", RegionCode::nz()).unwrap_err(),
         ParseError::InvalidCountryCode
     );
     // 00 - правильный МНН, но 210 - невалидный код страны.
     assert_eq!(
-        phone_util.parse("+ 00 210 3 331 6005", "NZ").unwrap_err(),
+        phone_util.parse("+ 00 210 3 331 6005", RegionCode::nz()).unwrap_err(),
         ParseError::InvalidCountryCode
     );
     assert_eq!(
-        phone_util.parse("123 456 7890", "ZZ").unwrap_err(),
+        phone_util.parse("123 456 7890", RegionCode::zz()).unwrap_err(),
         ParseError::InvalidCountryCode
     );
     assert_eq!(
-        phone_util.parse("123 456 7890", "CS").unwrap_err(),
+        phone_util.parse("123 456 7890", RegionCode::cs()).unwrap_err(),
         ParseError::InvalidCountryCode
     );
     assert_eq!(
-        phone_util.parse("0044-----", "GB").unwrap_err(),
+        phone_util.parse("0044-----", RegionCode::gb()).unwrap_err(),
         ParseError::TooShortAfterIdd
     );
     assert_eq!(
-        phone_util.parse("0044", "GB").unwrap_err(),
+        phone_util.parse("0044", RegionCode::gb()).unwrap_err(),
         ParseError::TooShortAfterIdd
     );
     assert_eq!(
-        phone_util.parse("011", "US").unwrap_err(),
+        phone_util.parse("011", RegionCode::us()).unwrap_err(),
         ParseError::TooShortAfterIdd
     );
     assert_eq!(
-        phone_util.parse("0119", "US").unwrap_err(),
+        phone_util.parse("0119", RegionCode::us()).unwrap_err(),
         ParseError::TooShortAfterIdd
     );
     // RFC3966 phone-context является веб-сайтом.
     assert_eq!(
-        phone_util.parse("tel:555-1234;phone-context=www.google.com", "ZZ").unwrap_err(),
+        phone_util.parse("tel:555-1234;phone-context=www.google.com", RegionCode::zz()).unwrap_err(),
         ParseError::InvalidCountryCode
     );
     // Это невалидно, так как отсутствует знак "+" в phone-context.
     assert!(matches!(
-        phone_util.parse("tel:555-1234;phone-context=1-331", "ZZ").unwrap_err(),
+        phone_util.parse("tel:555-1234;phone-context=1-331", RegionCode::zz()).unwrap_err(),
         ParseError::NotANumber(_)
     ));
     // Присутствует только символ phone-context, но нет данных.
     assert!(matches!(
-        phone_util.parse(";phone-context=", "ZZ").unwrap_err(),
+        phone_util.parse(";phone-context=", RegionCode::zz()).unwrap_err(),
         ParseError::NotANumber(_)
     ));
 }
@@ -1712,43 +1744,43 @@ fn parse_numbers_with_plus_with_no_region() {
     let mut nz_number = PhoneNumber::new();
     nz_number.set_country_code(64);
     nz_number.set_national_number(33316005);
-    // "ZZ" (неизвестный регион) разрешен только если номер начинается с "+",
+    // RegionCode::zz() (неизвестный регион) разрешен только если номер начинается с "+",
     // тогда код страны можно определить.
-    let mut result_proto = phone_util.parse("+64 3 331 6005", "ZZ").unwrap();
+    let mut result_proto = phone_util.parse("+64 3 331 6005", RegionCode::zz()).unwrap();
     assert_eq!(nz_number, result_proto);
 
     // Тестируем с полноширинным плюсом.
-    result_proto = phone_util.parse("\u{FF0B}64 3 331 6005", "ZZ").unwrap();
+    result_proto = phone_util.parse("\u{FF0B}64 3 331 6005", RegionCode::zz()).unwrap();
     assert_eq!(nz_number, result_proto);
     // Тестируем с обычным плюсом, но с начальными символами, которые нужно удалить.
-    result_proto = phone_util.parse("  +64 3 331 6005", "ZZ").unwrap();
+    result_proto = phone_util.parse("  +64 3 331 6005", RegionCode::zz()).unwrap();
     assert_eq!(nz_number, result_proto);
 
     let mut toll_free_number = PhoneNumber::new();
     toll_free_number.set_country_code(800);
     toll_free_number.set_national_number(12345678);
-    result_proto = phone_util.parse("+800 1234 5678", "ZZ").unwrap();
+    result_proto = phone_util.parse("+800 1234 5678", RegionCode::zz()).unwrap();
     assert_eq!(toll_free_number, result_proto);
 
     let mut universal_premium_rate = PhoneNumber::new();
     universal_premium_rate.set_country_code(979);
     universal_premium_rate.set_national_number(123456789);
-    result_proto = phone_util.parse("+979 123 456 789", "ZZ").unwrap();
+    result_proto = phone_util.parse("+979 123 456 789", RegionCode::zz()).unwrap();
     assert_eq!(universal_premium_rate, result_proto);
 
     // Тестируем парсинг формата RFC3966 с phone context.
-    result_proto = phone_util.parse("tel:03-331-6005;phone-context=+64", "ZZ").unwrap();
+    result_proto = phone_util.parse("tel:03-331-6005;phone-context=+64", RegionCode::zz()).unwrap();
     assert_eq!(nz_number, result_proto);
 
-    result_proto = phone_util.parse("  tel:03-331-6005;phone-context=+64", "ZZ").unwrap();
+    result_proto = phone_util.parse("  tel:03-331-6005;phone-context=+64", RegionCode::zz()).unwrap();
     assert_eq!(nz_number, result_proto);
     
-    result_proto = phone_util.parse("tel:03-331-6005;isub=12345;phone-context=+64", "ZZ").unwrap();
+    result_proto = phone_util.parse("tel:03-331-6005;isub=12345;phone-context=+64", RegionCode::zz()).unwrap();
     assert_eq!(nz_number, result_proto);
 
     nz_number.set_raw_input("+64 3 331 6005".to_string());
     nz_number.set_country_code_source(CountryCodeSource::FROM_NUMBER_WITH_PLUS_SIGN);
-    result_proto = phone_util.parse_and_keep_raw_input("+64 3 331 6005", "ZZ").unwrap();
+    result_proto = phone_util.parse_and_keep_raw_input("+64 3 331 6005", RegionCode::zz()).unwrap();
     assert_eq!(nz_number, result_proto);
 }
 
@@ -1762,22 +1794,22 @@ fn parse_number_too_short_if_national_prefix_stripped() {
     let mut by_number = PhoneNumber::new();
     by_number.set_country_code(375);
     by_number.set_national_number(8123);
-    let mut test_number = phone_util.parse("8123", "BY").unwrap();
+    let mut test_number = phone_util.parse("8123", RegionCode::by()).unwrap();
     assert_eq!(by_number, test_number);
 
     by_number.set_national_number(81234);
-    test_number = phone_util.parse("81234", "BY").unwrap();
+    test_number = phone_util.parse("81234", RegionCode::by()).unwrap();
     assert_eq!(by_number, test_number);
 
     // Префикс не удаляется, так как ввод является валидным 6-значным номером,
     // в то время как результат удаления - всего 5 цифр.
     by_number.set_national_number(812345);
-    test_number = phone_util.parse("812345", "BY").unwrap();
+    test_number = phone_util.parse("812345", RegionCode::by()).unwrap();
     assert_eq!(by_number, test_number);
 
     // Префикс удаляется, так как возможны только 6-значные номера.
     by_number.set_national_number(123456);
-    test_number = phone_util.parse("8123456", "BY").unwrap();
+    test_number = phone_util.parse("8123456", RegionCode::by()).unwrap();
     assert_eq!(by_number, test_number);
 }
 
@@ -1790,16 +1822,16 @@ fn parse_extensions() {
     nz_number.set_national_number(33316005);
     nz_number.set_extension("3456".to_string());
 
-    let mut test_number = phone_util.parse("03 331 6005 ext 3456", "NZ").unwrap();
+    let mut test_number = phone_util.parse("03 331 6005 ext 3456", RegionCode::nz()).unwrap();
     assert_eq!(nz_number, test_number);
 
-    test_number = phone_util.parse("03 331 6005x3456", "NZ").unwrap();
+    test_number = phone_util.parse("03 331 6005x3456", RegionCode::nz()).unwrap();
     assert_eq!(nz_number, test_number);
 
-    test_number = phone_util.parse("03-331 6005 int.3456", "NZ").unwrap();
+    test_number = phone_util.parse("03-331 6005 int.3456", RegionCode::nz()).unwrap();
     assert_eq!(nz_number, test_number);
 
-    test_number = phone_util.parse("03 331 6005 #3456", "NZ").unwrap();
+    test_number = phone_util.parse("03 331 6005 #3456", RegionCode::nz()).unwrap();
     assert_eq!(nz_number, test_number);
 
     // Тестируем, что следующие номера не извлекают добавочные номера:
@@ -1807,16 +1839,16 @@ fn parse_extensions() {
     non_extn_number.set_country_code(1);
     non_extn_number.set_national_number(80074935247);
 
-    test_number = phone_util.parse("1800 six-flags", "US").unwrap();
+    test_number = phone_util.parse("1800 six-flags", RegionCode::us()).unwrap();
     assert_eq!(non_extn_number, test_number);
 
-    test_number = phone_util.parse("1800 SIX-FLAGS", "US").unwrap();
+    test_number = phone_util.parse("1800 SIX-FLAGS", RegionCode::us()).unwrap();
     assert_eq!(non_extn_number, test_number);
 
-    test_number = phone_util.parse("0~0 1800 7493 5247", "PL").unwrap();
+    test_number = phone_util.parse("0~0 1800 7493 5247", RegionCode::pl()).unwrap();
     assert_eq!(non_extn_number, test_number);
 
-    test_number = phone_util.parse("(1800) 7493.5247", "US").unwrap();
+    test_number = phone_util.parse("(1800) 7493.5247", RegionCode::us()).unwrap();
     assert_eq!(non_extn_number, test_number);
 
     // Проверяем, что соответствует последний экземпляр токена расширения.
@@ -1824,7 +1856,7 @@ fn parse_extensions() {
     extn_number.set_country_code(1);
     extn_number.set_national_number(80074935247);
     extn_number.set_extension("1234".to_string());
-    test_number = phone_util.parse("0~0 1800 7493 5247 ~1234", "PL").unwrap();
+    test_number = phone_util.parse("0~0 1800 7493 5247 ~1234", RegionCode::pl()).unwrap();
     assert_eq!(extn_number, test_number);
 
     // Проверяем исправление ошибки, когда последняя цифра номера ранее опускалась,
@@ -1835,35 +1867,35 @@ fn parse_extensions() {
     uk_number.set_national_number(2034567890);
     uk_number.set_extension("456".to_string());
 
-    test_number = phone_util.parse("+44 2034567890x456", "NZ").unwrap();
+    test_number = phone_util.parse("+44 2034567890x456", RegionCode::nz()).unwrap();
     assert_eq!(uk_number, test_number);
-    test_number = phone_util.parse("+44 2034567890x456", "GB").unwrap();
+    test_number = phone_util.parse("+44 2034567890x456", RegionCode::gb()).unwrap();
     assert_eq!(uk_number, test_number);
-    test_number = phone_util.parse("+44 2034567890 x456", "GB").unwrap();
+    test_number = phone_util.parse("+44 2034567890 x456", RegionCode::gb()).unwrap();
     assert_eq!(uk_number, test_number);
-    test_number = phone_util.parse("+44 2034567890 X456", "GB").unwrap();
+    test_number = phone_util.parse("+44 2034567890 X456", RegionCode::gb()).unwrap();
     assert_eq!(uk_number, test_number);
-    test_number = phone_util.parse("+44 2034567890 X 456", "GB").unwrap();
+    test_number = phone_util.parse("+44 2034567890 X 456", RegionCode::gb()).unwrap();
     assert_eq!(uk_number, test_number);
-    test_number = phone_util.parse("+44 2034567890 X   456", "GB").unwrap();
+    test_number = phone_util.parse("+44 2034567890 X   456", RegionCode::gb()).unwrap();
     assert_eq!(uk_number, test_number);
-    test_number = phone_util.parse("+44 2034567890 x 456  ", "GB").unwrap();
+    test_number = phone_util.parse("+44 2034567890 x 456  ", RegionCode::gb()).unwrap();
     assert_eq!(uk_number, test_number);
-    test_number = phone_util.parse("+44 2034567890  X 456", "GB").unwrap();
+    test_number = phone_util.parse("+44 2034567890  X 456", RegionCode::gb()).unwrap();
     assert_eq!(uk_number, test_number);
-    test_number = phone_util.parse("+44-2034567890;ext=456", "GB").unwrap();
+    test_number = phone_util.parse("+44-2034567890;ext=456", RegionCode::gb()).unwrap();
     assert_eq!(uk_number, test_number);
-    test_number = phone_util.parse("tel:2034567890;ext=456;phone-context=+44", "ZZ").unwrap();
+    test_number = phone_util.parse("tel:2034567890;ext=456;phone-context=+44", RegionCode::zz()).unwrap();
     assert_eq!(uk_number, test_number);
 
     // Полноширинное расширение, только "extn".
-    test_number = phone_util.parse("+442034567890ｅｘｔｎ456", "GB").unwrap();
+    test_number = phone_util.parse("+442034567890ｅｘｔｎ456", RegionCode::gb()).unwrap();
     assert_eq!(uk_number, test_number);
     // Только "xtn".
-    test_number = phone_util.parse("+44-2034567890ｘｔｎ456", "GB").unwrap();
+    test_number = phone_util.parse("+44-2034567890ｘｔｎ456", RegionCode::gb()).unwrap();
     assert_eq!(uk_number, test_number);
     // Только "xt".
-    test_number = phone_util.parse("+44-2034567890ｘｔ456", "GB").unwrap();
+    test_number = phone_util.parse("+44-2034567890ｘｔ456", RegionCode::gb()).unwrap();
     assert_eq!(uk_number, test_number);
 
     let mut us_with_extension = PhoneNumber::new();
@@ -1871,43 +1903,43 @@ fn parse_extensions() {
     us_with_extension.set_national_number(8009013355);
     us_with_extension.set_extension("7246433".to_string());
 
-    test_number = phone_util.parse("(800) 901-3355 x 7246433", "US").unwrap();
+    test_number = phone_util.parse("(800) 901-3355 x 7246433", RegionCode::us()).unwrap();
     assert_eq!(us_with_extension, test_number);
-    test_number = phone_util.parse("(800) 901-3355 , ext 7246433", "US").unwrap();
+    test_number = phone_util.parse("(800) 901-3355 , ext 7246433", RegionCode::us()).unwrap();
     assert_eq!(us_with_extension, test_number);
-    test_number = phone_util.parse("(800) 901-3355 ; 7246433", "US").unwrap();
+    test_number = phone_util.parse("(800) 901-3355 ; 7246433", RegionCode::us()).unwrap();
     assert_eq!(us_with_extension, test_number);
     // Тестирование символа расширения без окружающих пробелов.
-    test_number = phone_util.parse("(800) 901-3355;7246433", "US").unwrap();
+    test_number = phone_util.parse("(800) 901-3355;7246433", RegionCode::us()).unwrap();
     assert_eq!(us_with_extension, test_number);
-    test_number = phone_util.parse("(800) 901-3355 ,extension 7246433", "US").unwrap();
+    test_number = phone_util.parse("(800) 901-3355 ,extension 7246433", RegionCode::us()).unwrap();
     assert_eq!(us_with_extension, test_number);
-    test_number = phone_util.parse("(800) 901-3355 ,extensión 7246433", "US").unwrap();
+    test_number = phone_util.parse("(800) 901-3355 ,extensión 7246433", RegionCode::us()).unwrap();
     assert_eq!(us_with_extension, test_number);
     // Повтор с маленькой буквой o с акутом, созданной с помощью комбинированных символов.
-    test_number = phone_util.parse("(800) 901-3355 ,extensión 7246433", "US").unwrap();
+    test_number = phone_util.parse("(800) 901-3355 ,extensión 7246433", RegionCode::us()).unwrap();
     assert_eq!(us_with_extension, test_number);
-    test_number = phone_util.parse("(800) 901-3355 , 7246433", "US").unwrap();
+    test_number = phone_util.parse("(800) 901-3355 , 7246433", RegionCode::us()).unwrap();
     assert_eq!(us_with_extension, test_number);
-    test_number = phone_util.parse("(800) 901-3355 ext: 7246433", "US").unwrap();
+    test_number = phone_util.parse("(800) 901-3355 ext: 7246433", RegionCode::us()).unwrap();
     assert_eq!(us_with_extension, test_number);
     // Тестирование русского расширения "доб" с вариантами, найденными в интернете.
     let mut ru_with_extension = PhoneNumber::new();
     ru_with_extension.set_country_code(7);
     ru_with_extension.set_national_number(4232022511);
     ru_with_extension.set_extension("100".to_string());
-    test_number = phone_util.parse("8 (423) 202-25-11, доб. 100", "RU").unwrap();
+    test_number = phone_util.parse("8 (423) 202-25-11, доб. 100", RegionCode::ru()).unwrap();
     assert_eq!(ru_with_extension, test_number);
-    test_number = phone_util.parse("8 (423) 202-25-11 доб. 100", "RU").unwrap();
+    test_number = phone_util.parse("8 (423) 202-25-11 доб. 100", RegionCode::ru()).unwrap();
     assert_eq!(ru_with_extension, test_number);
-    test_number = phone_util.parse("8 (423) 202-25-11, доб 100", "RU").unwrap();
+    test_number = phone_util.parse("8 (423) 202-25-11, доб 100", RegionCode::ru()).unwrap();
     assert_eq!(ru_with_extension, test_number);
-    test_number = phone_util.parse("8 (423) 202-25-11 доб 100", "RU").unwrap();
+    test_number = phone_util.parse("8 (423) 202-25-11 доб 100", RegionCode::ru()).unwrap();
     assert_eq!(ru_with_extension, test_number);
-    test_number = phone_util.parse("8 (423) 202-25-11доб 100", "RU").unwrap();
+    test_number = phone_util.parse("8 (423) 202-25-11доб 100", RegionCode::ru()).unwrap();
     assert_eq!(ru_with_extension, test_number);
     // В верхнем регистре
-    test_number = phone_util.parse("8 (423) 202-25-11 ДОБ 100", "RU").unwrap();
+    test_number = phone_util.parse("8 (423) 202-25-11 ДОБ 100", RegionCode::ru()).unwrap();
     assert_eq!(ru_with_extension, test_number);
     
     // Тестируем, что если у номера два расширения, мы игнорируем второе.
@@ -1916,11 +1948,11 @@ fn parse_extensions() {
     us_with_two_extensions_number.set_national_number(2121231234);
     us_with_two_extensions_number.set_extension("508".to_string());
 
-    test_number = phone_util.parse("(212)123-1234 x508/x1234", "US").unwrap();
+    test_number = phone_util.parse("(212)123-1234 x508/x1234", RegionCode::us()).unwrap();
     assert_eq!(us_with_two_extensions_number, test_number);
-    test_number = phone_util.parse("(212)123-1234 x508/ x1234", "US").unwrap();
+    test_number = phone_util.parse("(212)123-1234 x508/ x1234", RegionCode::us()).unwrap();
     assert_eq!(us_with_two_extensions_number, test_number);
-    test_number = phone_util.parse("(212)123-1234 x508\\x1234", "US").unwrap();
+    test_number = phone_util.parse("(212)123-1234 x508\\x1234", RegionCode::us()).unwrap();
     assert_eq!(us_with_two_extensions_number, test_number);
 
     // Тестируем парсинг номеров вида (645) 123-1234-910#, где последние 3 цифры
@@ -1929,7 +1961,7 @@ fn parse_extensions() {
     us_with_extension.set_country_code(1);
     us_with_extension.set_national_number(6451231234);
     us_with_extension.set_extension("910".to_string());
-    test_number = phone_util.parse("+1 (645) 123 1234-910#", "US").unwrap();
+    test_number = phone_util.parse("+1 (645) 123 1234-910#", RegionCode::us()).unwrap();
     assert_eq!(us_with_extension, test_number);
 }
 
@@ -1943,43 +1975,43 @@ fn test_parse_handles_long_extensions_with_explicit_labels() {
     
     // Сначала в формате RFC: ext_limit_after_explicit_label
     nz_number.set_extension("0".to_string());
-    let test_number = phone_util.parse("tel:+6433316005;ext=0", "NZ").unwrap();
+    let test_number = phone_util.parse("tel:+6433316005;ext=0", RegionCode::nz()).unwrap();
     assert_eq!(nz_number, test_number);
 
     nz_number.set_extension("01234567890123456789".to_string());
-    let test_number = phone_util.parse("tel:+6433316005;ext=01234567890123456789", "NZ").unwrap();
+    let test_number = phone_util.parse("tel:+6433316005;ext=01234567890123456789", RegionCode::nz()).unwrap();
     assert_eq!(nz_number, test_number);
 
     // Слишком длинное расширение.
-    let result = phone_util.parse("tel:+6433316005;ext=012345678901234567890", "NZ");
+    let result = phone_util.parse("tel:+6433316005;ext=012345678901234567890", RegionCode::nz());
     assert!(result.is_err());
 
     // Явная метка расширения: ext_limit_after_explicit_label
     nz_number.set_extension("1".to_string());
-    let test_number = phone_util.parse("03 3316005ext:1", "NZ").unwrap();
+    let test_number = phone_util.parse("03 3316005ext:1", RegionCode::nz()).unwrap();
     assert_eq!(nz_number, test_number);
 
     nz_number.set_extension("12345678901234567890".to_string());
-    let test_number = phone_util.parse("03 3316005 xtn:12345678901234567890", "NZ").unwrap();
+    let test_number = phone_util.parse("03 3316005 xtn:12345678901234567890", RegionCode::nz()).unwrap();
     assert_eq!(nz_number, test_number);
 
-    let test_number = phone_util.parse("03 3316005 extension\t12345678901234567890", "NZ").unwrap();
+    let test_number = phone_util.parse("03 3316005 extension\t12345678901234567890", RegionCode::nz()).unwrap();
     assert_eq!(nz_number, test_number);
 
-    let test_number = phone_util.parse("03 3316005 xtensio:12345678901234567890", "NZ").unwrap();
+    let test_number = phone_util.parse("03 3316005 xtensio:12345678901234567890", RegionCode::nz()).unwrap();
     assert_eq!(nz_number, test_number);
 
-    let test_number = phone_util.parse("03 3316005 xtensión, 12345678901234567890#", "NZ").unwrap();
+    let test_number = phone_util.parse("03 3316005 xtensión, 12345678901234567890#", RegionCode::nz()).unwrap();
     assert_eq!(nz_number, test_number);
 
-    let test_number = phone_util.parse("03 3316005extension.12345678901234567890", "NZ").unwrap();
+    let test_number = phone_util.parse("03 3316005extension.12345678901234567890", RegionCode::nz()).unwrap();
     assert_eq!(nz_number, test_number);
 
-    let test_number = phone_util.parse("03 3316005 доб:12345678901234567890", "NZ").unwrap();
+    let test_number = phone_util.parse("03 3316005 доб:12345678901234567890", RegionCode::nz()).unwrap();
     assert_eq!(nz_number, test_number);
 
     // Слишком длинное расширение.
-    let result = phone_util.parse("03 3316005 extension 123456789012345678901", "NZ");
+    let result = phone_util.parse("03 3316005 extension 123456789012345678901", RegionCode::nz());
     assert!(result.is_err());
 }
 
@@ -1994,10 +2026,10 @@ fn test_parse_handles_long_extensions_with_auto_dialling_labels() {
     us_number_user_input.set_national_number(2679000000);
     us_number_user_input.set_extension("123456789012345".to_string());
 
-    let mut test_number = phone_util.parse("+12679000000,,123456789012345#", "US").unwrap();
+    let mut test_number = phone_util.parse("+12679000000,,123456789012345#", RegionCode::us()).unwrap();
     assert_eq!(us_number_user_input, test_number);
 
-    test_number = phone_util.parse("+12679000000;123456789012345#", "US").unwrap();
+    test_number = phone_util.parse("+12679000000;123456789012345#", RegionCode::us()).unwrap();
     assert_eq!(us_number_user_input, test_number);
 
     let mut uk_number_user_input = PhoneNumber::new();
@@ -2005,11 +2037,11 @@ fn test_parse_handles_long_extensions_with_auto_dialling_labels() {
     uk_number_user_input.set_national_number(2034000000);
     uk_number_user_input.set_extension("123456789".to_string());
 
-    let test_number = phone_util.parse("+442034000000,,123456789#", "GB").unwrap();
+    let test_number = phone_util.parse("+442034000000,,123456789#", RegionCode::gb()).unwrap();
     assert_eq!(uk_number_user_input, test_number);
 
     // Слишком длинное расширение.
-    let result = phone_util.parse("+12679000000,,1234567890123456#", "US");
+    let result = phone_util.parse("+12679000000,,1234567890123456#", RegionCode::us());
     assert!(result.is_err());
 }
 
@@ -2022,19 +2054,19 @@ fn test_parse_handles_short_extensions_with_ambiguous_char() {
     nz_number.set_national_number(33316005);
     nz_number.set_extension("123456789".to_string());
 
-    let mut test_number = phone_util.parse("03 3316005 x 123456789", "NZ").unwrap();
+    let mut test_number = phone_util.parse("03 3316005 x 123456789", RegionCode::nz()).unwrap();
     assert_eq!(nz_number, test_number);
 
-    test_number = phone_util.parse("03 3316005 x. 123456789", "NZ").unwrap();
+    test_number = phone_util.parse("03 3316005 x. 123456789", RegionCode::nz()).unwrap();
     assert_eq!(nz_number, test_number);
 
-    test_number = phone_util.parse("03 3316005 #123456789#", "NZ").unwrap();
+    test_number = phone_util.parse("03 3316005 #123456789#", RegionCode::nz()).unwrap();
     assert_eq!(nz_number, test_number);
 
-    test_number = phone_util.parse("03 3316005 ~ 123456789", "NZ").unwrap();
+    test_number = phone_util.parse("03 3316005 ~ 123456789", RegionCode::nz()).unwrap();
     assert_eq!(nz_number, test_number);
 
-    let result = phone_util.parse("03 3316005 ~ 1234567890", "NZ");
+    let result = phone_util.parse("03 3316005 ~ 1234567890", RegionCode::nz());
     assert!(result.is_err());
 }
 
@@ -2048,15 +2080,15 @@ fn test_parse_handles_short_extensions_when_not_sure_of_label() {
     us_number.set_national_number(1234567890);
     us_number.set_extension("666666".to_string());
 
-    let mut test_number = phone_util.parse("+1123-456-7890 666666#", "US").unwrap();
+    let mut test_number = phone_util.parse("+1123-456-7890 666666#", RegionCode::us()).unwrap();
     assert_eq!(us_number, test_number);
 
     us_number.set_extension("6".to_string());
-    test_number = phone_util.parse("+11234567890-6#", "US").unwrap();
+    test_number = phone_util.parse("+11234567890-6#", RegionCode::us()).unwrap();
     assert_eq!(us_number, test_number);
 
     // Слишком длинное расширение.
-    let result = phone_util.parse("+1123-456-7890 7777777#", "US");
+    let result = phone_util.parse("+1123-456-7890 7777777#", RegionCode::us());
     assert!(result.is_err());
 }
 

@@ -13,19 +13,3 @@ impl<'a> PhoneNumberWithCountryCodeSource<'a> {
         Self { phone_number, country_code_source }
     }
 }
-
-#[derive(Debug)]
-pub struct PhoneNumberAndCarrierCode<'a> {
-    pub carrier_code: Option<&'a str>,
-    pub phone_number: Cow<'a, str>
-}
-
-impl<'a> PhoneNumberAndCarrierCode<'a> {
-    pub fn new<B: Into<Cow<'a, str>>>(carrier_code: Option<&'a str>, phone_number: B) -> Self {
-        Self { carrier_code, phone_number: phone_number.into() }
-    }
-    
-    pub fn new_phone<B: Into<Cow<'a, str>>>(phone_number: B) -> Self {
-        Self { carrier_code: None, phone_number: phone_number.into() }
-    }
-}

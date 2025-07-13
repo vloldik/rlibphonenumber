@@ -8,6 +8,7 @@ use crate::{phonenumberutil::{helper_constants::{
     VALID_PUNCTUATION
 }, helper_functions::create_extn_pattern}, regexp_cache::RegexCache};
 
+#[allow(unused)]
 pub(super) struct PhoneNumberRegExpsAndMappings {
     /// Regular expression of viable phone numbers. This is location independent.
     /// Checks we have at least three leading digits, and only valid punctuation,

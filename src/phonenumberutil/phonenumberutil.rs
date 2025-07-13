@@ -15,7 +15,6 @@
 
 use std::{
     borrow::Cow,
-    cmp::max,
     collections::{HashMap, HashSet, VecDeque},
     sync::Arc,
 };
@@ -36,7 +35,7 @@ use crate::{
             is_national_number_suffix_of_the_other, load_compiled_metadata, normalize_helper,
             prefix_number_with_country_calling_code, test_number_length,
             test_number_length_with_unknown_type,
-        }, helper_types::{PhoneNumberAndCarrierCode, PhoneNumberWithCountryCodeSource}, MatchType, PhoneNumberFormat, PhoneNumberType, ValidNumberLenType
+        }, helper_types::{PhoneNumberWithCountryCodeSource}, MatchType, PhoneNumberFormat, PhoneNumberType, ValidNumberLenType
     }, 
     phonemetadata::{NumberFormat, PhoneMetadata, PhoneNumberDesc},
     phonenumber::{phone_number::CountryCodeSource, PhoneNumber},

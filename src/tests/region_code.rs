@@ -1,5 +1,6 @@
 pub struct RegionCode {}
 
+#[allow(unused)]
 impl RegionCode {
     pub fn ad() -> &'static str {
         "AD"
