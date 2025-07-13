@@ -259,7 +259,7 @@ impl PhoneNumberUtil {
                 .full_match(national_prefix_formatting_rule);
     }
 
-    pub fn get_ndd_prefix_for_region(&self, region_code: &str, strip_non_digits: bool) -> String {
+    pub fn get_ndd_prefix_for_region(&self, region_code: &str, strip_non_digits: bool) -> Option<String> {
         self.region_to_metadata_map
             .get(region_code)
             .map(|metadata| {
@@ -268,10 +268,6 @@ impl PhoneNumberUtil {
                     prefix = prefix.replace("~", "");
                 }
                 prefix
-            })
-            .unwrap_or_else(|| {
-                warn!("Invalid or unknown region code ({}) provided.", region_code);
-                "".to_string()
             })
     }
 
@@ -1185,11 +1181,10 @@ impl PhoneNumberUtil {
                     self.get_region_code_for_country_code(phone_number.country_code());
                 // We strip non-digits from the NDD here, and from the raw input later, so
                 // that we can compare them easily.
-                let national_prefix =
-                    self.get_ndd_prefix_for_region(region_code, true /* strip non-digits */);
-                if national_prefix.is_empty() {
+                let Some(national_prefix) =
+                    self.get_ndd_prefix_for_region(region_code, true /* strip non-digits */) else {
                     break 'default_block format_national()?;
-                }
+                };
                 let Some(metadata) = self.region_to_metadata_map.get(region_code) else {
                     // If the region doesn't have a national prefix at all, we can safely
                     // return the national format without worrying about a national prefix

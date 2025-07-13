@@ -1077,6 +1077,88 @@ fn format_in_original_format() {
 }
 
 #[test]
+fn get_national_dialling_prefix_for_region() {
+    let phone_util = get_phone_util();
+
+    // Для США префикс "1".
+    let ndd_prefix = phone_util.get_ndd_prefix_for_region("US", false).unwrap();
+    assert_eq!("1", ndd_prefix);
+
+    // Тестируем страну, не являющуюся основной, чтобы увидеть, что она получает
+    // национальный префикс набора для основной страны с этим кодом страны.
+    let ndd_prefix = phone_util.get_ndd_prefix_for_region("BS", false).unwrap();
+    assert_eq!("1", ndd_prefix);
+
+    // Для Новой Зеландии префикс "0".
+    let ndd_prefix = phone_util.get_ndd_prefix_for_region("NZ", false).unwrap();
+    assert_eq!("0", ndd_prefix);
+
+    // Тестируем случай с нецифровым символом в национальном префиксе.
+    let ndd_prefix = phone_util.get_ndd_prefix_for_region("AO", false).unwrap();
+    assert_eq!("0~0", ndd_prefix);
+
+    // Тестируем с удалением нецифровых символов.
+    let ndd_prefix = phone_util.get_ndd_prefix_for_region("AO", true).unwrap();
+    assert_eq!("00", ndd_prefix);
+
+    // Тестируем случаи с невалидными регионами.
+    assert!(phone_util.get_ndd_prefix_for_region("ZZ", false).is_none());
+    assert!(phone_util.get_ndd_prefix_for_region("UN001", false).is_none());
+    
+    // CS уже устарел, поэтому библиотека его не поддерживает.
+    assert!(phone_util.get_ndd_prefix_for_region("CS", false).is_none());
+}
+
+#[test]
+fn is_viable_phone_number() {
+    let phone_util = get_phone_util();
+    
+    assert!(!phone_util.is_viable_phone_number("1"));
+    // Только одна или две цифры перед странной недопустимой пунктуацией.
+    assert!(!phone_util.is_viable_phone_number("1+1+1"));
+    assert!(!phone_util.is_viable_phone_number("80+0"));
+    // Две цифры являются жизнеспособным номером.
+    assert!(phone_util.is_viable_phone_number("00"));
+    assert!(phone_util.is_viable_phone_number("111"));
+    // Буквенно-цифровые номера.
+    assert!(phone_util.is_viable_phone_number("0800-4-pizza"));
+    assert!(phone_util.is_viable_phone_number("0800-4-PIZZA"));
+    // Нам нужно как минимум три цифры перед любыми буквенными символами.
+    assert!(!phone_util.is_viable_phone_number("08-PIZZA"));
+    assert!(!phone_util.is_viable_phone_number("8-PIZZA"));
+    assert!(!phone_util.is_viable_phone_number("12. March"));
+}
+
+#[test]
+fn is_viable_phone_number_non_ascii() {
+    let phone_util = get_phone_util();
+
+    // Только одна или две цифры перед возможной пунктуацией, за которой следуют еще цифры.
+    // Используемый здесь знак препинания — это символ юникода u+3000.
+    assert!(phone_util.is_viable_phone_number("1　34"));
+    assert!(!phone_util.is_viable_phone_number("1　3+4"));
+    // Юникодные варианты возможного начального символа и другой разрешенной пунктуации/цифр.
+    assert!(phone_util.is_viable_phone_number("（1）　3456789"));
+    // Проверяем, что ведущий + разрешен.
+    assert!(phone_util.is_viable_phone_number("+1）　3456789"));
+}
+
+#[test]
+fn convert_alpha_characters_in_number() {
+    let phone_util = get_phone_util();
+    let input = "1800-ABC-DEF".to_string();
+    let result = phone_util.convert_alpha_characters_in_number(&input);
+    // Буквенные символы преобразуются в цифры; все остальное остается без изменений.
+    assert_eq!("1800-222-333", result);
+
+    // Пробуем с некоторыми не-ASCII символами.
+    let input = "1　（800) ABC-DEF".to_string();
+    let expected_fullwidth_output = "1　（800) 222-333";
+    let result = phone_util.convert_alpha_characters_in_number(&input);
+    assert_eq!(expected_fullwidth_output, result);
+}
+
+#[test]
 fn parse_and_keep_raw() {
     let phone_util = get_phone_util();
     let mut alpha_numeric_number = PhoneNumber::new();
@@ -2103,6 +2185,108 @@ fn normalise_strip_alpha_characters() {
     assert_eq!(expected_output, normalized_number, "Conversion did not correctly remove alpha characters");
 }
 
+#[test]
+fn normalise_strip_non_diallable_characters() {
+    let phone_util = get_phone_util();
+    let input_number = "03*4-56&+1a#234";
+    let expected_output = "03*456+1#234";
+    assert_eq!(
+        expected_output, 
+        phone_util.normalize_diallable_chars_only(&input_number), 
+        "Conversion did not correctly remove non-diallable characters"
+    );
+}
+
+#[test]
+fn maybe_strip_international_prefix() {
+    let phone_util = get_phone_util();
+    let international_prefix = "00[39]";
+    
+    let number_to_strip = "0034567700-3898003";
+    // Примечание: дефис удаляется в процессе нормализации.
+    let stripped_number = "45677003898003";
+
+    let number_with_source = phone_util
+            .maybe_strip_international_prefix_and_normalize(number_to_strip, international_prefix)
+            .unwrap();
+    assert_eq!(
+        CountryCodeSource::FROM_NUMBER_WITH_IDD,
+        number_with_source.country_code_source
+    );
+    assert_eq!(stripped_number, number_with_source.phone_number, "The number was not stripped of its international prefix.");
+
+    // Теперь номер больше не начинается с префикса IDD, поэтому он должен сообщать
+    // FROM_DEFAULT_COUNTRY.
+    assert_eq!(
+        CountryCodeSource::FROM_DEFAULT_COUNTRY,
+        phone_util.maybe_strip_international_prefix_and_normalize(&number_with_source.phone_number, international_prefix)
+            .unwrap()
+            .country_code_source
+    );
+
+    let number_to_strip = "00945677003898003";
+    let number_with_source = phone_util
+        .maybe_strip_international_prefix_and_normalize(number_to_strip, international_prefix)
+        .unwrap();
+    assert_eq!(
+        CountryCodeSource::FROM_NUMBER_WITH_IDD,
+        number_with_source.country_code_source
+    );
+    assert_eq!(stripped_number, number_with_source.phone_number, "The number was not stripped of its international prefix.");
+
+    // Проверяем, что это работает, когда международный префикс разбит пробелами.
+    let number_to_strip = "00 9 45677003898003";
+    let number_with_source = phone_util
+        .maybe_strip_international_prefix_and_normalize(number_to_strip, international_prefix)
+        .unwrap();
+    assert_eq!(
+        CountryCodeSource::FROM_NUMBER_WITH_IDD,
+        number_with_source.country_code_source
+    );
+    assert_eq!(stripped_number, number_with_source.phone_number, "The number was not stripped of its international prefix.");
+    
+    // Теперь номер больше не начинается с префикса IDD, поэтому он должен сообщать
+    // FROM_DEFAULT_COUNTRY.
+    assert_eq!(
+        CountryCodeSource::FROM_DEFAULT_COUNTRY,
+        phone_util.maybe_strip_international_prefix_and_normalize(&number_with_source.phone_number, international_prefix)
+            .unwrap()
+            .country_code_source
+    );
+
+    // Проверяем, что символ + также распознается и удаляется.
+    let number_to_strip = "+45677003898003";
+    let stripped_number_plus = "45677003898003";
+    let number_with_source = phone_util
+        .maybe_strip_international_prefix_and_normalize(number_to_strip, international_prefix)
+        .unwrap();
+    assert_eq!(
+        CountryCodeSource::FROM_NUMBER_WITH_PLUS_SIGN,
+        number_with_source.country_code_source
+    );
+    assert_eq!(stripped_number_plus, number_with_source.phone_number, "The number supplied was not stripped of the plus symbol.");
+
+    // Если после префикса идет ноль, мы не должны его удалять - ни один код страны не начинается с 0.
+    let number_to_strip = "0090112-3123";
+    let stripped_number_zero = "00901123123";
+    let number_with_source = phone_util
+        .maybe_strip_international_prefix_and_normalize(number_to_strip, international_prefix)
+        .unwrap();
+    assert_eq!(
+        CountryCodeSource::FROM_DEFAULT_COUNTRY,
+        number_with_source.country_code_source
+    );
+    assert_eq!(stripped_number_zero, number_with_source.phone_number, "The number had a 0 after the match so shouldn't be stripped.");
+    
+    // Здесь 0 отделен от IDD пробелом.
+    let number_to_strip = "009 0-112-3123";
+    assert_eq!(
+        CountryCodeSource::FROM_DEFAULT_COUNTRY,
+        phone_util.maybe_strip_international_prefix_and_normalize(number_to_strip, international_prefix)
+            .unwrap()
+            .country_code_source
+    );
+}
 
 #[test]
 fn maybe_strip_extension() {
@@ -2287,6 +2471,216 @@ fn parse_national_number() {
     short_number.set_italian_leading_zero(true);
     let test_number = phone_util.parse("0123456", RegionCode::gb()).unwrap();
     assert_eq!(short_number, test_number);
+}
+
+#[test]
+fn parse_number_with_alpha_characters() {
+    let phone_util = get_phone_util();
+
+    // Тестовый случай с буквенными символами.
+    let mut tollfree_number = PhoneNumber::new();
+    tollfree_number.set_country_code(64);
+    tollfree_number.set_national_number(800332005);
+    let mut test_number = phone_util.parse("0800 DDA 005", "NZ").unwrap();
+    assert_eq!(tollfree_number, test_number);
+
+    let mut premium_number = PhoneNumber::new();
+    premium_number.set_country_code(64);
+    premium_number.set_national_number(9003326005);
+    test_number = phone_util.parse("0900 DDA 6005", "NZ").unwrap();
+    assert_eq!(premium_number, test_number);
+
+    // Недостаточно буквенных символов, чтобы считать их преднамеренными, поэтому они удаляются.
+    test_number = phone_util.parse("0900 332 6005a", "NZ").unwrap();
+    assert_eq!(premium_number, test_number);
+
+    test_number = phone_util.parse("0900 332 600a5", "NZ").unwrap();
+    assert_eq!(premium_number, test_number);
+
+    test_number = phone_util.parse("0900 332 600A5", "NZ").unwrap();
+    assert_eq!(premium_number, test_number);
+
+    test_number = phone_util.parse("0900 a332 600A5", "NZ").unwrap();
+    assert_eq!(premium_number, test_number);
+}
+
+#[test]
+fn parse_with_international_prefixes() {
+    let phone_util = get_phone_util();
+    let mut us_number = PhoneNumber::new();
+    us_number.set_country_code(1);
+    us_number.set_national_number(6503336000);
+
+    let mut test_number = phone_util.parse("+1 (650) 333-6000", "US").unwrap();
+    assert_eq!(us_number, test_number);
+    test_number = phone_util.parse("+1-650-333-6000", "US").unwrap();
+    assert_eq!(us_number, test_number);
+
+    // Звонок на номер США из Сингапура с использованием разных поставщиков услуг
+    // 1-й тест: звонок с использованием услуги SingTel IDD (IDD - 001)
+    test_number = phone_util.parse("0011-650-333-6000", "SG").unwrap();
+    assert_eq!(us_number, test_number);
+    // 2-й тест: звонок с использованием услуги StarHub IDD (IDD - 008)
+    test_number = phone_util.parse("0081-650-333-6000", "SG").unwrap();
+    assert_eq!(us_number, test_number);
+    // 3-й тест: звонок с использованием услуги SingTel V019 (IDD - 019)
+    test_number = phone_util.parse("0191-650-333-6000", "SG").unwrap();
+    assert_eq!(us_number, test_number);
+    // Звонок на номер США из Польши
+    test_number = phone_util.parse("0~01-650-333-6000", "PL").unwrap();
+    assert_eq!(us_number, test_number);
+
+    // Использование "++" в начале.
+    test_number = phone_util.parse("++1 (650) 333-6000", "PL").unwrap();
+    assert_eq!(us_number, test_number);
+    // Использование полноширинного знака плюса.
+    test_number = phone_util.parse("＋1 (650) 333-6000", "SG").unwrap();
+    assert_eq!(us_number, test_number);
+    // Использование мягкого дефиса U+00AD.
+    test_number = phone_util.parse("1 (650) 333\u{00AD}-6000", "US").unwrap();
+    assert_eq!(us_number, test_number);
+    // Весь номер, включая знаки препинания, представлен в полноширинной форме.
+    test_number = phone_util.parse("＋１　（６５０）　３３３－６０００", "SG").unwrap();
+    assert_eq!(us_number, test_number);
+
+    // Использование тире U+30FC.
+    test_number = phone_util.parse("＋１　（６５０）　３３３ー６０００", "SG").unwrap();
+    assert_eq!(us_number, test_number);
+
+    let mut toll_free_number = PhoneNumber::new();
+    toll_free_number.set_country_code(800);
+    toll_free_number.set_national_number(12345678);
+    test_number = phone_util.parse("011 800 1234 5678", "US").unwrap();
+    assert_eq!(toll_free_number, test_number);
+}
+
+#[test]
+fn parse_with_leading_zero() {
+    let phone_util = get_phone_util();
+    let mut it_number = PhoneNumber::new();
+    it_number.set_country_code(39);
+    it_number.set_national_number(236618300);
+    it_number.set_italian_leading_zero(true);
+
+    let mut test_number = phone_util.parse("+39 02-36618 300", "NZ").unwrap();
+    assert_eq!(it_number, test_number);
+
+    test_number = phone_util.parse("02-36618 300", "IT").unwrap();
+    assert_eq!(it_number, test_number);
+
+    it_number.clear();
+    it_number.set_country_code(39);
+    it_number.set_national_number(312345678);
+    test_number = phone_util.parse("312 345 678", "IT").unwrap();
+    assert_eq!(it_number, test_number);
+}
+
+#[test]
+fn parse_national_number_argentina() {
+    let phone_util = get_phone_util();
+    // Тестирование парсинга мобильных номеров Аргентины.
+    let mut ar_number = PhoneNumber::new();
+    ar_number.set_country_code(54);
+    ar_number.set_national_number(93435551212);
+    
+    let mut test_number = phone_util.parse("+54 9 343 555 1212", "AR").unwrap();
+    assert_eq!(ar_number, test_number);
+    
+    test_number = phone_util.parse("0343 15 555 1212", "AR").unwrap();
+    assert_eq!(ar_number, test_number);
+
+    ar_number.set_national_number(93715654320);
+    test_number = phone_util.parse("+54 9 3715 65 4320", "AR").unwrap();
+    assert_eq!(ar_number, test_number);
+
+    test_number = phone_util.parse("03715 15 65 4320", "AR").unwrap();
+    assert_eq!(ar_number, test_number);
+
+    // Тестирование парсинга стационарных номеров Аргентины.
+    ar_number.set_national_number(1137970000);
+    test_number = phone_util.parse("+54 11 3797 0000", "AR").unwrap();
+    assert_eq!(ar_number, test_number);
+
+    test_number = phone_util.parse("011 3797 0000", "AR").unwrap();
+    assert_eq!(ar_number, test_number);
+
+    ar_number.set_national_number(3715654321);
+    test_number = phone_util.parse("+54 3715 65 4321", "AR").unwrap();
+    assert_eq!(ar_number, test_number);
+
+    test_number = phone_util.parse("03715 65 4321", "AR").unwrap();
+    assert_eq!(ar_number, test_number);
+
+    ar_number.set_national_number(2312340000);
+    test_number = phone_util.parse("+54 23 1234 0000", "AR").unwrap();
+    assert_eq!(ar_number, test_number);
+    
+    test_number = phone_util.parse("023 1234 0000", "AR").unwrap();
+    assert_eq!(ar_number, test_number);
+}
+
+#[test]
+fn parse_with_x_in_number() {
+    let phone_util = get_phone_util();
+    // Проверяем, что наличие 'x' в начале номера телефона допустимо и что он просто удаляется.
+    let mut ar_number = PhoneNumber::new();
+    ar_number.set_country_code(54);
+    ar_number.set_national_number(123456789);
+
+    let mut test_number = phone_util.parse("0123456789", "AR").unwrap();
+    assert_eq!(ar_number, test_number);
+
+    test_number = phone_util.parse("(0) 123456789", "AR").unwrap();
+    assert_eq!(ar_number, test_number);
+
+    test_number = phone_util.parse("0 123456789", "AR").unwrap();
+    assert_eq!(ar_number, test_number);
+
+    test_number = phone_util.parse("(0xx) 123456789", "AR").unwrap();
+    assert_eq!(ar_number, test_number);
+
+    let mut ar_from_us = PhoneNumber::new();
+    ar_from_us.set_country_code(54);
+    ar_from_us.set_national_number(81429712);
+    // Этот тест намеренно построен так, что количество цифр после xx больше 7,
+    // чтобы номер не был ошибочно принят за добавочный, так как мы разрешаем
+    // добавочные номера до 7 цифр. Это предположение на данный момент приемлемо,
+    // так как все страны, где код выбора оператора записывается в виде xx,
+    // имеют национальный значащий номер длиной более 7.
+    test_number = phone_util.parse("011xx5481429712", "US").unwrap();
+    assert_eq!(ar_from_us, test_number);
+}
+
+#[test]
+fn parse_numbers_mexico() {
+    let phone_util = get_phone_util();
+    // Тестирование парсинга стационарных номеров Мексики.
+    let mut mx_number = PhoneNumber::new();
+    mx_number.set_country_code(52);
+    mx_number.set_national_number(4499780001);
+
+    let mut test_number = phone_util.parse("+52 (449)978-0001", "MX").unwrap();
+    assert_eq!(mx_number, test_number);
+
+    test_number = phone_util.parse("01 (449)978-0001", "MX").unwrap();
+    assert_eq!(mx_number, test_number);
+
+    test_number = phone_util.parse("(449)978-0001", "MX").unwrap();
+    assert_eq!(mx_number, test_number);
+
+    // Тестирование парсинга мобильных номеров Мексики.
+    mx_number.clear();
+    mx_number.set_country_code(52);
+    mx_number.set_national_number(13312345678);
+
+    test_number = phone_util.parse("+52 1 33 1234-5678", "MX").unwrap();
+    assert_eq!(mx_number, test_number);
+
+    test_number = phone_util.parse("044 (33) 1234-5678", "MX").unwrap();
+    assert_eq!(mx_number, test_number);
+
+    test_number = phone_util.parse("045 33 1234-5678", "MX").unwrap();
+    assert_eq!(mx_number, test_number);
 }
 
 #[test]
