@@ -7,10 +7,10 @@ use crate::regexp_cache::ErrorInvalidRegex;
 #[derive(Debug, PartialEq, Error)]
 pub enum InternalLogicError {
     #[error("{0}")]
-    InvalidRegexError(#[from] ErrorInvalidRegex),
+    InvalidRegex(#[from] ErrorInvalidRegex),
     
     #[error("{0}")]
-    InvalidMetadataForValidRegionError(#[from] InvalidMetadataForValidRegionError)
+    InvalidMetadataForValidRegion(#[from] InvalidMetadataForValidRegionError)
 }   
 
 #[derive(Debug, PartialEq, Error)]
@@ -18,7 +18,7 @@ pub enum ParseError {
     // Removed as OK variant
     // NoParsingError,
     #[error("Invalid country code")]
-    InvalidCountryCodeError, // INVALID_COUNTRY_CODE in the java version.
+    InvalidCountryCode, // INVALID_COUNTRY_CODE in the java version.
     #[error("Not a number: {0}")]
     NotANumber(#[from] NotANumberError),
     #[error("Too short after idd")]
@@ -28,7 +28,7 @@ pub enum ParseError {
     #[error("Too long nsn")]
     TooLongNsn, // TOO_LONG in the java version.
     #[error("{0}")]
-    InvalidRegexError(#[from] ErrorInvalidRegex),
+    InvalidRegex(#[from] ErrorInvalidRegex),
 }
 
 #[derive(Debug, PartialEq, Error)]
@@ -38,9 +38,9 @@ pub enum NotANumberError {
     #[error("Invalid phone context")]
     InvalidPhoneContext,
     #[error("{0}")]
-    ParseNumberAsIntError(#[from] ParseIntError),
+    FailedToParseNumberAsInt(#[from] ParseIntError),
     #[error("{0}")]
-    ExtractNumberError(#[from] ExtractNumberError),
+    FailedToExtractNumber(#[from] ExtractNumberError),
 }
 
 #[derive(Debug, PartialEq, Error)]
@@ -53,22 +53,22 @@ pub enum ExtractNumberError {
 
 impl From<ExtractNumberError> for ParseError {
     fn from(value: ExtractNumberError) -> Self {
-        NotANumberError::ExtractNumberError(value).into()
+        NotANumberError::FailedToExtractNumber(value).into()
     }
 }
 
 #[derive(Debug, PartialEq, Error)]
 pub enum GetExampleNumberError {
     #[error("Parse error: {0}")]
-    ParseError(#[from] ParseError),
+    FailedToParse(#[from] ParseError),
     #[error("{0}")]
-    InternalLogicError(#[from] InternalLogicError),
+    Internal(#[from] InternalLogicError),
     #[error("No example number")]
-    NoExampleNumberError,
+    NoExampleNumber,
     #[error("Could not get number")]
-    CouldNotGetNumberError,
+    CouldNotGetNumber,
     #[error("Invalid metadata")]
-    InvalidMetadataError
+    InvalidMetadata
 }
 
 

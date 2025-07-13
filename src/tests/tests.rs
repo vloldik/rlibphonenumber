@@ -1658,20 +1658,20 @@ fn failed_parse_on_invalid_numbers() {
     );
     assert_eq!(
         phone_util.parse("+210 3456 56789", "NZ").unwrap_err(),
-        ParseError::InvalidCountryCodeError
+        ParseError::InvalidCountryCode
     );
     // 00 - правильный МНН, но 210 - невалидный код страны.
     assert_eq!(
         phone_util.parse("+ 00 210 3 331 6005", "NZ").unwrap_err(),
-        ParseError::InvalidCountryCodeError
+        ParseError::InvalidCountryCode
     );
     assert_eq!(
         phone_util.parse("123 456 7890", "ZZ").unwrap_err(),
-        ParseError::InvalidCountryCodeError
+        ParseError::InvalidCountryCode
     );
     assert_eq!(
         phone_util.parse("123 456 7890", "CS").unwrap_err(),
-        ParseError::InvalidCountryCodeError
+        ParseError::InvalidCountryCode
     );
     assert_eq!(
         phone_util.parse("0044-----", "GB").unwrap_err(),
@@ -1692,7 +1692,7 @@ fn failed_parse_on_invalid_numbers() {
     // RFC3966 phone-context является веб-сайтом.
     assert_eq!(
         phone_util.parse("tel:555-1234;phone-context=www.google.com", "ZZ").unwrap_err(),
-        ParseError::InvalidCountryCodeError
+        ParseError::InvalidCountryCode
     );
     // Это невалидно, так как отсутствует знак "+" в phone-context.
     assert!(matches!(
