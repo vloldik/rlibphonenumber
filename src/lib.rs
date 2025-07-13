@@ -41,22 +41,8 @@ pub use phonenumberutil::{
         ExtractNumberResult,
         PhoneNumberUtil
     },
-    errors::{
-        ExtractNumberError,
-        GetExampleNumberError,
-        ParseError,
-        NotANumberError,
-        ValidationError,
-        InternalLogicError,
-        InvalidNumberError,
-        InvalidMetadataForValidRegionError
-    },
-    enums::{
-        MatchType,
-        PhoneNumberType,
-        NumberLengthType,
-        PhoneNumberFormat
-    },
+    errors::{*},
+    enums::{*},
 };
 pub use generated::proto::phonemetadata::{*};
 pub use generated::proto::phonenumber::PhoneNumber;

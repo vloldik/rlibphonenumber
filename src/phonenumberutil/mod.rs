@@ -23,7 +23,6 @@ pub(self) mod helper_types;
 
 use std::sync::LazyLock;
 
-pub use enums::{MatchType, PhoneNumberFormat, PhoneNumberType, NumberLengthType};
 use crate::phonenumberutil::phonenumberutil::PhoneNumberUtil;
 
 /// Singleton instance of phone number util for general use

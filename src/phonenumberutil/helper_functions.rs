@@ -20,13 +20,16 @@ use strum::IntoEnumIterator;
 
 use crate::{
     interfaces::MatcherApi, generated::metadata::METADATA, 
-        PhoneMetadata, PhoneMetadataCollection, PhoneNumberDesc,
-        PhoneNumber,
-    
+    generated::proto::{
+        phonemetadata::{
+            PhoneMetadata, PhoneMetadataCollection, PhoneNumberDesc
+        },
+        phonenumber::PhoneNumber,
+    }  
 };
 
 use super::{
-    PhoneNumberFormat, PhoneNumberType, NumberLengthType,
+    enums::{PhoneNumberFormat, PhoneNumberType, NumberLengthType},
     errors::ValidationError,
     helper_constants::{
         OPTIONAL_EXT_SUFFIX, PLUS_SIGN, POSSIBLE_CHARS_AFTER_EXT_LABEL,

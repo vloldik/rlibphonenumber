@@ -19,26 +19,32 @@ use std::{
     sync::Arc,
 };
 
-use super::phone_number_regexps_and_mappings::PhoneNumberRegExpsAndMappings;
+use super::{
+    phone_number_regexps_and_mappings::PhoneNumberRegExpsAndMappings,
+    helper_constants::{
+        DEFAULT_EXTN_PREFIX, MAX_LENGTH_COUNTRY_CODE, MAX_LENGTH_FOR_NSN, MIN_LENGTH_FOR_NSN,
+        NANPA_COUNTRY_CODE, PLUS_SIGN, REGION_CODE_FOR_NON_GEO_ENTITY, RFC3966_EXTN_PREFIX,
+        RFC3966_ISDN_SUBADDRESS, RFC3966_PHONE_CONTEXT, RFC3966_PREFIX,
+    }, helper_functions::{
+        self, copy_core_fields_only, get_number_desc_by_type, get_supported_types_for_metadata,
+        is_national_number_suffix_of_the_other, load_compiled_metadata, normalize_helper,
+        prefix_number_with_country_calling_code, test_number_length,
+        test_number_length_with_unknown_type,
+    },
+    helper_types::{PhoneNumberWithCountryCodeSource}, 
+    enums::{MatchType, PhoneNumberFormat, PhoneNumberType, NumberLengthType},
+    errors::{
+        ExtractNumberError, GetExampleNumberError, InternalLogicError,
+        InvalidMetadataForValidRegionError, InvalidNumberError, ParseError,
+        ValidationError, NotANumberError
+    },
+};
 use crate::{
-    region_code::RegionCode, interfaces::MatcherApi, macros::owned_from_cow_or, PhoneMetadataCollection, phonenumberutil::{
-        errors::{
-            ExtractNumberError, GetExampleNumberError, InternalLogicError,
-            InvalidMetadataForValidRegionError, InvalidNumberError, ParseError,
-            ValidationError, NotANumberError
-        }, helper_constants::{
-            DEFAULT_EXTN_PREFIX, MAX_LENGTH_COUNTRY_CODE, MAX_LENGTH_FOR_NSN, MIN_LENGTH_FOR_NSN,
-            NANPA_COUNTRY_CODE, PLUS_SIGN, REGION_CODE_FOR_NON_GEO_ENTITY, RFC3966_EXTN_PREFIX,
-            RFC3966_ISDN_SUBADDRESS, RFC3966_PHONE_CONTEXT, RFC3966_PREFIX,
-        }, helper_functions::{
-            self, copy_core_fields_only, get_number_desc_by_type, get_supported_types_for_metadata,
-            is_national_number_suffix_of_the_other, load_compiled_metadata, normalize_helper,
-            prefix_number_with_country_calling_code, test_number_length,
-            test_number_length_with_unknown_type,
-        }, helper_types::{PhoneNumberWithCountryCodeSource}, MatchType, PhoneNumberFormat, PhoneNumberType, NumberLengthType
-    }, 
-    NumberFormat, PhoneMetadata, PhoneNumberDesc,
-    CountryCodeSource, PhoneNumber,
+    generated::proto::{
+        phonemetadata::{PhoneMetadataCollection, NumberFormat, PhoneMetadata, PhoneNumberDesc},
+        phonenumber::{phone_number::CountryCodeSource, PhoneNumber}
+    },
+    region_code::RegionCode, interfaces::MatcherApi, macros::owned_from_cow_or,
     regex_based_matcher::RegexBasedMatcher, regex_util::{RegexConsume, RegexFullMatch}, regexp_cache::ErrorInvalidRegex, string_util::strip_cow_prefix
 };
 
