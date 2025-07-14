@@ -6,6 +6,8 @@
 
 A Rust port of Google's comprehensive library for parsing, formatting, and validating international phone numbers.
 
+**Built on base libphonenumber 9.0.8**
+
 ## Overview
 
 This library is a new adaptation of Google's `libphonenumber` for Rust. Its primary goal is to provide a powerful and efficient tool for handling phone numbers, with a structure that is intuitively close to the original C++ version.
