@@ -7,6 +7,7 @@
 A Rust port of Google's comprehensive library for parsing, formatting, and validating international phone numbers.
 
 **Built on base libphonenumber 9.0.8**
+**Used metadata version: 9.0.9**
 
 ## Overview
 

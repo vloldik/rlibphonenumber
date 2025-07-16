@@ -16,7 +16,7 @@ use crate::{
         phonenumber::phone_number::CountryCodeSource, 
         phonenumber::PhoneNumber,
     },
-    phonenumberutil::phonenumberutil::PhoneNumberUtil,
+    phonenumberutil::phonenumberutil_internal::PhoneNumberUtilInternal,
 };
 
 use super::region_code::RegionCode;
@@ -25,7 +25,7 @@ use crate::generated::metadata::TEST_METADATA;
 static ONCE: std::sync::Once = std::sync::Once::new();
 
 #[cfg(test)]
-fn get_phone_util() -> PhoneNumberUtil {
+fn get_phone_util() -> PhoneNumberUtilInternal {
     ONCE.call_once(||colog::default_builder()
         .filter_level(log::LevelFilter::Trace)
         .init()
@@ -33,7 +33,7 @@ fn get_phone_util() -> PhoneNumberUtil {
 
     let metadata = PhoneMetadataCollection::parse_from_bytes(&TEST_METADATA)
         .expect("Metadata should be valid");
-    return PhoneNumberUtil::new_for_metadata(metadata);
+    return PhoneNumberUtilInternal::new_for_metadata(metadata);
 }
 
 #[test]
@@ -2696,7 +2696,7 @@ fn parse_numbers_mexico() {
 
 #[test]
 fn parse_with_phone_context() {
-    fn assert_throws_for_invalid_phone_context(phone_util: &PhoneNumberUtil, number_to_parse: &str) {
+    fn assert_throws_for_invalid_phone_context(phone_util: &PhoneNumberUtilInternal, number_to_parse: &str) {
         let result = phone_util.parse(number_to_parse, RegionCode::zz());
         assert!(result.is_err(), "Expected an error for: {}", number_to_parse);
     }

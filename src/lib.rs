@@ -30,8 +30,8 @@ pub(crate) mod string_util;
 mod macros;
 
 pub use phonenumberutil::{
-    PHONE_NUMBER_UTIL,
-    phonenumberutil::{
+    // PHONE_NUMBER_UTIL,
+    phonenumberutil_internal::{
         RegexResult,
         MatchResult,
         ParseResult,
@@ -39,7 +39,7 @@ pub use phonenumberutil::{
         ExampleNumberResult,
         InternalLogicResult,
         ExtractNumberResult,
-        PhoneNumberUtil
+        PhoneNumberUtilInternal
     },
     errors::{*},
     enums::{*},

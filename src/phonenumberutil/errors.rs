@@ -77,7 +77,7 @@ pub enum GetExampleNumberError {
     #[error("Parse error: {0}")]
     FailedToParse(#[from] ParseError),
     #[error("{0}")]
-    Internal(#[from] InternalLogicError),
+    InvalidRegex(#[from] InvalidRegexError),
     #[error("No example number")]
     NoExampleNumber,
     #[error("Could not get number")]

@@ -17,15 +17,14 @@ mod helper_constants;
 mod helper_functions;
 pub mod errors;
 pub mod enums;
+pub(super) mod phonenumberutil_internal;
 pub mod phonenumberutil;
 mod phone_number_regexps_and_mappings;
 pub(self) mod helper_types;
 
 use std::sync::LazyLock;
 
-use crate::phonenumberutil::phonenumberutil::PhoneNumberUtil;
-
-/// Singleton instance of phone number util for general use
-pub static PHONE_NUMBER_UTIL: LazyLock<PhoneNumberUtil> = LazyLock::new(|| {
-    PhoneNumberUtil::new()
-});
+// /// Singleton instance of phone number util for general use
+// pub static PHONE_NUMBER_UTIL: LazyLock<PhoneNumberUtilInternal> = LazyLock::new(|| {
+//     PhoneNumberUtilInternal::new()
+// });
