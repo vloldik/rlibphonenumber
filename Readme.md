@@ -40,62 +40,112 @@ The following benchmarks were run against the `rust-phonenumber` crate. All test
 |:--- |:---:|:---:|:---:|
 | **Parse** | **~11.60 µs** | ~13.45 µs | **~16% faster** |
 
-This significant performance advantage is achieved through a focus on minimizing allocations, a more direct implementation path, and the use of modern tooling for metadata generation.
-
-## Current Status
-
-The project is currently in its initial phase of development. The core functionalities are being ported module by module to ensure quality and consistency.
-
-### Implemented:
-*   **PhoneNumberUtil:** The main utility for all phone number operations, such as parsing, formatting, and validation (Passes original tests).
-
-### Future Plans:
-The roadmap includes porting the following key components:
-
-*   **AsYouTypeFormatter:** To format phone numbers as they are being typed.
-*   **PhoneNumberOfflineGeocoder:** To provide geographical information for a phone number.
-*   **PhoneNumberToCarrierMapper:** To identify the carrier associated with a phone number.
-
 ## Installation
 
-Add this to your `Cargo.toml`:
+Add `rlibphonenumber` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rlibphonenumber = "0.1.0" # Replace with the actual version
+rlibphonenumber = "0.2.0" # Please use the latest version from crates.io
 ```
 
-## Getting Started
+## Getting Started: A Detailed Example
 
-Here is a basic example of how to parse and format a phone number:
+Using the library is straightforward. The `PhoneNumberUtil` struct is the main entry point for all operations. For convenience, a thread-safe static instance, `PHONE_NUMBER_UTIL`, is provided.
+
+Here is a detailed example that demonstrates how to parse a number, validate it, and format it in several standard ways.
 
 ```rust
-use rlibphonenumber::{PhoneNumberFormat, PHONE_NUMBER_UTIL};
-
+use rlibphonenumber::{
+    // or instead you can use PhoneNumberUtil::new()
+    PHONE_NUMBER_UTIL, 
+    PhoneNumberFormat, 
+};
+#[test]
 fn main() {
-    let number_to_parse = "+14155552671";
-    let default_region = "US";
+    let number_string = "+1-587-530-2271";
+    let region_code = "US"; // United States
 
-    match PHONE_NUMBER_UTIL.parse(number_to_parse, default_region) {
+    // 1. Parse the number
+    match PHONE_NUMBER_UTIL.parse(number_string, region_code) {
         Ok(number) => {
-            println!("Parsed number: {:?}", number);
+            println!("✅ Successfully parsed number.");
+            println!("   - Original input: '{}' (in '{}')", number_string, region_code);
+            println!("   - Country Code: {}", number.country_code());
+            println!("   - National Number: {}", number.national_number());
+            
+            // 2. Validate the number
+            // `is_valid_number` performs a full validation, checking length,
+            // prefix, and other region-specific rules.
+            let is_valid = PHONE_NUMBER_UTIL.is_valid_number(&number);
+            println!("\nIs the number valid? {}", if is_valid { "Yes" } else { "No" });
 
-            let formatted_number = PHONE_NUMBER_UTIL.format(&number, PhoneNumberFormat::International).unwrap();
-            println!("International format: {}", formatted_number);
+            if !is_valid {
+                return;
+            }
 
-            let is_valid = PHONE_NUMBER_UTIL.is_valid_number(&number).unwrap();
-            println!("Is the number valid? {}", is_valid);
+            // 3. Format the number in different standard formats
+            let international_format = PHONE_NUMBER_UTIL.format(&number, PhoneNumberFormat::International);
+            let national_format = PHONE_NUMBER_UTIL.format(&number, PhoneNumberFormat::National);
+            let e164_format = PHONE_NUMBER_UTIL.format(&number, PhoneNumberFormat::E164);
+            let rfc3966_format = PHONE_NUMBER_UTIL.format(&number, PhoneNumberFormat::RFC3966);
+
+            println!("\nFormatted Outputs:");
+            println!("   - International: {}", international_format);
+            println!("   - National:      {}", national_format);
+            println!("   - E.164:         {}", e164_format);
+            println!("   - RFC3966:       {}", rfc3966_format);
+            
+            // 4. Get additional information about the number
+            let number_type = PHONE_NUMBER_UTIL.get_number_type(&number);
+            let number_region = PHONE_NUMBER_UTIL.get_region_code_for_number(&number);
+
+            println!("\nAdditional Information:");
+            println!("   - Number Type:   {:?}", number_type); // e.g., FixedLine
+            println!("   - Number Region: {}", number_region); // e.g., US
         }
         Err(e) => {
-            println!("Error parsing number: {:?}", e);
+            // Handle parsing errors, e.g., if the number is invalid or not a number.
+            println!("❌ Error parsing number: {:?}", e);
         }
     }
 }
 ```
 
-## For Contributors
+### Expected Output:
 
-Contributions are **highly** welcome! Whether you are fixing a bug, improving documentation, or helping to port a new module, your help is appreciated.
+```text
+✅ Successfully parsed number.
+   - Original input: '+1-587-530-2271' (in 'US')
+   - Country Code: 1
+   - National Number: 5875302271
+
+Is the number valid? Yes
+
+Formatted Outputs:
+   - International: +1 587-530-2271
+   - National:      (587) 530-2271
+   - E.164:         +15875302271
+   - RFC3966:       tel:+1-587-530-2271
+
+Additional Information:
+   - Number Type:   FixedLineOrMobile
+   - Number Region: CA
+```
+
+## Project Status
+
+The library is under active development. The core `PhoneNumberUtil` is fully implemented and passes the original library's test suite.
+
+The project roadmap includes porting these additional components:
+
+*   **`AsYouTypeFormatter`**: For formatting phone numbers as a user types.
+*   **`PhoneNumberOfflineGeocoder`**: To provide geographical location information for a number.
+*   **`PhoneNumberToCarrierMapper`**: To identify the carrier associated with a number.
+
+## Contributing
+
+Contributions are highly welcome! Whether you are fixing a bug, improving documentation, or helping to port a new module, your help is appreciated.
 
 ### Code Generation
 
@@ -103,7 +153,7 @@ To maintain consistency with the original library, this project uses pre-compile
 
 The `tools` directory contains a rewritten Rust-based code generator for the C++ pre-compiled metadata.
 
-To run the code generation process, simply execute the following script:
+To run the code generation process, execute the following script:
 
 ```sh
 ./tools/scripts/generate_metadata.sh

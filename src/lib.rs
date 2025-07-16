@@ -40,4 +40,3 @@ pub use generated::proto::phonenumber::PhoneNumber;
 pub use generated::proto::phonenumber::phone_number::CountryCodeSource;
 pub use regexp_cache::InvalidRegexError;
 mod tests;
-
