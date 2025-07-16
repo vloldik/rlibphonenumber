@@ -43,6 +43,15 @@ pub struct PhoneNumberUtil {
 }
 
 impl PhoneNumberUtil {
+    
+    /// Creates new `PhoneNumberUtil` instance
+    pub fn new() -> Self {
+        Self { util_internal: 
+            PhoneNumberUtilInternal::new()
+                .expect("Metadata should be valid and all regex should compile") 
+        }
+    }
+
     /// Checks if a `PhoneNumber` can be dialed internationally.
     ///
     /// # Parameters

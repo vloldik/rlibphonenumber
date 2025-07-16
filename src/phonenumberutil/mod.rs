@@ -24,7 +24,9 @@ pub(self) mod helper_types;
 
 use std::sync::LazyLock;
 
-// /// Singleton instance of phone number util for general use
-// pub static PHONE_NUMBER_UTIL: LazyLock<PhoneNumberUtilInternal> = LazyLock::new(|| {
-//     PhoneNumberUtilInternal::new()
-// });
+use crate::phonenumberutil::phonenumberutil::PhoneNumberUtil;
+
+/// Singleton instance of phone number util for general use
+pub static PHONE_NUMBER_UTIL: LazyLock<PhoneNumberUtil> = LazyLock::new(|| {
+    PhoneNumberUtil::new()
+});
