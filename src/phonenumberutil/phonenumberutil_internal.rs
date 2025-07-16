@@ -1,5 +1,5 @@
 // Copyright (C) 2009 The Libphonenumber Authors
-// Copyright (C) 2025 The Kashin Vladislav (Rust adaptation author)
+// Copyright (C) 2025 Kashin Vladislav (Rust adaptation author)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -35,17 +35,15 @@ use super::{
     enums::{MatchType, PhoneNumberFormat, PhoneNumberType, NumberLengthType},
     errors::{
         ExtractNumberError, GetExampleNumberError, InternalLogicError,
-        InvalidMetadataForValidRegionError, InvalidNumberError, ParseError,
-        ValidationError, NotANumberError
+        InvalidMetadataForValidRegionError, InvalidNumberErrorInternal, ParseError,
+        ValidationError, NotANumberError, ParseErrorInternal, 
     },
 };
 use crate::{
     generated::proto::{
-        phonemetadata::{PhoneMetadataCollection, NumberFormat, PhoneMetadata, PhoneNumberDesc},
+        phonemetadata::{NumberFormat, PhoneMetadata, PhoneMetadataCollection, PhoneNumberDesc},
         phonenumber::{phone_number::CountryCodeSource, PhoneNumber}
-    },
-    region_code::RegionCode, interfaces::MatcherApi, macros::owned_from_cow_or,
-    regex_based_matcher::RegexBasedMatcher, regex_util::{RegexConsume, RegexFullMatch}, regexp_cache::InvalidRegexError, string_util::strip_cow_prefix
+    }, interfaces::MatcherApi, macros::owned_from_cow_or, regex_based_matcher::RegexBasedMatcher, regex_util::{RegexConsume, RegexFullMatch}, regexp_cache::InvalidRegexError, region_code::RegionCode, string_util::strip_cow_prefix, GetExampleNumberErrorInternal,
 };
 
 use dec_from_char::DecimalExtended;
@@ -56,11 +54,11 @@ use regex::Regex;
 
 pub type RegexResult<T> = std::result::Result<T, InvalidRegexError>;
 
-pub type ParseResult<T> = std::result::Result<T, ParseError>;
+pub type ParseResult<T> = std::result::Result<T, ParseErrorInternal>;
 
-pub type ExampleNumberResult = std::result::Result<PhoneNumber, GetExampleNumberError>;
+pub type ExampleNumberResult = std::result::Result<PhoneNumber, GetExampleNumberErrorInternal>;
 pub type ValidationResult = std::result::Result<NumberLengthType, ValidationError>;
-pub type MatchResult = std::result::Result<MatchType, InvalidNumberError>;
+pub type MatchResult = std::result::Result<MatchType, InvalidNumberErrorInternal>;
 pub type ExtractNumberResult<T> = std::result::Result<T, ExtractNumberError>;
 pub type InternalLogicResult<T> = std::result::Result<T, InternalLogicError>;
 
@@ -157,21 +155,14 @@ impl PhoneNumberUtilInternal {
     /// This method loads the compiled metadata for parsing, formatting, and validating phone numbers.
     /// 
     /// You probably want use `PHONE_NUMBER_UTIL` singleton instead
-    pub fn new() -> Self {
-        let metadata_collection = match load_compiled_metadata() {
-            Err(err) => {
-                let err_message = format!("Could not parse compiled-in metadata: {:?}", err);
-                error!("{}", err_message);
-                panic!("{}", err_message);
-            }
-            Ok(metadata) => metadata,
-        };
-        Self::new_for_metadata(metadata_collection)
+    pub fn new() -> Result<Self, protobuf::Error> {
+        let metadata_collection = load_compiled_metadata()?;
+        Ok(Self::new_for_metadata(metadata_collection))
     }
 
     /// Gets an iterator over all region codes supported by the library.
     /// These are the regions for which metadata is available.
-    pub fn get_supported_regions(&self) -> impl Iterator<Item = &str> {
+    pub fn get_supported_regions(&self) -> impl ExactSizeIterator<Item = &str> {
         self.region_to_metadata_map.keys().map(|k| k.as_str())
     }
 
@@ -188,6 +179,10 @@ impl PhoneNumberUtilInternal {
         self.country_calling_code_to_region_code_map
             .iter()
             .map(|(k, _)| *k)
+    }
+
+    pub fn is_nanpa_country(&self, region_code: &str) -> bool {
+        self.nanpa_regions.contains(region_code)
     }
 
     /// Gets a list of all supported phone number types for a given region.
@@ -227,6 +222,13 @@ impl PhoneNumberUtilInternal {
                 );
                 None
             })
+    }
+
+    pub fn get_country_code_for_region(&self, region_code: &str) -> Option<i32> {
+        self
+            .region_to_metadata_map
+            .get(region_code)
+            .map(| metadata | metadata.country_code())
     }
 
     pub fn get_extn_patterns_for_matching(&self) -> &str {
@@ -928,7 +930,7 @@ impl PhoneNumberUtilInternal {
     pub fn get_number_type(
         &self,
         phone_number: &PhoneNumber,
-    ) -> InternalLogicResult<PhoneNumberType> {
+    ) -> RegexResult<PhoneNumberType> {
         let region_code = self.get_region_code_for_number(phone_number)?;
         let Some(metadata) =
             self.get_metadata_for_region_or_calling_code(phone_number.country_code(), region_code)
@@ -1104,7 +1106,7 @@ impl PhoneNumberUtilInternal {
     pub fn can_be_internationally_dialled(
         &self,
         phone_number: &PhoneNumber,
-    ) -> InternalLogicResult<bool> {
+    ) -> RegexResult<bool> {
         let region_code = self.get_region_code_for_number(phone_number)?;
         let Some(metadata) = self.region_to_metadata_map.get(region_code) else {
             // Note numbers belonging to non-geographical entities (e.g. +800 numbers)
@@ -1652,7 +1654,7 @@ impl PhoneNumberUtilInternal {
                 Self::extract_phone_context(number_to_parse, index_of_phone_context);
             if !self.is_phone_context_valid(phone_context) {
                 trace!("The phone-context value for phone number {number_to_parse} is invalid.");
-                return Err(NotANumberError::InvalidPhoneContext.into());
+                return Err(ParseErrorInternal::FailedToParse(NotANumberError::InvalidPhoneContext.into()));
             }
             // If the phone context contains a phone number prefix, we need to capture
             // it, whereas domains will be ignored.
@@ -1677,7 +1679,10 @@ impl PhoneNumberUtilInternal {
         } else {
             // Extract a possible number from the string passed in (this strips leading
             // characters that could not be the start of a phone number.)
-            national_number.push_str(self.extract_possible_number(number_to_parse)?);
+            national_number.push_str(self
+                .extract_possible_number(number_to_parse)
+                .map_err(| err | ParseErrorInternal::FailedToParse(err.into()))?
+            );
         }
 
         // Delete the isdn-subaddress and everything after it if it is present. Note
@@ -1900,12 +1905,12 @@ impl PhoneNumberUtilInternal {
         let national_number = self.build_national_number_for_parsing(number_to_parse)?;
         if !self.is_viable_phone_number(&national_number) {
             trace!("The string supplied did not seem to be a phone number '{national_number}'.");
-            return Err(ParseError::NotANumber(NotANumberError::NotMatchedValidNumberPattern));
+            return Err(ParseError::NotANumber(NotANumberError::NotMatchedValidNumberPattern).into());
         }
 
         if check_region && !self.check_region_for_parsing(&national_number, default_region) {
             trace!("Missing or invalid default country.");
-            return Err(ParseError::InvalidCountryCode);
+            return Err(ParseError::InvalidCountryCode.into());
         }
         let mut temp_number = PhoneNumber::new();
         if keep_raw_input {
@@ -1930,7 +1935,7 @@ impl PhoneNumberUtilInternal {
                 &mut temp_number,
             )
             .or_else(|err| {
-                if !matches!(err, ParseError::InvalidCountryCode) {
+                if !matches!(err, ParseErrorInternal::FailedToParse(ParseError::InvalidCountryCode)) {
                     return Err(err);
                 }
                 let plus_match = self.reg_exps.plus_chars_pattern.find_start(national_number);
@@ -2034,7 +2039,9 @@ impl PhoneNumberUtilInternal {
         let number_as_int = u64::from_str_radix(&normalized_national_number, 10);
         match number_as_int {
             Ok(number_as_int) => temp_number.set_national_number(number_as_int),
-            Err(err) => return Err(NotANumberError::FailedToParseNumberAsInt(err).into()),
+            Err(err) => return Err(ParseErrorInternal::FailedToParse(
+                NotANumberError::FailedToParseNumberAsInt(err).into()
+            ).into()),
         }
         return Ok(temp_number);
     }
@@ -2151,14 +2158,14 @@ impl PhoneNumberUtilInternal {
                 long enough to be a viable phone number.",
                     national_number
                 );
-                return Err(ParseError::TooShortAfterIdd);
+                return Err(ParseError::TooShortAfterIdd.into());
             }
             let Some((national_number, potential_country_code)) =
                 self.extract_country_code(national_number)
             else {
                 // If this fails, they must be using a strange country calling code that we
                 // don't recognize, or that doesn't exist.
-                return Err(ParseError::InvalidCountryCode);
+                return Err(ParseError::InvalidCountryCode.into());
             };
             phone_number.set_country_code(potential_country_code);
             return Ok(national_number);
@@ -2236,7 +2243,7 @@ impl PhoneNumberUtilInternal {
     pub fn get_invalid_example_number(&self, region_code: &str) -> ExampleNumberResult {
         let Some(region_metadata) = self.region_to_metadata_map.get(region_code) else {
             warn!("Invalid or unknown region code ({}) provided.", region_code);
-            return Err(GetExampleNumberError::InvalidMetadata);
+            return Err(GetExampleNumberError::InvalidRegionCode.into());
         };
 
         // We start off with a valid fixed-line number since every country supports
@@ -2247,7 +2254,7 @@ impl PhoneNumberUtilInternal {
 
         if !desc.has_example_number() {
             // This shouldn't happen - we have a test for this.
-            return Err(GetExampleNumberError::NoExampleNumber);
+            return Err(GetExampleNumberError::NoExampleNumber.into());
         }
 
         let example_number = desc.example_number();
@@ -2280,7 +2287,7 @@ impl PhoneNumberUtilInternal {
             }
         }
         // We have a test to check that this doesn't happen for any of our supported
-        Err(GetExampleNumberError::CouldNotGetNumber)
+        Err(GetExampleNumberError::CouldNotGetNumber.into())
     }
 
     /// Gets an example of a valid phone number for a given region and type.
@@ -2296,7 +2303,7 @@ impl PhoneNumberUtilInternal {
     ) -> ExampleNumberResult {
         let Some(region_metadata) = self.region_to_metadata_map.get(region_code) else {
             warn!("Invalid or unknown region code ({}) provided.", region_code);
-            return Err(GetExampleNumberError::InvalidMetadata);
+            return Err(GetExampleNumberError::InvalidRegionCode.into());
         };
         let desc = get_number_desc_by_type(region_metadata, phone_number_type);
         if desc.has_example_number() {
@@ -2304,7 +2311,7 @@ impl PhoneNumberUtilInternal {
                 .parse(desc.example_number(), region_code)
                 .inspect_err(|err| error!("Error parsing example number ({:?})", err))?);
         }
-        Err(GetExampleNumberError::CouldNotGetNumber)
+        Err(GetExampleNumberError::CouldNotGetNumber.into())
     }
 
     /// Gets an example of a valid phone number for a given region and type.
@@ -2334,7 +2341,7 @@ impl PhoneNumberUtilInternal {
                     .country_code_to_non_geographical_metadata_map
                     .get(&country_calling_code)
                 else {
-                    return Some(Err(GetExampleNumberError::InvalidMetadata));
+                    return Some(Err(GetExampleNumberError::InvalidRegionCode.into()));
                 };
                 let desc = get_number_desc_by_type(metadata, phone_number_type);
                 if desc.has_example_number() {
@@ -2348,7 +2355,7 @@ impl PhoneNumberUtilInternal {
                             ),
                             RegionCode::get_unknown(),
                         )
-                        .map_err(|err| GetExampleNumberError::FailedToParse(err)),
+                        .map_err(|err| err.into()),
                     );
                 }
                 None
@@ -2357,7 +2364,7 @@ impl PhoneNumberUtilInternal {
             return res;
         }
         // There are no example numbers of this type for any country in the library.
-        Err(GetExampleNumberError::CouldNotGetNumber)
+        Err(GetExampleNumberError::CouldNotGetNumber.into())
     }
 
     /// Gets an example of a valid phone number for a non-geographical entity.
@@ -2377,7 +2384,7 @@ impl PhoneNumberUtilInternal {
                 "Invalid or unknown country calling code provided: {}",
                 country_calling_code
             );
-            return Err(GetExampleNumberError::InvalidMetadata);
+            return Err(GetExampleNumberError::InvalidRegionCode.into());
         };
         // For geographical entities, fixed-line data is always present. However,
         // for non-geographical entities, this is not the case, so we have to go
@@ -2409,7 +2416,7 @@ impl PhoneNumberUtilInternal {
                 RegionCode::get_unknown(),
             )?);
         }
-        return Err(GetExampleNumberError::CouldNotGetNumber);
+        return Err(GetExampleNumberError::CouldNotGetNumber.into());
     }
 
     /// Strips any international prefix (such as +, 00, 011) present in the number
@@ -2523,7 +2530,7 @@ impl PhoneNumberUtilInternal {
     /// # Arguments
     ///
     /// * `phone_number` - The phone number to check.
-    pub fn is_number_geographical(&self, phone_number: &PhoneNumber) -> InternalLogicResult<bool> {
+    pub fn is_number_geographical(&self, phone_number: &PhoneNumber) -> RegexResult<bool> {
         Ok(self.is_number_geographical_by_country_code_and_type(
             self.get_number_type(phone_number)?,
             phone_number.country_code(),
@@ -2874,8 +2881,8 @@ impl PhoneNumberUtilInternal {
                 return self.is_number_match_with_one_string(&first_number_as_proto, second_number);
             }
             Err(err) => {
-                if !matches!(err, ParseError::InvalidCountryCode) {
-                    return Err(InvalidNumberError(err));
+                if !matches!(err, ParseErrorInternal::FailedToParse(ParseError::InvalidCountryCode)) {
+                    return Err(err.into());
                 }
             }
         }
@@ -2884,8 +2891,8 @@ impl PhoneNumberUtilInternal {
                 return self.is_number_match_with_one_string(&second_number_as_proto, first_number);
             }
             Err(err) => {
-                if !matches!(err, ParseError::InvalidCountryCode) {
-                    return Err(InvalidNumberError(err));
+                if !matches!(err, ParseErrorInternal::FailedToParse(ParseError::InvalidCountryCode)) {
+                    return Err(err.into());
                 }
                 let first_number_as_proto =
                     self.parse_helper(first_number, RegionCode::get_unknown(), false, false)?;
@@ -2919,8 +2926,8 @@ impl PhoneNumberUtilInternal {
                 return Ok(self.is_number_match(first_number, &second_number_as_proto));
             }
             Err(err) => {
-                if !matches!(err, ParseError::InvalidCountryCode) {
-                    return Err(InvalidNumberError(err));
+                if !matches!(err, ParseErrorInternal::FailedToParse(ParseError::InvalidCountryCode)) {
+                    return Err(err.into());
                 }
             }
         }

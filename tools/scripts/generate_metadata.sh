@@ -11,7 +11,7 @@ rust_build_jar="$javadir/rust-build/target/rust-build-1.0-SNAPSHOT-jar-with-depe
 
 copyright_header="\
 // Copyright (C) 2009 The Libphonenumber Authors
-// Copyright (C) 2025 The Kashin Vladislav (Rust adaptation author)
+// Copyright (C) 2025 Kashin Vladislav (Rust adaptation author)
 //
 // Licensed under the Apache License, Version 2.0 (the \"License\");
 // you may not use this file except in compliance with the License.

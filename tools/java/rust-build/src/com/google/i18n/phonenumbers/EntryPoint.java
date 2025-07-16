@@ -1,6 +1,6 @@
 /*
  *  Copyright (C) 2011 The Libphonenumber Authors
- *  Copyright (C) 2025 The Kashin Vladislav (modified)
+ *  Copyright (C) 2025 Kashin Vladislav (modified)
 
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");

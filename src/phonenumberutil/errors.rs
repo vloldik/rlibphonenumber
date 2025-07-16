@@ -1,5 +1,5 @@
 // Copyright (C) 2009 The Libphonenumber Authors
-// Copyright (C) 2025 The Kashin Vladislav (Rust adaptation author)
+// Copyright (C) 2025 Kashin Vladislav (Rust adaptation author)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,6 +29,14 @@ pub enum InternalLogicError {
 }   
 
 #[derive(Debug, PartialEq, Error)]
+pub enum ParseErrorInternal {
+    #[error("{0}")]
+    FailedToParse(#[from] ParseError),
+    #[error("{0}")]
+    RegexError(#[from] InvalidRegexError)
+}
+
+#[derive(Debug, PartialEq, Error)]
 pub enum ParseError {
     // Removed as OK variant
     // NoParsingError,
@@ -42,8 +50,6 @@ pub enum ParseError {
     TooShortNsn,
     #[error("Too long nsn")]
     TooLongNsn, // TOO_LONG in the java version.
-    #[error("{0}")]
-    InvalidRegex(#[from] InvalidRegexError),
 }
 
 #[derive(Debug, PartialEq, Error)]
@@ -66,26 +72,34 @@ pub enum ExtractNumberError {
     NotANumber,
 }
 
-impl From<ExtractNumberError> for ParseError {
-    fn from(value: ExtractNumberError) -> Self {
-        NotANumberError::FailedToExtractNumber(value).into()
-    }
+
+#[derive(Debug, PartialEq, Error)]
+pub enum GetExampleNumberErrorInternal {
+    #[error("{0}")]
+    FailedToGetExampleNumber(#[from] GetExampleNumberError),
+    #[error("{0}")]
+    RegexError(#[from] InvalidRegexError)
 }
 
 #[derive(Debug, PartialEq, Error)]
 pub enum GetExampleNumberError {
     #[error("Parse error: {0}")]
     FailedToParse(#[from] ParseError),
-    #[error("{0}")]
-    InvalidRegex(#[from] InvalidRegexError),
     #[error("No example number")]
     NoExampleNumber,
     #[error("Could not get number")]
     CouldNotGetNumber,
-    #[error("Invalid metadata")]
-    InvalidMetadata
+    #[error("Invalid country code provided")]
+    InvalidRegionCode
 }
 
+#[derive(Debug, PartialEq, Error)]
+pub enum InvalidNumberErrorInternal {
+    #[error("{0}")]
+    InvalidNumber(#[from] InvalidNumberError),
+    #[error("{0}")]
+    InvalidRegex(#[from] InvalidRegexError)
+}
 
 #[derive(Error, Debug, PartialEq)]
 #[error("Invalid number given")]
@@ -120,3 +134,62 @@ pub enum ValidationError {
     #[error("The number is longer than all valid numbers for this region")]
     TooLong,
 }
+
+impl From<ParseErrorInternal> for GetExampleNumberErrorInternal {
+    fn from(value: ParseErrorInternal) -> Self {
+        match value {
+            ParseErrorInternal::FailedToParse(err) => 
+                GetExampleNumberError::FailedToParse(err).into(),
+            ParseErrorInternal::RegexError(err) =>
+                GetExampleNumberErrorInternal::RegexError(err)
+        }
+    }
+}
+
+impl From<ParseErrorInternal> for InvalidNumberErrorInternal {
+    fn from(value: ParseErrorInternal) -> Self {
+        match value {
+            ParseErrorInternal::FailedToParse(err) => 
+                InvalidNumberError(err).into(),
+            ParseErrorInternal::RegexError(err) =>
+                InvalidNumberErrorInternal::InvalidRegex(err)
+        }
+    }
+}
+
+impl From<ExtractNumberError> for ParseError {
+    fn from(value: ExtractNumberError) -> Self {
+        NotANumberError::FailedToExtractNumber(value).into()
+    }
+}
+
+impl GetExampleNumberErrorInternal {
+    pub fn into_public(self) -> GetExampleNumberError {
+        match self {
+            GetExampleNumberErrorInternal::FailedToGetExampleNumber(err) => err,
+            GetExampleNumberErrorInternal::RegexError(err) => 
+                panic!("A valid regex is expected in metadata; this indicates a library bug! {}", err)
+        }
+    }
+}
+
+impl ParseErrorInternal {
+    pub fn into_public(self) -> ParseError {
+        match self {
+            ParseErrorInternal::FailedToParse(err) => err,
+            ParseErrorInternal::RegexError(err) => 
+                panic!("A valid regex is expected in metadata; this indicates a library bug! {}", err)
+        }
+    }
+}
+
+impl InvalidNumberErrorInternal {
+    pub fn into_public(self) -> InvalidNumberError {
+        match self {
+            InvalidNumberErrorInternal::InvalidNumber(err) => err,
+            InvalidNumberErrorInternal::InvalidRegex(err) => 
+                panic!("A valid regex is expected in metadata; this indicates a library bug! {}", err)
+        }
+    }
+}
+

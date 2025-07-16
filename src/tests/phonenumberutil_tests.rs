@@ -57,7 +57,7 @@ fn interchange_invalid_codepoints() {
     for input in invalid_inputs {
         assert!(!phone_util.is_viable_phone_number(input));
         assert!(
-            phone_util.parse(input, RegionCode::gb()).is_err_and(| err | matches!(err, ParseError::NotANumber(_)))
+            phone_util.parse(input, RegionCode::gb()).is_err_and(| err | matches!(err.into_public(), ParseError::NotANumber(_)))
         );
     }
 }
@@ -2765,87 +2765,87 @@ fn failed_parse_on_invalid_numbers() {
 
     // Проверяем, что парсинг невалидных номеров завершается ошибкой.
     assert!(matches!(
-        phone_util.parse("This is not a phone number", RegionCode::nz()).unwrap_err(),
+        phone_util.parse("This is not a phone number", RegionCode::nz()).unwrap_err().into_public(),
         ParseError::NotANumber(_)
     ));
     assert!(matches!(
-        phone_util.parse("1 Still not a number", RegionCode::nz()).unwrap_err(),
+        phone_util.parse("1 Still not a number", RegionCode::nz()).unwrap_err().into_public(),
         ParseError::NotANumber(_)
     ));
     assert!(matches!(
-        phone_util.parse("1 MICROSOFT", RegionCode::nz()).unwrap_err(),
+        phone_util.parse("1 MICROSOFT", RegionCode::nz()).unwrap_err().into_public(),
         ParseError::NotANumber(_)
     ));
     assert!(matches!(
-        phone_util.parse("12 MICROSOFT", RegionCode::nz()).unwrap_err(),
+        phone_util.parse("12 MICROSOFT", RegionCode::nz()).unwrap_err().into_public(),
         ParseError::NotANumber(_)
     ));
     assert_eq!(
-        phone_util.parse("01495 72553301873 810104", RegionCode::gb()).unwrap_err(),
+        phone_util.parse("01495 72553301873 810104", RegionCode::gb()).unwrap_err().into_public(),
         ParseError::TooLongNsn
     );
     assert!(matches!(
-        phone_util.parse("+---", RegionCode::de()).unwrap_err(),
+        phone_util.parse("+---", RegionCode::de()).unwrap_err().into_public(),
         ParseError::NotANumber(_)
     ));
     assert!(matches!(
-        phone_util.parse("+***", RegionCode::de()).unwrap_err(),
+        phone_util.parse("+***", RegionCode::de()).unwrap_err().into_public(),
         ParseError::NotANumber(_)
     ));
     assert!(matches!(
-        phone_util.parse("+*******91", RegionCode::de()).unwrap_err(),
+        phone_util.parse("+*******91", RegionCode::de()).unwrap_err().into_public(),
         ParseError::NotANumber(_)
     ));
     assert_eq!(
-        phone_util.parse("+49 0", RegionCode::de()).unwrap_err(),
+        phone_util.parse("+49 0", RegionCode::de()).unwrap_err().into_public(),
         ParseError::TooShortNsn
     );
     assert_eq!(
-        phone_util.parse("+210 3456 56789", RegionCode::nz()).unwrap_err(),
+        phone_util.parse("+210 3456 56789", RegionCode::nz()).unwrap_err().into_public(),
         ParseError::InvalidCountryCode
     );
     // 00 - правильный МНН, но 210 - невалидный код страны.
     assert_eq!(
-        phone_util.parse("+ 00 210 3 331 6005", RegionCode::nz()).unwrap_err(),
+        phone_util.parse("+ 00 210 3 331 6005", RegionCode::nz()).unwrap_err().into_public(),
         ParseError::InvalidCountryCode
     );
     assert_eq!(
-        phone_util.parse("123 456 7890", RegionCode::zz()).unwrap_err(),
+        phone_util.parse("123 456 7890", RegionCode::zz()).unwrap_err().into_public(),
         ParseError::InvalidCountryCode
     );
     assert_eq!(
-        phone_util.parse("123 456 7890", RegionCode::cs()).unwrap_err(),
+        phone_util.parse("123 456 7890", RegionCode::cs()).unwrap_err().into_public(),
         ParseError::InvalidCountryCode
     );
     assert_eq!(
-        phone_util.parse("0044-----", RegionCode::gb()).unwrap_err(),
+        phone_util.parse("0044-----", RegionCode::gb()).unwrap_err().into_public(),
         ParseError::TooShortAfterIdd
     );
     assert_eq!(
-        phone_util.parse("0044", RegionCode::gb()).unwrap_err(),
+        phone_util.parse("0044", RegionCode::gb()).unwrap_err().into_public(),
         ParseError::TooShortAfterIdd
     );
     assert_eq!(
-        phone_util.parse("011", RegionCode::us()).unwrap_err(),
+        phone_util.parse("011", RegionCode::us()).unwrap_err().into_public(),
         ParseError::TooShortAfterIdd
     );
     assert_eq!(
-        phone_util.parse("0119", RegionCode::us()).unwrap_err(),
+        phone_util.parse("0119", RegionCode::us()).unwrap_err().into_public(),
         ParseError::TooShortAfterIdd
     );
     // RFC3966 phone-context является веб-сайтом.
     assert_eq!(
-        phone_util.parse("tel:555-1234;phone-context=www.google.com", RegionCode::zz()).unwrap_err(),
+        phone_util.parse("tel:555-1234;phone-context=www.google.com", RegionCode::zz()).unwrap_err().into_public(),
         ParseError::InvalidCountryCode
     );
     // Это невалидно, так как отсутствует знак "+" в phone-context.
     assert!(matches!(
-        phone_util.parse("tel:555-1234;phone-context=1-331", RegionCode::zz()).unwrap_err(),
+        phone_util.parse("tel:555-1234;phone-context=1-331", RegionCode::zz()).unwrap_err().into_public(),
         ParseError::NotANumber(_)
     ));
     // Присутствует только символ phone-context, но нет данных.
     assert!(matches!(
-        phone_util.parse(";phone-context=", RegionCode::zz()).unwrap_err(),
+        phone_util.parse(";phone-context=", RegionCode::zz()).unwrap_err().into_public(),
         ParseError::NotANumber(_)
     ));
 }
