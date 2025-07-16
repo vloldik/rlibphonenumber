@@ -50,8 +50,7 @@ fn formatting_benchmark(c: &mut Criterion) {
             b.iter(|| {
                 for number in &numbers {
                     PHONE_NUMBER_UTIL
-                        .format(black_box(number), black_box(format_a))
-                            .unwrap();
+                        .format(black_box(number), black_box(format_a));
                 }
             })
         });
@@ -69,7 +68,6 @@ fn formatting_benchmark(c: &mut Criterion) {
                 rlp::format(number_a).mode(format_b).to_string(),
                 PHONE_NUMBER_UTIL
                     .format(number_b, format_a)
-                    .unwrap()
             );
         }
     };
