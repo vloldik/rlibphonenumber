@@ -1,5 +1,6 @@
 #[cfg(test)]
 use crate::phonemetadata::PhoneMetadataCollection;
+#[cfg(test)]
 use crate::phonenumberutil::phonenumberutil_internal::PhoneNumberUtilInternal;
 
 #[cfg(test)]
