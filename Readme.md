@@ -7,7 +7,7 @@
 A Rust port of Google's comprehensive library for parsing, formatting, and validating international phone numbers.
 
 **Built on base libphonenumber 9.0.8**
-**Used metadata version: 9.0.9**
+**Used metadata version: 9.0.10**
 
 ## Overview
 
@@ -46,7 +46,7 @@ Add `rlibphonenumber` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rlibphonenumber = "0.2.0" # Please use the latest version from crates.io
+rlibphonenumber = "0.2.1" # Please use the latest version from crates.io
 ```
 
 ## Getting Started: A Detailed Example
