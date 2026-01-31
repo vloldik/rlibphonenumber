@@ -19,17 +19,16 @@ use protobuf::Message;
 use strum::IntoEnumIterator;
 
 use crate::{
-    interfaces::MatcherApi, generated::metadata::METADATA, 
+    generated::metadata::METADATA,
     generated::proto::{
-        phonemetadata::{
-            PhoneMetadata, PhoneMetadataCollection, PhoneNumberDesc
-        },
+        phonemetadata::{PhoneMetadata, PhoneMetadataCollection, PhoneNumberDesc},
         phonenumber::PhoneNumber,
-    }  
+    },
+    interfaces::MatcherApi,
 };
 
 use super::{
-    enums::{PhoneNumberFormat, PhoneNumberType, NumberLengthType},
+    enums::{NumberLengthType, PhoneNumberFormat, PhoneNumberType},
     errors::ValidationError,
     helper_constants::{
         OPTIONAL_EXT_SUFFIX, PLUS_SIGN, POSSIBLE_CHARS_AFTER_EXT_LABEL,
@@ -118,8 +117,8 @@ pub fn is_national_number_suffix_of_the_other(
     let mut buf = itoa::Buffer::new();
     let second_number_national_number = buf.format(second_number.national_number());
     // Note that HasSuffixString returns true if the numbers are equal.
-    return first_number_national_number.ends_with(second_number_national_number)
-        || second_number_national_number.ends_with(first_number_national_number);
+    first_number_national_number.ends_with(second_number_national_number)
+        || second_number_national_number.ends_with(first_number_national_number)
 }
 
 /// Helper method for constructing regular expressions for parsing. Creates an
@@ -140,7 +139,7 @@ pub fn extn_digits(max_length: u32) -> String {
     expr.push_str(max_length_str);
     expr.push_str("})");
 
-    return expr;
+    expr
 }
 
 // Helper initialiser method to create the regular-expression pattern to match
@@ -256,7 +255,7 @@ pub fn create_extn_pattern(for_parsing: bool) -> String {
             &only_commas_extn
         );
     }
-    return extension_pattern;
+    extension_pattern
 }
 
 /// Normalizes a string of characters representing a phone number by replacing
@@ -271,17 +270,18 @@ pub fn create_extn_pattern(for_parsing: bool) -> String {
 /// * `remove_non_matches` - indicates whether characters that are not able to be
 ///   replaced should be stripped from the number. If this is false, they will be
 ///   left unchanged in the number.
-/// 
+///
 /// Returns: normalized_string
 pub fn normalize_helper(
     normalization_replacements: &HashMap<char, char>,
     remove_non_matches: bool,
-    phone_number: &str
+    phone_number: &str,
 ) -> String {
     let mut normalized_number = String::with_capacity(phone_number.len());
     // Skip UTF checking because strings in rust are valid UTF-8 already
     for phone_char in phone_number.chars() {
-        if let Some(replacement) = normalization_replacements.get(&phone_char.to_ascii_uppercase()) {
+        if let Some(replacement) = normalization_replacements.get(&phone_char.to_ascii_uppercase())
+        {
             normalized_number.push(*replacement);
         } else if !remove_non_matches {
             normalized_number.push(phone_char);
@@ -297,12 +297,12 @@ pub fn normalize_helper(
 pub fn desc_has_possible_number_data(desc: &PhoneNumberDesc) -> bool {
     // If this is empty, it means numbers of this type inherit from the "general
     // desc" -> the value "-1" means that no numbers exist for this type.
-    return desc.possible_length.len() != 1
+    desc.possible_length.len() != 1
         || desc
             .possible_length
             .get(0)
             .and_then(|l| Some(*l != -1))
-            .unwrap_or(false);
+            .unwrap_or(false)
 }
 
 /// Note: `DescHasData` must account for any of MetadataFilter's
@@ -369,7 +369,7 @@ pub fn test_number_length(
     // parent, this is missing, so we fall back to the general desc (where no
     // numbers of the type exist at all, there is one possible length (-1) which
     // is guaranteed not to match the length of any real phone number).
-    let mut possible_lengths = if desc_for_type.possible_length.len() == 0 {
+    let mut possible_lengths = if desc_for_type.possible_length.is_empty() {
         phone_metadata.general_desc.possible_length.clone()
     } else {
         desc_for_type.possible_length.clone()
@@ -391,7 +391,7 @@ pub fn test_number_length(
                 // general desc and should be obtained from there.
 
                 // RUST NOTE: since merge adds elements to the end of the list, we can do the same
-                let len_to_append = if mobile_desc.possible_length.len() == 0 {
+                let len_to_append = if mobile_desc.possible_length.is_empty() {
                     &phone_metadata.general_desc.possible_length
                 } else {
                     &mobile_desc.possible_length
@@ -399,7 +399,7 @@ pub fn test_number_length(
                 possible_lengths.extend_from_slice(len_to_append);
                 possible_lengths.sort();
 
-                if local_lengths.len() == 0 {
+                if local_lengths.is_empty() {
                     local_lengths = mobile_desc.possible_length_local_only.clone();
                 } else {
                     local_lengths.extend_from_slice(&mobile_desc.possible_length_local_only);
@@ -433,11 +433,11 @@ pub fn test_number_length(
         return Err(ValidationError::TooLong);
     }
     // We skip the first element; we've already checked it.
-    return if possible_lengths[1..].contains(&actual_length) {
+    if possible_lengths[1..].contains(&actual_length) {
         Ok(NumberLengthType::IsPossible)
     } else {
         Err(ValidationError::InvalidLength)
-    };
+    }
 }
 
 /// Helper method to check a number against possible lengths for this region,
@@ -447,7 +447,7 @@ pub fn test_number_length_with_unknown_type(
     phone_number: &str,
     phone_metadata: &PhoneMetadata,
 ) -> Result<NumberLengthType, ValidationError> {
-    return test_number_length(phone_number, phone_metadata, PhoneNumberType::Unknown);
+    test_number_length(phone_number, phone_metadata, PhoneNumberType::Unknown)
 }
 
 /// Returns a new phone number containing only the fields needed to uniquely

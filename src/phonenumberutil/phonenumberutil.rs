@@ -22,16 +22,13 @@
 
 use std::borrow::Cow;
 
-use crate::{
-    generated::proto::phonenumber::PhoneNumber, 
-};
+use crate::generated::proto::phonenumber::PhoneNumber;
 
 use super::{
-    errors::{ParseError, ValidationError, GetExampleNumberError},
-    enums::{PhoneNumberFormat, PhoneNumberType, MatchType, NumberLengthType},
+    enums::{MatchType, NumberLengthType, PhoneNumberFormat, PhoneNumberType},
+    errors::{GetExampleNumberError, ParseError, ValidationError},
     phonenumberutil_internal::PhoneNumberUtilInternal,
 };
-
 
 /// The main struct for all phone number-related operations.
 ///
@@ -39,16 +36,15 @@ use super::{
 /// formatting, and validating phone numbers. An instance of this struct is the
 /// primary entry point for using the library's features.
 pub struct PhoneNumberUtil {
-    util_internal: PhoneNumberUtilInternal
+    util_internal: PhoneNumberUtilInternal,
 }
 
 impl PhoneNumberUtil {
-    
     /// Creates new `PhoneNumberUtil` instance
     pub fn new() -> Self {
-        Self { util_internal: 
-            PhoneNumberUtilInternal::new()
-                .expect("Metadata should be valid and all regex should compile") 
+        Self {
+            util_internal: PhoneNumberUtilInternal::new()
+                .expect("Metadata should be valid and all regex should compile"),
         }
     }
 
@@ -77,7 +73,7 @@ impl PhoneNumberUtil {
     ///
     /// For example, an input of "1-800-FLOWERS" will be converted to "1-800-3569377".
     ///
-    
+
     /// # Parameters
     ///
     /// * `number`: A string slice or `String` representing the phone number.
@@ -86,7 +82,8 @@ impl PhoneNumberUtil {
     ///
     /// A `String` containing the phone number with all alphabetic characters converted to digits.
     pub fn convert_alpha_characters_in_number<'a>(&self, number: impl AsRef<str>) -> String {
-        self.util_internal.convert_alpha_characters_in_number(number.as_ref())
+        self.util_internal
+            .convert_alpha_characters_in_number(number.as_ref())
     }
 
     /// Formats a `PhoneNumber` into a standardized format.
@@ -105,7 +102,11 @@ impl PhoneNumberUtil {
     ///
     /// This method panics if the underlying metadata contains an invalid regular expression,
     /// indicating a library bug.
-    pub fn format<'a>(&self, phone_number: &'a PhoneNumber, number_format: PhoneNumberFormat) -> Cow<'a, str> {
+    pub fn format<'a>(
+        &self,
+        phone_number: &'a PhoneNumber,
+        number_format: PhoneNumberFormat,
+    ) -> Cow<'a, str> {
         self.util_internal
             .format(phone_number, number_format)
             // This should not never happen
@@ -129,12 +130,16 @@ impl PhoneNumberUtil {
     ///
     /// This method panics if metadata is invalid, which indicates a library bug.
     pub fn format_in_original_format<'a>(
-        &self, phone_number: &'a PhoneNumber, region_calling_from: impl AsRef<str>
+        &self,
+        phone_number: &'a PhoneNumber,
+        region_calling_from: impl AsRef<str>,
     ) -> Cow<'a, str> {
         self.util_internal
             .format_in_original_format(phone_number, region_calling_from.as_ref())
             // This should not never happen
-            .expect("A valid regex and region is expected in metadata; this indicates a library bug.")
+            .expect(
+                "A valid regex and region is expected in metadata; this indicates a library bug.",
+            )
     }
 
     /// Formats a national number with a specified carrier code.
@@ -183,10 +188,14 @@ impl PhoneNumberUtil {
         with_formatting: bool,
     ) -> Cow<'a, str> {
         self.util_internal
-            .format_number_for_mobile_dialing(phone_number, region_calling_from.as_ref(), with_formatting)
+            .format_number_for_mobile_dialing(
+                phone_number,
+                region_calling_from.as_ref(),
+                with_formatting,
+            )
             .expect("Formatting failed; this indicates a library bug.")
     }
-    
+
     /// Formats a `PhoneNumber` for out-of-country calling.
     ///
     /// # Parameters
@@ -202,7 +211,9 @@ impl PhoneNumberUtil {
     ///
     /// Panics on invalid metadata, indicating a library bug.
     pub fn format_out_of_country_calling_number<'a>(
-        &self, phone_number: &'a PhoneNumber, region_calling_from: impl AsRef<str>
+        &self,
+        phone_number: &'a PhoneNumber,
+        region_calling_from: impl AsRef<str>,
     ) -> Cow<'a, str> {
         self.util_internal
             .format_out_of_country_calling_number(phone_number, region_calling_from.as_ref())
@@ -257,8 +268,12 @@ impl PhoneNumberUtil {
     /// # Returns
     ///
     /// A `Result` containing a valid `PhoneNumber` on success, or a `GetExampleNumberError` on failure.
-    pub fn get_example_number(&self, region_code: impl AsRef<str>) -> Result<PhoneNumber, GetExampleNumberError> {
-        self.util_internal.get_example_number(region_code.as_ref())
+    pub fn get_example_number(
+        &self,
+        region_code: impl AsRef<str>,
+    ) -> Result<PhoneNumber, GetExampleNumberError> {
+        self.util_internal
+            .get_example_number(region_code.as_ref())
             .map_err(|err| err.into_public())
     }
 
@@ -275,7 +290,8 @@ impl PhoneNumberUtil {
         &self,
         number_type: PhoneNumberType,
     ) -> Result<PhoneNumber, GetExampleNumberError> {
-        self.util_internal.get_example_number_for_type(number_type)
+        self.util_internal
+            .get_example_number_for_type(number_type)
             .map_err(|err| err.into_public())
     }
 
@@ -288,8 +304,12 @@ impl PhoneNumberUtil {
     /// # Returns
     ///
     /// A `Result` containing an invalid `PhoneNumber` on success, or a `GetExampleNumberError` on failure.
-    pub fn get_invalid_example_number(&self, region_code: impl AsRef<str>) -> Result<PhoneNumber, GetExampleNumberError> {
-        self.util_internal.get_invalid_example_number(region_code.as_ref())
+    pub fn get_invalid_example_number(
+        &self,
+        region_code: impl AsRef<str>,
+    ) -> Result<PhoneNumber, GetExampleNumberError> {
+        self.util_internal
+            .get_invalid_example_number(region_code.as_ref())
             .map_err(|err| err.into_public())
     }
 
@@ -342,8 +362,9 @@ impl PhoneNumberUtil {
     /// # Returns
     ///
     /// A `String` containing the NSN.
-    pub fn get_national_significant_number<'a>(&self, phone_number: &'a PhoneNumber) -> String {
-        self.util_internal.get_national_significant_number(phone_number)
+    pub fn get_national_significant_number(&self, phone_number: &PhoneNumber) -> String {
+        self.util_internal
+            .get_national_significant_number(phone_number)
     }
 
     /// Determines the `PhoneNumberType` of a given `PhoneNumber`.
@@ -360,11 +381,12 @@ impl PhoneNumberUtil {
     ///
     /// Panics on invalid metadata, indicating a library bug.
     pub fn get_number_type(&self, phone_number: &PhoneNumber) -> PhoneNumberType {
-        self
-            .util_internal
+        self.util_internal
             .get_number_type(phone_number)
             // This should not never happen
-            .expect("A valid regex and region is expected in metadata; this indicates a library bug.")
+            .expect(
+                "A valid regex and region is expected in metadata; this indicates a library bug.",
+            )
     }
 
     /// Gets the primary region code for a given country calling code.
@@ -380,7 +402,8 @@ impl PhoneNumberUtil {
     ///
     /// A string slice with the corresponding two-letter region code. Returns "ZZ" for invalid codes.
     pub fn get_region_code_for_country_code(&self, country_code: i32) -> &str {
-        self.util_internal.get_region_code_for_country_code(country_code)
+        self.util_internal
+            .get_region_code_for_country_code(country_code)
     }
 
     /// Gets the region code for a `PhoneNumber`.
@@ -397,13 +420,12 @@ impl PhoneNumberUtil {
     ///
     /// Panics on invalid metadata, indicating a library bug.
     pub fn get_region_code_for_number(&self, phone_number: &PhoneNumber) -> &str {
-        self
-            .util_internal
+        self.util_internal
             .get_region_code_for_number(phone_number)
             // This should not never happen
-            .expect("A valid regex is expected in metadata; this indicates a library bug.")            
+            .expect("A valid regex is expected in metadata; this indicates a library bug.")
     }
-    
+
     /// Gets all region codes associated with a country calling code.
     ///
     /// # Parameters
@@ -414,8 +436,12 @@ impl PhoneNumberUtil {
     ///
     /// An `Option` containing an iterator over all associated region codes, or `None` if the
     /// country code is invalid.
-    pub fn get_region_codes_for_country_code(&self, country_code: i32) -> Option<impl ExactSizeIterator<Item=&str>> {
-        self.util_internal.get_region_codes_for_country_calling_code(country_code)
+    pub fn get_region_codes_for_country_code(
+        &self,
+        country_code: i32,
+    ) -> Option<impl ExactSizeIterator<Item = &str>> {
+        self.util_internal
+            .get_region_codes_for_country_calling_code(country_code)
     }
 
     /// Gets an iterator over all supported two-letter region codes.
@@ -423,7 +449,7 @@ impl PhoneNumberUtil {
     /// # Returns
     ///
     /// An `ExactSizeIterator` that yields string slices of all supported region codes.
-    pub fn get_supported_regions(&self) -> impl ExactSizeIterator<Item=&str> {
+    pub fn get_supported_regions(&self) -> impl ExactSizeIterator<Item = &str> {
         self.util_internal.get_supported_regions()
     }
 
@@ -467,7 +493,8 @@ impl PhoneNumberUtil {
     ///
     /// Panics on invalid metadata, indicating a library bug.
     pub fn is_number_geographical(&self, phone_number: &PhoneNumber) -> bool {
-        self.util_internal.is_number_geographical(phone_number)
+        self.util_internal
+            .is_number_geographical(phone_number)
             .expect("A valid regex is expected in metadata; this indicates a library bug.")
     }
 
@@ -514,8 +541,12 @@ impl PhoneNumberUtil {
     /// # Returns
     ///
     /// A `Result` which is `Ok(NumberLengthType)` on success or a `ValidationError` on failure.
-    pub fn is_possible_number_with_reason(&self, phone_number: &PhoneNumber) -> Result<NumberLengthType, ValidationError> {
-        self.util_internal.is_possible_number_with_reason(phone_number)
+    pub fn is_possible_number_with_reason(
+        &self,
+        phone_number: &PhoneNumber,
+    ) -> Result<NumberLengthType, ValidationError> {
+        self.util_internal
+            .is_possible_number_with_reason(phone_number)
     }
 
     /// Performs a full validation of a `PhoneNumber`.
@@ -534,8 +565,7 @@ impl PhoneNumberUtil {
     ///
     /// Panics on invalid metadata, indicating a library bug.
     pub fn is_valid_number(&self, phone_number: &PhoneNumber) -> bool {
-        self
-            .util_internal
+        self.util_internal
             .is_valid_number(phone_number)
             // This should not never happen
             .expect("A valid regex is expected in metadata; this indicates a library bug.")
@@ -551,8 +581,13 @@ impl PhoneNumberUtil {
     /// # Returns
     ///
     /// `true` if the number is valid for the given region, `false` otherwise.
-    pub fn is_valid_number_for_region(&self, phone_number: &PhoneNumber, region: impl AsRef<str>) -> bool {
-        self.util_internal.is_valid_number_for_region(phone_number, region.as_ref())
+    pub fn is_valid_number_for_region(
+        &self,
+        phone_number: &PhoneNumber,
+        region: impl AsRef<str>,
+    ) -> bool {
+        self.util_internal
+            .is_valid_number_for_region(phone_number, region.as_ref())
     }
 
     /// Parses a string into a `PhoneNumber`, keeping the raw input string.
@@ -572,7 +607,7 @@ impl PhoneNumberUtil {
     ) -> Result<PhoneNumber, ParseError> {
         self.util_internal
             .parse_and_keep_raw_input(number_to_parse.as_ref(), default_region.as_ref())
-            .map_err(| err | err.into_public())
+            .map_err(|err| err.into_public())
     }
 
     /// Parses a string into a `PhoneNumber`.
@@ -595,7 +630,7 @@ impl PhoneNumberUtil {
     ) -> Result<PhoneNumber, ParseError> {
         self.util_internal
             .parse(number_to_parse.as_ref(), default_region.as_ref())
-            .map_err(| err | err.into_public())
+            .map_err(|err| err.into_public())
     }
 
     /// Truncates a `PhoneNumber` that is too long to a valid length.
@@ -612,9 +647,9 @@ impl PhoneNumberUtil {
     ///
     /// Panics on invalid metadata, indicating a library bug.
     pub fn truncate_too_long_number(&self, phone_number: &mut PhoneNumber) -> bool {
-        self.util_internal.truncate_too_long_number(phone_number)
+        self.util_internal
+            .truncate_too_long_number(phone_number)
             // This should not never happen
             .expect("A valid regex is expected in metadata; this indicates a library bug.")
     }
 }
-

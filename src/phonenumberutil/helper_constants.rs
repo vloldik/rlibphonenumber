@@ -13,7 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 // The minimum and maximum length of the national significant number.
 pub const MIN_LENGTH_FOR_NSN: usize = 2;
 // The ITU says the maximum length should be 15, but we have found longer
@@ -42,7 +41,6 @@ pub const VALID_PUNCTUATION: &'static str = "-x\
 // string preceding this is captured.
 // This corresponds to SECOND_NUMBER_START in the java version.
 pub const CAPTURE_UP_TO_SECOND_NUMBER_START: &'static str = r"(.*)[\\/] *x";
-
 
 pub const REGION_CODE_FOR_NON_GEO_ENTITY: &'static str = "001";
 

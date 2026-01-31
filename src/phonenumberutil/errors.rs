@@ -28,12 +28,12 @@ pub enum InternalLogicError {
     /// This points to a bug in the library's bundled metadata files.
     #[error("{0}")]
     InvalidRegex(#[from] InvalidRegexError),
-    
+
     /// An error indicating that metadata for a valid, supported region is unexpectedly missing.
     /// This points to a bug in the library's initialization or metadata loading.
     #[error("{0}")]
-    InvalidMetadataForValidRegion(#[from] InvalidMetadataForValidRegionError)
-}   
+    InvalidMetadataForValidRegion(#[from] InvalidMetadataForValidRegionError),
+}
 
 /// An internal error type used during the parsing process.
 /// It distinguishes between a general parsing failure and a regex-specific issue.
@@ -45,7 +45,7 @@ pub enum ParseErrorInternal {
     /// An error indicating that a regular expression was invalid during parsing.
     /// This signals a bug in the library's metadata.
     #[error("{0}")]
-    RegexError(#[from] InvalidRegexError)
+    RegexError(#[from] InvalidRegexError),
 }
 
 /// Represents the possible errors that can occur when parsing a phone number string.
@@ -109,7 +109,6 @@ pub enum ExtractNumberError {
     NotANumber,
 }
 
-
 /// Internal error type used when fetching an example number.
 #[derive(Debug, PartialEq, Error)]
 pub enum GetExampleNumberErrorInternal {
@@ -119,7 +118,7 @@ pub enum GetExampleNumberErrorInternal {
     /// An error indicating that a regular expression was invalid while generating the example.
     /// This signals a bug in the library's metadata.
     #[error("{0}")]
-    RegexError(#[from] InvalidRegexError)
+    RegexError(#[from] InvalidRegexError),
 }
 
 /// Represents possible failures when requesting an example phone number.
@@ -136,7 +135,7 @@ pub enum GetExampleNumberError {
     CouldNotGetNumber,
     /// The provided region code is invalid or not supported by the library.
     #[error("Invalid country code provided")]
-    InvalidRegionCode
+    InvalidRegionCode,
 }
 
 /// Internal error type used during number validation.
@@ -147,7 +146,7 @@ pub enum InvalidNumberErrorInternal {
     InvalidNumber(#[from] InvalidNumberError),
     /// An error indicating a regex was invalid during validation, signaling a library bug.
     #[error("{0}")]
-    InvalidRegex(#[from] InvalidRegexError)
+    InvalidRegex(#[from] InvalidRegexError),
 }
 
 /// A specific error indicating that the provided input is not a number.
@@ -184,11 +183,13 @@ pub enum ValidationError {
     /// The number's length falls between the shortest and longest possible lengths
     /// for its region but does not match any specific valid length. This can also occur
     ///  if no numbers of the requested type exist for the region.
-    #[error("\
+    #[error(
+        "\
     The number is longer than the shortest valid numbers for this region,\
     shorter than the longest valid numbers for this region, and does not\
     itself have a number length that matches valid numbers for this region\
-    ")]
+    "
+    )]
     InvalidLength,
     /// **The number is too long.**
     /// The number's length is longer than the longest possible valid number
@@ -202,10 +203,10 @@ impl From<ParseErrorInternal> for GetExampleNumberErrorInternal {
     /// This is used to propagate errors within the library's logic.
     fn from(value: ParseErrorInternal) -> Self {
         match value {
-            ParseErrorInternal::FailedToParse(err) => 
-                GetExampleNumberError::FailedToParse(err).into(),
-            ParseErrorInternal::RegexError(err) =>
-                GetExampleNumberErrorInternal::RegexError(err)
+            ParseErrorInternal::FailedToParse(err) => {
+                GetExampleNumberError::FailedToParse(err).into()
+            }
+            ParseErrorInternal::RegexError(err) => GetExampleNumberErrorInternal::RegexError(err),
         }
     }
 }
@@ -214,10 +215,8 @@ impl From<ParseErrorInternal> for InvalidNumberErrorInternal {
     /// Converts an internal parsing error into an internal "invalid number" error.
     fn from(value: ParseErrorInternal) -> Self {
         match value {
-            ParseErrorInternal::FailedToParse(err) => 
-                InvalidNumberError(err).into(),
-            ParseErrorInternal::RegexError(err) =>
-                InvalidNumberErrorInternal::InvalidRegex(err)
+            ParseErrorInternal::FailedToParse(err) => InvalidNumberError(err).into(),
+            ParseErrorInternal::RegexError(err) => InvalidNumberErrorInternal::InvalidRegex(err),
         }
     }
 }
@@ -238,8 +237,10 @@ impl GetExampleNumberErrorInternal {
     pub fn into_public(self) -> GetExampleNumberError {
         match self {
             GetExampleNumberErrorInternal::FailedToGetExampleNumber(err) => err,
-            GetExampleNumberErrorInternal::RegexError(err) => 
-                panic!("A valid regex is expected in metadata; this indicates a library bug! {}", err)
+            GetExampleNumberErrorInternal::RegexError(err) => panic!(
+                "A valid regex is expected in metadata; this indicates a library bug! {}",
+                err
+            ),
         }
     }
 }
@@ -252,8 +253,10 @@ impl ParseErrorInternal {
     pub fn into_public(self) -> ParseError {
         match self {
             ParseErrorInternal::FailedToParse(err) => err,
-            ParseErrorInternal::RegexError(err) => 
-                panic!("A valid regex is expected in metadata; this indicates a library bug! {}", err)
+            ParseErrorInternal::RegexError(err) => panic!(
+                "A valid regex is expected in metadata; this indicates a library bug! {}",
+                err
+            ),
         }
     }
 }
@@ -266,8 +269,10 @@ impl InvalidNumberErrorInternal {
     pub fn into_public(self) -> InvalidNumberError {
         match self {
             InvalidNumberErrorInternal::InvalidNumber(err) => err,
-            InvalidNumberErrorInternal::InvalidRegex(err) => 
-                panic!("A valid regex is expected in metadata; this indicates a library bug! {}", err)
+            InvalidNumberErrorInternal::InvalidRegex(err) => panic!(
+                "A valid regex is expected in metadata; this indicates a library bug! {}",
+                err
+            ),
         }
     }
 }
