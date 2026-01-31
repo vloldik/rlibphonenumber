@@ -16,5 +16,6 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
        libssl-dev \
        lldb
 RUN chown -R vscode:vscode /usr/local/cargo
+USER $USERNAME
 
 RUN rustup component add clippy rustfmt
