@@ -99,8 +99,7 @@
 346047|Lebara
 346048|Lebara
 346049|Lebara
-34605|Orange
-3460529|MasMovil
+34605|Vodafone
 34606|Movistar
 34607|Vodafone
 34608|Movistar
@@ -115,6 +114,7 @@
 346124|Lycamobile
 346125|Lycamobile
 34613|Yoigo
+34614|DigiMobil
 34615|Orange
 34616|Movistar
 34617|Vodafone
@@ -128,6 +128,7 @@
 346214|Republica Movil
 346215|Aire Networks
 346216|Republica Movil
+346218|Vodafone
 34622|Yoigo
 346230|Yoigo
 346231|Yoigo

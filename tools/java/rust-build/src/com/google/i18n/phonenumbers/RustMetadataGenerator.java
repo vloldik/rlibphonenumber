@@ -114,7 +114,7 @@ public final class RustMetadataGenerator {
 
     PrintWriter pw = new PrintWriter(out);
     CopyrightNotice.writeTo(pw, type.getCopyrightYear(), type.getCopyrightSecondYear());
-    pw.println("pub const "+constantName+": [u8; "+dataLength+"] = [");
+    pw.println("pub static "+constantName+": [u8; "+dataLength+"] = [");
     emitStaticArrayData(pw, data);
     pw.println("];");
     pw.flush();

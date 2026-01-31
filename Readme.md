@@ -170,6 +170,14 @@ You can skip the Java build step by passing the `--skip-install` flag, which is 
 ./tools/scripts/generate_metadata.sh --skip-install
 ```
 
+**NEW**
+
+You can add --tag flag, this will clone original project's metadata and replace resources dir
+
+```sh
+./tools/scripts/generate_metadata.sh --skip-install --tag v9.0.23
+```
+
 ## License
 
 This project is licensed under the Apache License, Version 2.0. Please see the `LICENSE` file for details.

@@ -69,7 +69,7 @@ public class RustMetadataGeneratorTest {
     metadata.outputSourceFile(writer);
     Iterator<String> lines = toLines(writer.toString()).iterator();
     // Sanity check that at least some of the expected lines are present.
-    assertTrue(consumeUntil("pub const "+TEST_CONSTANT_NAME+": [u8; "+testDataLen+"] = [", lines));
+    assertTrue(consumeUntil("pub static "+TEST_CONSTANT_NAME+": [u8; "+testDataLen+"] = [", lines));
     assertTrue(consumeUntil("  0xCA, 0xFE, 0xBA, 0xBE", lines));
     assertTrue(consumeUntil("];", lines));
   }

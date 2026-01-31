@@ -93,7 +93,7 @@ public class BuildMetadataRustFromXmlTest {
     command.start();
     // Sanity check the captured data (asserting implicitly that the mocked methods were called).
     String sourceString = command.capturedSourceFile();
-    assertTrue(sourceString.contains("pub const "+TEST_CONSTANT_NAME+": [u8; " + TEST_DATA_LEN + "] ="));
+    assertTrue(sourceString.contains("pub static "+TEST_CONSTANT_NAME+": [u8; " + TEST_DATA_LEN + "] ="));
     assertTrue(sourceString.contains(OUTPUT_DATA));
     assertTrue(sourceString.contains("];"));
   }
