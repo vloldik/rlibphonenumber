@@ -7,6 +7,7 @@ ARG USER_GID=$USER_UID
 
 RUN groupadd --gid $USER_GID $USERNAME \
     && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME
+RUN rm /bin/sh && ln -s /bin/bash /bin/sh
 
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && apt-get -y install --no-install-recommends \
@@ -14,8 +15,10 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
        cmake \
        pkg-config \
        libssl-dev \
-       lldb
+       lldb \
+       protobuf-compiler
+
+
 RUN chown -R vscode:vscode /usr/local/cargo
 USER $USERNAME
-
 RUN rustup component add clippy rustfmt
