@@ -4,8 +4,6 @@ filedir="./$(dirname "$0")"
 javadir="$filedir/../java"
 project_home="$filedir/../.."
 generated_dir="$project_home/src/generated/metadata"
-echo $generated_dir
-
 resources_dir="$project_home/resources"
 rust_build_jar="$javadir/rust-build/target/rust-build-1.0-SNAPSHOT-jar-with-dependencies.jar"
 
@@ -27,21 +25,48 @@ copyright_header="\
 "
 
 skip_install=false
+tag_name=""
 
-# Loop through all the command-line arguments
-for arg in "$@"
-do
-    if [ "$arg" == "--skip-install" ]
-    then
-        skip_install=true
-        # You can break the loop once the flag is found if you don't need to process further arguments
-        break
-    fi
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --skip-install)
+            skip_install=true
+            shift
+            ;;
+        --tag)
+            tag_name="$2"
+            shift 2
+            ;;
+        *)
+            shift
+            ;;
+    esac
 done
+
+if [ -n "$tag_name" ]; then
+    echo "Downloading metadata for tag: $tag_name..."
+    
+    temp_dir=$(mktemp -d)
+    git clone --depth 1 --branch "$tag_name" https://github.com/google/libphonenumber.git "$temp_dir"
+    
+    if [ $? -eq 0 ]; then
+        mkdir -p "$resources_dir"
+    
+        cp -rf "$temp_dir/resources" "$project_home"
+        echo "Metadata updated from original repository."
+    else
+        echo "Error: Failed to download tag $tag_name"
+        rm -rf "$temp_dir"
+        exit 1
+    fi
+    
+    rm -rf "$temp_dir"
+fi
 
 if [[ $skip_install == false ]]; then
     mvn -f "$javadir/pom.xml" install
 fi
+
 mkdir -p "$generated_dir"
 
 function generate {
@@ -73,3 +98,5 @@ pub use metadata::METADATA;
 #[cfg(test)]
 pub use test_metadata::TEST_METADATA;
 " > "$generated_dir/mod.rs"
+
+echo "Generation complete!"
