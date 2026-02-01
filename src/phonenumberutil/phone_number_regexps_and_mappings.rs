@@ -13,16 +13,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 use std::collections::{HashMap, HashSet};
 
 use regex::Regex;
 
-use crate::{phonenumberutil::{helper_constants::{
-    CAPTURE_UP_TO_SECOND_NUMBER_START, DIGITS, MIN_LENGTH_FOR_NSN, PLUS_CHARS, 
-    PLUS_SIGN, RFC3966_VISUAL_SEPARATOR, STAR_SIGN, VALID_ALPHA, VALID_ALPHA_INCL_UPPERCASE, 
-    VALID_PUNCTUATION
-}, helper_functions::create_extn_pattern}, regexp_cache::RegexCache};
+use crate::{
+    phonenumberutil::{
+        helper_constants::{
+            CAPTURE_UP_TO_SECOND_NUMBER_START, DIGITS, MIN_LENGTH_FOR_NSN, PLUS_CHARS, PLUS_SIGN,
+            RFC3966_VISUAL_SEPARATOR, STAR_SIGN, VALID_ALPHA, VALID_ALPHA_INCL_UPPERCASE,
+            VALID_PUNCTUATION,
+        },
+        helper_functions::create_extn_pattern,
+    },
+    regexp_cache::RegexCache,
+};
 
 #[allow(unused)]
 pub(super) struct PhoneNumberRegExpsAndMappings {
@@ -32,7 +37,7 @@ pub(super) struct PhoneNumberRegExpsAndMappings {
     /// data. The symbol 'x' is allowed here as valid punctuation since it is often
     /// used as a placeholder for carrier codes, for example in Brazilian phone
     /// numbers. We also allow multiple plus-signs at the start.
-    /// 
+    ///
     /// Corresponds to the following:
     /// `[digits]{minLengthNsn}|
     /// plus_sign*(([punctuation]|[star])*[digits]){3,}
@@ -174,35 +179,38 @@ pub(super) struct PhoneNumberRegExpsAndMappings {
 
     /// *Rust note*: It's for some reason calculated inside function in C++,
     /// so, we move it here
-    /// 
+    ///
     /// A pattern that is used to determine if a numberFormat under
     /// availableFormats is eligible to be used by the AYTF. It is eligible when
     /// the format element under numberFormat contains groups of the dollar sign
     /// followed by a single digit, separated by valid phone number punctuation.
     /// This prevents invalid punctuation (such as the star sign in Israeli star
-    /// numbers) getting into the output of the AYTF. 
+    /// numbers) getting into the output of the AYTF.
     pub is_format_eligible_as_you_type_formatting_regex: Regex,
 
     /// Added for function `formatting_rule_has_first_group_only`
     /// A pattern that is used to determine if the national prefix formatting rule
     /// has the first group only, i.e., does not start with the national prefix.
     /// Note that the pattern explicitly allows for unbalanced parentheses.
-    pub formatting_rule_has_first_group_only_regex: Regex
+    pub formatting_rule_has_first_group_only_regex: Regex,
 }
 
 impl PhoneNumberRegExpsAndMappings {
     fn initialize_regexp_mappings(&mut self) {
         self.mobile_token_mappings.insert(54, '9');
 
-        self.geo_mobile_countries_without_mobile_area_codes.insert(86);  // China
+        self.geo_mobile_countries_without_mobile_area_codes
+            .insert(86); // China
 
-        self.countries_without_national_prefix_with_area_codes.insert(52);  // Mexico
+        self.countries_without_national_prefix_with_area_codes
+            .insert(52); // Mexico
 
-        self.geo_mobile_countries.insert(52);  // Mexico
-        self.geo_mobile_countries.insert(54);  // Argentina
-        self.geo_mobile_countries.insert(55);  // Brazil
-        self.geo_mobile_countries.insert(62);  // Indonesia: some prefixes only (fixed CMDA wireless)
-        self.geo_mobile_countries.extend(&self.geo_mobile_countries_without_mobile_area_codes);
+        self.geo_mobile_countries.insert(52); // Mexico
+        self.geo_mobile_countries.insert(54); // Argentina
+        self.geo_mobile_countries.insert(55); // Brazil
+        self.geo_mobile_countries.insert(62); // Indonesia: some prefixes only (fixed CMDA wireless)
+        self.geo_mobile_countries
+            .extend(&self.geo_mobile_countries_without_mobile_area_codes);
 
         // Simple ASCII digits map used to populate ALPHA_PHONE_MAPPINGS and
         // ALL_PLUS_NUMBER_GROUPING_SYMBOLS.
@@ -285,24 +293,30 @@ impl PhoneNumberRegExpsAndMappings {
         let alphanum = fast_cat::concat_str!(VALID_ALPHA_INCL_UPPERCASE, DIGITS);
         let extn_patterns_for_parsing = create_extn_pattern(true);
         let valid_phone_number = format!(
-                // moved 2-digits pattern to an end for match full number first
-                "[{}]*(?:[{}{}]*{}){{3,}}[{}{}{}{}]*|{}{{{}}}",
-                PLUS_CHARS,
-                VALID_PUNCTUATION, STAR_SIGN, DIGITS,
-                VALID_PUNCTUATION, STAR_SIGN, DIGITS, VALID_ALPHA,
-                DIGITS, MIN_LENGTH_FOR_NSN, 
-            );
+            // moved 2-digits pattern to an end for match full number first
+            "[{}]*(?:[{}{}]*{}){{3,}}[{}{}{}{}]*|{}{{{}}}",
+            PLUS_CHARS,
+            VALID_PUNCTUATION,
+            STAR_SIGN,
+            DIGITS,
+            VALID_PUNCTUATION,
+            STAR_SIGN,
+            DIGITS,
+            VALID_ALPHA,
+            DIGITS,
+            MIN_LENGTH_FOR_NSN,
+        );
 
         let rfc3966_phone_digit = format!("({}|{})", DIGITS, RFC3966_VISUAL_SEPARATOR);
         let rfc3966_domainlabel = format!("[{}]+((\\-)*[{}])*", alphanum, alphanum);
         let rfc3966_toplabel = format!("[{}]+((\\-)*[{}])*", VALID_ALPHA_INCL_UPPERCASE, alphanum);
 
-        let mut instance = Self{
+        let mut instance = Self {
             // it'll be initialized only once, so we can use slow format!
             valid_phone_number: valid_phone_number.clone(),
             extn_patterns_for_parsing: extn_patterns_for_parsing.clone(),
             rfc3966_phone_digit: rfc3966_phone_digit.clone(),
-            alphanum: alphanum,
+            alphanum,
             rfc3966_domainlabel: rfc3966_domainlabel.clone(),
             rfc3966_toplabel: rfc3966_toplabel.clone(),
             regexp_cache: RegexCache::with_capacity(128),
@@ -314,20 +328,25 @@ impl PhoneNumberRegExpsAndMappings {
             countries_without_national_prefix_with_area_codes: Default::default(),
             geo_mobile_countries: Default::default(),
             geo_mobile_countries_without_mobile_area_codes: Default::default(),
-            single_international_prefix: Regex::new("[\\d]+(?:[~\u{2053}\u{223C}\u{FF5E}][\\d]+)?").unwrap(),
+            single_international_prefix: Regex::new("[\\d]+(?:[~\u{2053}\u{223C}\u{FF5E}][\\d]+)?")
+                .unwrap(),
             digits_pattern: Regex::new(&format!("[{}]*", DIGITS)).unwrap(),
             capturing_digit_pattern: Regex::new(&format!("([{}])", DIGITS)).unwrap(),
             capturing_ascii_digits_pattern: Regex::new("(\\d+)").unwrap(),
             valid_start_char_pattern: Regex::new(&format!("[{}{}]", PLUS_CHARS, DIGITS)).unwrap(),
-            capture_up_to_second_number_start_pattern: Regex::new(CAPTURE_UP_TO_SECOND_NUMBER_START).unwrap(),
+            capture_up_to_second_number_start_pattern: Regex::new(
+                CAPTURE_UP_TO_SECOND_NUMBER_START,
+            )
+            .unwrap(),
             unwanted_end_char_pattern: Regex::new("[^\\p{N}\\p{L}#]").unwrap(),
             separator_pattern: Regex::new(&format!("[{}]+", VALID_PUNCTUATION)).unwrap(),
             extn_patterns_for_matching: create_extn_pattern(false),
             extn_pattern: Regex::new(&format!("(?i)(?:{})$", &extn_patterns_for_parsing)).unwrap(),
-            valid_phone_number_pattern: Regex::new(&format!("(?i)^(?:{})(?:{})?$", 
-                &valid_phone_number,
-                &extn_patterns_for_parsing
-            )).unwrap(),
+            valid_phone_number_pattern: Regex::new(&format!(
+                "(?i)^(?:{})(?:{})?$",
+                &valid_phone_number, &extn_patterns_for_parsing
+            ))
+            .unwrap(),
             // from java
             valid_alpha_phone_pattern: Regex::new("(?:.*?[A-Za-z]){3}.*").unwrap(),
             // The first_group_capturing_pattern was originally set to $1 but there
@@ -338,16 +357,22 @@ impl PhoneNumberRegExpsAndMappings {
             first_group_capturing_pattern: Regex::new("(\\$\\d)").unwrap(),
             carrier_code_pattern: Regex::new("\\$CC").unwrap(),
             plus_chars_pattern: Regex::new(&format!("[{}]+", &PLUS_CHARS)).unwrap(),
-            rfc3966_global_number_digits_pattern: Regex::new(
-                &format!("^\\{}{}*{}{}*$", PLUS_SIGN, &rfc3966_phone_digit, DIGITS, rfc3966_phone_digit)
-            ).unwrap(),
-            rfc3966_domainname_pattern: Regex::new(
-                &format!("^({}\\.)*{}\\.?$", rfc3966_domainlabel, rfc3966_toplabel)
-            ).unwrap(),
-            is_format_eligible_as_you_type_formatting_regex: Regex::new(
-                &format!("[{}]*\\$1[{}]*(\\$\\d[{}]*)*",VALID_PUNCTUATION, VALID_PUNCTUATION, VALID_PUNCTUATION)
-            ).unwrap(),
-            formatting_rule_has_first_group_only_regex: Regex::new("\\(?\\$1\\)?").unwrap()
+            rfc3966_global_number_digits_pattern: Regex::new(&format!(
+                "^\\{}{}*{}{}*$",
+                PLUS_SIGN, &rfc3966_phone_digit, DIGITS, rfc3966_phone_digit
+            ))
+            .unwrap(),
+            rfc3966_domainname_pattern: Regex::new(&format!(
+                "^({}\\.)*{}\\.?$",
+                rfc3966_domainlabel, rfc3966_toplabel
+            ))
+            .unwrap(),
+            is_format_eligible_as_you_type_formatting_regex: Regex::new(&format!(
+                "[{}]*\\$1[{}]*(\\$\\d[{}]*)*",
+                VALID_PUNCTUATION, VALID_PUNCTUATION, VALID_PUNCTUATION
+            ))
+            .unwrap(),
+            formatting_rule_has_first_group_only_regex: Regex::new("\\(?\\$1\\)?").unwrap(),
         };
         instance.initialize_regexp_mappings();
         instance

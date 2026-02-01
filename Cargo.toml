@@ -1,16 +1,27 @@
 [package]
 name = "rlibphonenumber"
 version = "0.2.5"
-edition = "2024" 
+edition = "2024"
 
+rust_version = "1.85"
 authors = ["Vladislav K. https://t.me/vloldik"]
 description = "A high-performance Rust port of Google's libphonenumber for parsing, formatting, and validating international phone numbers."
 repository = "https://github.com/vloldik/rlibphonenumber"
 documentation = "https://docs.rs/rlibphonenumber"
 readme = "Readme.md"
 license = "Apache-2.0"
-keywords = ["phone", "phonenumber", "libphonenumber", "validation", "formatting"]
-categories = ["parser-implementations", "text-processing", "internationalization"]
+keywords = [
+    "phone",
+    "phonenumber",
+    "libphonenumber",
+    "validation",
+    "formatting",
+]
+categories = [
+    "parser-implementations",
+    "text-processing",
+    "internationalization",
+]
 
 
 build = "build/rust_build.rs"

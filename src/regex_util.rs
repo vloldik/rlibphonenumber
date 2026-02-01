@@ -21,7 +21,7 @@ pub trait RegexFullMatch {
 }
 
 pub trait RegexConsume {
-    fn matches_start<'a>(&self, s: &'a str) -> bool {
+    fn matches_start(&self, s: &str) -> bool {
         self.find_start(s).is_some()
     }
 
@@ -44,7 +44,7 @@ impl RegexConsume for Regex {
         let captures = self.captures(s)?;
         let full_capture = captures.get(0)?;
         if full_capture.start() != 0 {
-            return None
+            return None;
         }
 
         Some(captures)
@@ -53,7 +53,7 @@ impl RegexConsume for Regex {
     fn find_start<'a>(&self, s: &'a str) -> Option<Match<'a>> {
         let found = self.find(s)?;
         if found.start() != 0 {
-            return None
+            return None;
         }
         Some(found)
     }
