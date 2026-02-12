@@ -14,16 +14,16 @@
 
 use std::borrow::Cow;
 
-/// Strips prefix of given string Cow. Returns option with `Some` if 
+/// Strips prefix of given string Cow. Returns option with `Some` if
 /// prefix found and stripped.
-/// 
+///
 /// Calls `drain` if string is owned and returns slice if string is borrowed
 pub fn strip_cow_prefix<'a>(cow: Cow<'a, str>, prefix: &str) -> Option<Cow<'a, str>> {
     match cow {
-        Cow::Borrowed(s) => s.strip_prefix(prefix).map(| s | Cow::Borrowed(s)),
+        Cow::Borrowed(s) => s.strip_prefix(prefix).map(Cow::Borrowed),
         Cow::Owned(mut s) => {
             if s.starts_with(prefix) {
-                s.drain(0..prefix.len());                               
+                s.drain(0..prefix.len());
                 return Some(Cow::Owned(s));
             }
             None
