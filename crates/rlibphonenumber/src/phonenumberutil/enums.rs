@@ -133,4 +133,4 @@ pub enum NumberLengthType {
     IsPossibleLocalOnly,
 }
 
-countries_enum!(Country);
+countries_enum!(Region);

@@ -1,6 +1,6 @@
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 
-use rlibphonenumber::{Country, PHONE_NUMBER_UTIL, PhoneNumberFormat};
+use rlibphonenumber::{PHONE_NUMBER_UTIL, PhoneNumberFormat, Region};
 
 use phonenumber::{
     self as rlp, Mode,
@@ -11,8 +11,8 @@ type TestEntity = (&'static str, &'static str, Id);
 
 fn setup_numbers() -> Vec<TestEntity> {
     vec![
-        ("0011 54 9 11 8765 4321 ext. 1234", Country::AU.as_ref(), AU),
-        ("(650) 253-0000", Country::US.as_ref(), US),
+        ("0011 54 9 11 8765 4321 ext. 1234", Region::AU.as_ref(), AU),
+        ("(650) 253-0000", Region::US.as_ref(), US),
         ("+44 20 8765 4321", "GB", GB),
         ("020 8765 4321", "GB", GB),
         ("011 15-1234-5678", "AR", AR),

@@ -58,34 +58,42 @@ Here is a detailed example that demonstrates how to parse a number, validate it,
 ```rust
 use rlibphonenumber::{
     // or instead you can use PhoneNumberUtil::new()
-    PHONE_NUMBER_UTIL, 
-    PhoneNumberFormat, 
+    PHONE_NUMBER_UTIL,
+    PhoneNumberFormat,
+    Region,
 };
-#[test]
+
 fn main() {
     let number_string = "+1-587-530-2271";
-    let region_code = "US"; // United States
 
     // 1. Parse the number
-    match PHONE_NUMBER_UTIL.parse(number_string, region_code) {
+    match PHONE_NUMBER_UTIL.parse(number_string, Region::US) {
         Ok(number) => {
             println!("✅ Successfully parsed number.");
-            println!("   - Original input: '{}' (in '{}')", number_string, region_code);
+            println!(
+                "   - Original input: '{}' (in '{}')",
+                number_string,
+                Region::US.as_ref()
+            );
             println!("   - Country Code: {}", number.country_code());
             println!("   - National Number: {}", number.national_number());
-            
+
             // 2. Validate the number
             // `is_valid_number` performs a full validation, checking length,
             // prefix, and other region-specific rules.
             let is_valid = PHONE_NUMBER_UTIL.is_valid_number(&number);
-            println!("\nIs the number valid? {}", if is_valid { "Yes" } else { "No" });
+            println!(
+                "\nIs the number valid? {}",
+                if is_valid { "Yes" } else { "No" }
+            );
 
             if !is_valid {
                 return;
             }
 
             // 3. Format the number in different standard formats
-            let international_format = PHONE_NUMBER_UTIL.format(&number, PhoneNumberFormat::International);
+            let international_format =
+                PHONE_NUMBER_UTIL.format(&number, PhoneNumberFormat::International);
             let national_format = PHONE_NUMBER_UTIL.format(&number, PhoneNumberFormat::National);
             let e164_format = PHONE_NUMBER_UTIL.format(&number, PhoneNumberFormat::E164);
             let rfc3966_format = PHONE_NUMBER_UTIL.format(&number, PhoneNumberFormat::RFC3966);
@@ -95,7 +103,7 @@ fn main() {
             println!("   - National:      {}", national_format);
             println!("   - E.164:         {}", e164_format);
             println!("   - RFC3966:       {}", rfc3966_format);
-            
+
             // 4. Get additional information about the number
             let number_type = PHONE_NUMBER_UTIL.get_number_type(&number);
             let number_region = PHONE_NUMBER_UTIL.get_region_code_for_number(&number);
