@@ -116,7 +116,6 @@ pub enum MatchType {
     ExactMatch,
 }
 
-
 // Separated enum ValidationResult into ValidationResult err and
 // ValidationResultOk for using Result<Ok, Err>
 

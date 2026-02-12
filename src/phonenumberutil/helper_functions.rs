@@ -300,8 +300,8 @@ pub fn desc_has_possible_number_data(desc: &PhoneNumberDesc) -> bool {
     desc.possible_length.len() != 1
         || desc
             .possible_length
-            .get(0)
-            .and_then(|l| Some(*l != -1))
+            .first()
+            .map(|l| *l != -1)
             .unwrap_or(false)
 }
 
@@ -320,9 +320,9 @@ pub fn desc_has_data(desc: &PhoneNumberDesc) -> bool {
     // exampleNumber). We don't bother checking the PossibleLengthsLocalOnly,
     // since if this is the only thing that's present we don't really support the
     // type at all: no type-specific methods will work with only this data.
-    return desc.has_example_number()
+    desc.has_example_number()
         || desc_has_possible_number_data(desc)
-        || desc.has_national_number_pattern();
+        || desc.has_national_number_pattern()
 }
 
 /// Returns the types we have metadata for based on the PhoneMetadata object
@@ -472,10 +472,6 @@ pub(crate) fn copy_core_fields_only(from_number: &PhoneNumber) -> PhoneNumber {
 
 /// Determines whether the given number is a national number match for the given
 /// PhoneNumberDesc. Does not check against possible lengths!
-pub fn is_match(
-    matcher_api: &Box<dyn MatcherApi>,
-    number: &str,
-    number_desc: &PhoneNumberDesc,
-) -> bool {
+pub fn is_match(matcher_api: &dyn MatcherApi, number: &str, number_desc: &PhoneNumberDesc) -> bool {
     matcher_api.match_national_number(number, number_desc, false)
 }

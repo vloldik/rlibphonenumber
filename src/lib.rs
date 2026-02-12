@@ -13,30 +13,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod interfaces;
 /// This module is automatically generated from /resources/*.proto
 mod generated;
+mod interfaces;
 mod phonenumberutil;
-mod regexp_cache;
 mod regex_based_matcher;
-pub mod region_code;
 pub(crate) mod regex_util;
+mod regexp_cache;
+pub mod region_code;
 pub(crate) mod string_util;
 
-/// I decided to create this module because there are many 
-/// boilerplate places in the code that can be replaced with macros, 
-/// the name of which will describe what is happening more 
+/// I decided to create this module because there are many
+/// boilerplate places in the code that can be replaced with macros,
+/// the name of which will describe what is happening more
 /// clearly than a few lines of code.
 mod macros;
 
-pub use phonenumberutil::{
-    PHONE_NUMBER_UTIL,
-    phonenumberutil::PhoneNumberUtil,
-    errors::{*},
-    enums::{*},
-};
 pub use generated::proto::phonemetadata;
 pub use generated::proto::phonenumber::PhoneNumber;
 pub use generated::proto::phonenumber::phone_number::CountryCodeSource;
+pub use phonenumberutil::{
+    PHONE_NUMBER_UTIL, enums::*, errors::*, phonenumberutil_public::PhoneNumberUtil,
+};
 pub use regexp_cache::InvalidRegexError;
 mod tests;

@@ -240,7 +240,7 @@ impl PhoneNumberUtilInternal {
     }
 
     pub(crate) fn get_extn_patterns_for_matching(&self) -> &str {
-        return &self.reg_exps.extn_patterns_for_matching;
+        &self.reg_exps.extn_patterns_for_matching
     }
 
     pub(crate) fn starts_with_plus_chars_pattern(&self, phone_number: &str) -> bool {
@@ -661,7 +661,7 @@ impl PhoneNumberUtilInternal {
         let national_significant_number = self.get_national_significant_number(phone_number);
         let region_code = self.get_region_code_for_country_code(country_calling_code);
         let Some(metadata) =
-            self.get_metadata_for_region_or_calling_code(country_calling_code, &region_code)
+            self.get_metadata_for_region_or_calling_code(country_calling_code, region_code)
         else {
             return Ok(national_significant_number);
         };
@@ -733,7 +733,7 @@ impl PhoneNumberUtilInternal {
         // Note GetRegionCodeForCountryCode() is used because formatting information
         // contained in the metadata for US.
         let Some(metadata) =
-            self.get_metadata_for_region_or_calling_code(country_calling_code, &region_code)
+            self.get_metadata_for_region_or_calling_code(country_calling_code, region_code)
         else {
             return Ok(national_significant_number);
         };
@@ -994,16 +994,14 @@ impl PhoneNumberUtilInternal {
             let Some(metadata) = &self.region_to_metadata_map.get(code) else {
                 return Ok(None);
             };
-            if metadata.has_leading_digits()
+            if (metadata.has_leading_digits()
                 && self
                     .reg_exps
                     .regexp_cache
                     .get_regex(metadata.leading_digits())?
-                    .matches_start(&national_number)
-            {
-                return Ok(Some(code));
-            } else if self.get_number_type_helper(&national_number, metadata)
-                != PhoneNumberType::Unknown
+                    .matches_start(&national_number))
+                || self.get_number_type_helper(&national_number, metadata)
+                    != PhoneNumberType::Unknown
             {
                 return Ok(Some(code));
             }
@@ -1103,7 +1101,7 @@ impl PhoneNumberUtilInternal {
             return false;
         }
         // very common name, so specify mod
-        helper_functions::is_match(&self.matcher_api, national_number, number_desc)
+        helper_functions::is_match(self.matcher_api.as_ref(), national_number, number_desc)
     }
 
     /// Checks if a number can be dialled internationally.
@@ -2232,11 +2230,11 @@ impl PhoneNumberUtilInternal {
                 // long before, we consider the number with the country code stripped to
                 // be a better result and keep that instead.
                 if (!helper_functions::is_match(
-                    &self.matcher_api,
+                    self.matcher_api.as_ref(),
                     &national_number,
                     general_num_desc,
                 ) && helper_functions::is_match(
-                    &self.matcher_api,
+                    self.matcher_api.as_ref(),
                     &potential_national_number,
                     general_num_desc,
                 )) || test_number_length_with_unknown_type(
@@ -2450,7 +2448,7 @@ impl PhoneNumberUtilInternal {
                 RegionCode::get_unknown(),
             )?);
         }
-        return Err(GetExampleNumberError::CouldNotGetNumber.into());
+        Err(GetExampleNumberError::CouldNotGetNumber.into())
     }
 
     /// Strips any international prefix (such as +, 00, 011) present in the number
@@ -2739,7 +2737,7 @@ impl PhoneNumberUtilInternal {
         let general_desc = &metadata.general_desc;
         // Check if the original number is viable.
         let is_viable_original_number =
-            helper_functions::is_match(&self.matcher_api, phone_number, general_desc);
+            helper_functions::is_match(self.matcher_api.as_ref(), phone_number, general_desc);
         // Attempt to parse the first digits as a national prefix. We make a
         // copy so that we can revert to the original string if necessary.
         let transform_rule = metadata.national_prefix_transform_rule();
@@ -2777,7 +2775,11 @@ impl PhoneNumberUtilInternal {
             let replaced_number =
                 possible_national_prefix_pattern.replace(phone_number, transform_rule);
             if is_viable_original_number
-                && !helper_functions::is_match(&self.matcher_api, &replaced_number, general_desc)
+                && !helper_functions::is_match(
+                    self.matcher_api.as_ref(),
+                    &replaced_number,
+                    general_desc,
+                )
             {
                 return Ok((phone_number.into(), None));
             }
@@ -2792,7 +2794,11 @@ impl PhoneNumberUtilInternal {
             // transformation is necessary, and we just remove the national prefix.
             let stripped_number = &phone_number[matched.end()..];
             if is_viable_original_number
-                && !helper_functions::is_match(&self.matcher_api, stripped_number, general_desc)
+                && !helper_functions::is_match(
+                    self.matcher_api.as_ref(),
+                    stripped_number,
+                    general_desc,
+                )
             {
                 return Ok((phone_number.into(), None));
             }
