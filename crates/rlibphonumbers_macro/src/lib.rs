@@ -3,7 +3,7 @@ use quote::{format_ident, quote};
 use xml::{EventReader, reader::XmlEvent};
 
 fn get_country_list() -> Vec<String> {
-    let file = include_str!("../../../resources/ShortNumberMetadata.xml");
+    let file = include_str!(concat!(env!("OUT_DIR"), "/ShortNumberMetadata.xml"));
     let mut countries = Vec::new();
 
     let parser = EventReader::from_str(file);
