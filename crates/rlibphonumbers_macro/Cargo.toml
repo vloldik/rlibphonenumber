@@ -2,7 +2,8 @@
 name = "rlibphonumbers_macro"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+description = "Package for \"Region\" enum generation for a high-performance Rust port of Google's libphonenumber for parsing, formatting, and validating international phone numbers."
+repository = "https://github.com/vloldik/rlibphonenumber"
 
 [lib]
 proc-macro = true
