@@ -34,14 +34,15 @@ path = "src/lib.rs"
 [dependencies]
 # logging standard in rust
 log = "0.4"
-# helpful error package
-thiserror = "1.0"
 # protobuf lib required to use .proto files from assets
 protobuf = "3.7"
 # optimized concurrent map
 dashmap = "5.5"
 # just regex package
 regex = "1.10"
+
+thiserror = { workspace = true }
+
 # for fast 0-alloc int to string conversion
 itoa = "1.0"
 # simple macro for single allocation concatenation of strings
