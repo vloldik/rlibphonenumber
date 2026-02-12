@@ -13,6 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use rlibphonumbers_macro::countries_enum;
 use strum::EnumIter;
 
 /// Defines the various standardized formats for representing phone numbers.
@@ -131,3 +132,5 @@ pub enum NumberLengthType {
     /// for a number that can be dialed within a specific local area (e.g., without the area code).
     IsPossibleLocalOnly,
 }
+
+countries_enum!(Country);

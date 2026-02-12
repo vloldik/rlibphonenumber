@@ -12,8 +12,9 @@ fn get_country_list() -> Vec<String> {
             name, attributes, ..
         }) = e
             && name.borrow().local_name == "territory"
+            && let Some(id_attr) = attributes.iter().find(|attr| attr.name.local_name == "id")
         {
-            countries.push(attributes[0].value.clone());
+            countries.push(id_attr.value.clone());
         }
     }
 
@@ -21,7 +22,7 @@ fn get_country_list() -> Vec<String> {
 }
 
 #[proc_macro]
-pub fn contries_enum(name: TokenStream) -> TokenStream {
+pub fn countries_enum(name: TokenStream) -> TokenStream {
     let country_list = get_country_list();
     let countries = country_list
         .iter()
@@ -38,11 +39,11 @@ pub fn contries_enum(name: TokenStream) -> TokenStream {
 
     quote! {
         #[derive(Debug)]
-        enum #name {
+        pub enum #name {
             #(#countries),*
         }
 
-        impl AsRef<str> for TEST {
+        impl AsRef<str> for #name {
             fn as_ref(&self) -> &str {
                 match self {
                     #(#str_mapper),*

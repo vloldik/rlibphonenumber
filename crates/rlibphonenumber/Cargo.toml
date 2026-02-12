@@ -51,6 +51,7 @@ fast-cat = "0.1"
 strum = { version = "0.26", features = ["derive"] }
 # Simple lib to converts any unicode valid chars into decimals 
 dec_from_char = "0.2"
+rlibphonumbers_macro = { path = "../rlibphonumbers_macro" }
 
 [build-dependencies]
 thiserror = "1.0"

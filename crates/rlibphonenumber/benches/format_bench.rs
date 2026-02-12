@@ -1,18 +1,18 @@
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 
-use rlibphonenumber::{PhoneNumberFormat, PHONE_NUMBER_UTIL};
+use rlibphonenumber::{Country, PHONE_NUMBER_UTIL, PhoneNumberFormat};
 
 use phonenumber::{
-    self as rlp,
-    country::Id::{self, AR, AU, DE, GB, IT, US}, Mode,
+    self as rlp, Mode,
+    country::Id::{self, AR, AU, DE, GB, IT, US},
 };
 
 type TestEntity = (&'static str, &'static str, Id);
 
 fn setup_numbers() -> Vec<TestEntity> {
     vec![
-        ("0011 54 9 11 8765 4321 ext. 1234", "AU", AU),
-        ("(650) 253-0000", "US", US),
+        ("0011 54 9 11 8765 4321 ext. 1234", Country::AU.as_ref(), AU),
+        ("(650) 253-0000", Country::US.as_ref(), US),
         ("+44 20 8765 4321", "GB", GB),
         ("020 8765 4321", "GB", GB),
         ("011 15-1234-5678", "AR", AR),
@@ -29,9 +29,7 @@ fn convert_to_rlp_numbers(numbers: &[TestEntity]) -> Vec<rlp::PhoneNumber> {
         .collect()
 }
 
-fn convert_to_rlibphonenumber_numbers(
-    numbers: &[TestEntity],
-) -> Vec<rlibphonenumber::PhoneNumber> {
+fn convert_to_rlibphonenumber_numbers(numbers: &[TestEntity]) -> Vec<rlibphonenumber::PhoneNumber> {
     numbers
         .iter()
         .map(|s| PHONE_NUMBER_UTIL.parse(s.0, s.1).unwrap())
@@ -49,8 +47,7 @@ fn formatting_benchmark(c: &mut Criterion) {
         group.bench_function(format!("rlibphonenumber: format({:?})", format_a), |b| {
             b.iter(|| {
                 for number in &numbers {
-                    PHONE_NUMBER_UTIL
-                        .format(black_box(number), black_box(format_a));
+                    PHONE_NUMBER_UTIL.format(black_box(number), black_box(format_a));
                 }
             })
         });
@@ -66,8 +63,7 @@ fn formatting_benchmark(c: &mut Criterion) {
         for (number_a, number_b) in rlp_numbers.iter().zip(numbers.iter()) {
             assert_eq!(
                 rlp::format(number_a).mode(format_b).to_string(),
-                PHONE_NUMBER_UTIL
-                    .format(number_b, format_a)
+                PHONE_NUMBER_UTIL.format(number_b, format_a)
             );
         }
     };

@@ -868,6 +868,7 @@ dependencies = [
  "protobuf",
  "protobuf-codegen",
  "regex",
+ "rlibphonumbers_macro",
  "strum",
  "thiserror",
 ]
