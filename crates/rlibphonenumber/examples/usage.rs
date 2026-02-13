@@ -2,7 +2,6 @@ use rlibphonenumber::{
     // or instead you can use PhoneNumberUtil::new()
     PHONE_NUMBER_UTIL,
     PhoneNumberFormat,
-    PhoneNumberStaticExt,
     Region,
 };
 
@@ -38,8 +37,8 @@ fn main() {
             let international_format =
                 PHONE_NUMBER_UTIL.format(&number, PhoneNumberFormat::International);
             let national_format = PHONE_NUMBER_UTIL.format(&number, PhoneNumberFormat::National);
-            let e164_format = number.format(PhoneNumberFormat::E164);
-            let rfc3966_format = number.format(PhoneNumberFormat::RFC3966);
+            let e164_format = number.format_as(PhoneNumberFormat::E164);
+            let rfc3966_format = number.format_as(PhoneNumberFormat::RFC3966);
 
             println!("\nFormatted Outputs:");
             println!("   - International: {}", international_format);

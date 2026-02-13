@@ -35,7 +35,10 @@ pub use generated::proto::phonenumber::phone_number::CountryCodeSource;
 #[cfg(feature = "global_static")]
 mod phone_ext;
 #[cfg(feature = "global_static")]
-pub use crate::{phone_ext::PhoneNumberStaticExt, phonenumberutil::PHONE_NUMBER_UTIL};
+pub use crate::phonenumberutil::PHONE_NUMBER_UTIL;
+
+#[cfg(feature = "serde")]
+pub mod serde;
 
 pub use phonenumberutil::{enums::*, errors::*, phonenumberutil_public::PhoneNumberUtil};
 pub use regexp_cache::InvalidRegexError;
