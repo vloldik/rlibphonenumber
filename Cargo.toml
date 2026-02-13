@@ -5,3 +5,7 @@ members = ["crates/rlibphonenumber", "crates/rlibphonenumbers_macro"]
 [workspace.dependencies]
 # helpful error package
 thiserror = "1.0"
+
+[workspace.package]
+
+readme = "Readme.md"

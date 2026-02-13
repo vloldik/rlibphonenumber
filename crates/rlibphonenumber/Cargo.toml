@@ -8,7 +8,7 @@ authors = ["Vladislav K. https://t.me/vloldik"]
 description = "A high-performance Rust port of Google's libphonenumber for parsing, formatting, and validating international phone numbers."
 repository = "https://github.com/vloldik/rlibphonenumber"
 documentation = "https://docs.rs/rlibphonenumber"
-readme = "../../Readme.md"
+readme.workspace = true
 license = "Apache-2.0"
 keywords = [
     "phone",
