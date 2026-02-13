@@ -1,4 +1,4 @@
-use std::{borrow::Cow, str::FromStr};
+use std::{borrow::Cow, fmt::Display, str::FromStr};
 
 use crate::{
     NumberLengthType, PHONE_NUMBER_UTIL, ParseError, PhoneNumber, PhoneNumberFormat,
@@ -139,6 +139,12 @@ impl FromStr for PhoneNumber {
     type Err = ParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        todo!()
+        PHONE_NUMBER_UTIL.parse(s)
+    }
+}
+
+impl Display for PhoneNumber {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.format(PhoneNumberFormat::E164))
     }
 }
