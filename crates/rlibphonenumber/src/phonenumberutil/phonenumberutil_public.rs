@@ -73,7 +73,6 @@ impl PhoneNumberUtil {
     ///
     /// For example, an input of "1-800-FLOWERS" will be converted to "1-800-3569377".
     ///
-
     /// # Parameters
     ///
     /// * `number`: A string slice or `String` representing the phone number.
@@ -81,7 +80,7 @@ impl PhoneNumberUtil {
     /// # Returns
     ///
     /// A `String` containing the phone number with all alphabetic characters converted to digits.
-    pub fn convert_alpha_characters_in_number<'a>(&self, number: impl AsRef<str>) -> String {
+    pub fn convert_alpha_characters_in_number(&self, number: impl AsRef<str>) -> String {
         self.util_internal
             .convert_alpha_characters_in_number(number.as_ref())
     }
@@ -156,9 +155,9 @@ impl PhoneNumberUtil {
     /// # Panics
     ///
     /// Panics if metadata is invalid, indicating a library bug.
-    pub fn format_national_number_with_carrier_code<'a>(
+    pub fn format_national_number_with_carrier_code(
         &self,
-        phone_number: &'a PhoneNumber,
+        phone_number: &PhoneNumber,
         carrier_code: impl AsRef<str>,
     ) -> String {
         self.util_internal
@@ -651,5 +650,11 @@ impl PhoneNumberUtil {
             .truncate_too_long_number(phone_number)
             // This should not never happen
             .expect("A valid regex is expected in metadata; this indicates a library bug.")
+    }
+}
+
+impl Default for PhoneNumberUtil {
+    fn default() -> Self {
+        Self::new()
     }
 }
