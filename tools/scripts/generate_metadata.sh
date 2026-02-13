@@ -6,7 +6,7 @@ project_home="$filedir/../.."
 generated_dir="$project_home/crates/rlibphonenumber/src/generated/metadata"
 
 rlibphonenumber_resources_dir="$project_home/crates/rlibphonenumber/resources"
-rlibphonenumber_resources_dir="$project_home/crates/rlibphonenumber/resources"
+rlibphonenumber_macro_resources_dir="$project_home/crates/rlibphonenumbers_macro/resources"
 
 resources_dir="$project_home/resources"
 rust_build_jar="$javadir/rust-build/target/rust-build-1.0-SNAPSHOT-jar-with-dependencies.jar"
@@ -102,5 +102,12 @@ pub use metadata::METADATA;
 #[cfg(test)]
 pub use test_metadata::TEST_METADATA;
 " > "$generated_dir/mod.rs"
+
+for dir in "$rlibphonenumber_resources_dir" "$rlibphonenumber_macro_resources_dir"
+do
+    mkdir -p "$dir"
+done
+cp "$resources_dir/"*.proto "$rlibphonenumber_resources_dir"
+cp "$resources_dir/ShortNumberMetadata.xml" "$rlibphonenumber_macro_resources_dir"
 
 echo "Generation complete!"

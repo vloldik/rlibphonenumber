@@ -16,9 +16,9 @@
 fn main() {
     protobuf_codegen::Codegen::new()
         .pure()
-        .includes(["../../resources"])
-        .input("../../resources/phonemetadata.proto")
-        .input("../../resources/phonenumber.proto")
+        .includes(["resources"])
+        .input("resources/phonemetadata.proto")
+        .input("resources/phonenumber.proto")
         .cargo_out_dir("proto_gen")
         .run_from_script();
 }
