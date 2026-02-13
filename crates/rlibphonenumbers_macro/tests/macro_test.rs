@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod test {
-    use rlibphonumbers_macro::countries_enum;
+    use rlibphonenumbers_macro::countries_enum;
 
     countries_enum!(TEST);
 

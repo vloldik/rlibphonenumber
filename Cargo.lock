@@ -868,13 +868,13 @@ dependencies = [
  "protobuf",
  "protobuf-codegen",
  "regex",
- "rlibphonumbers_macro",
+ "rlibphonenumbers_macro",
  "strum",
  "thiserror",
 ]
 
 [[package]]
-name = "rlibphonumbers_macro"
+name = "rlibphonenumbers_macro"
 version = "0.1.0"
 dependencies = [
  "proc-macro2",

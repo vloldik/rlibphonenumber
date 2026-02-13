@@ -3,7 +3,11 @@
 filedir="./$(dirname "$0")"
 javadir="$filedir/../java"
 project_home="$filedir/../.."
-generated_dir="$project_home/src/generated/metadata"
+generated_dir="$project_home/crates/rlibphonenumber/src/generated/metadata"
+
+rlibphonenumber_resources_dir="$project_home/crates/rlibphonenumber/resources"
+rlibphonenumber_resources_dir="$project_home/crates/rlibphonenumber/resources"
+
 resources_dir="$project_home/resources"
 rust_build_jar="$javadir/rust-build/target/rust-build-1.0-SNAPSHOT-jar-with-dependencies.jar"
 

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/rlibphonenumber", "crates/rlibphonumbers_macro"]
+members = ["crates/rlibphonenumber", "crates/rlibphonenumbers_macro"]
 
 [workspace.dependencies]
 # helpful error package
