@@ -32,8 +32,12 @@ mod macros;
 pub use generated::proto::phonemetadata;
 pub use generated::proto::phonenumber::PhoneNumber;
 pub use generated::proto::phonenumber::phone_number::CountryCodeSource;
-pub use phonenumberutil::{
-    PHONE_NUMBER_UTIL, enums::*, errors::*, phonenumberutil_public::PhoneNumberUtil,
-};
+
+#[cfg(feature = "global_static")]
+mod phone_ext;
+#[cfg(feature = "global_static")]
+pub use crate::{phone_ext::PhoneNumberStaticExt, phonenumberutil::PHONE_NUMBER_UTIL};
+
+pub use phonenumberutil::{enums::*, errors::*, phonenumberutil_public::PhoneNumberUtil};
 pub use regexp_cache::InvalidRegexError;
 mod tests;

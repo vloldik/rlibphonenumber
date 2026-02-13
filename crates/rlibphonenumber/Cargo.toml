@@ -24,6 +24,10 @@ categories = [
 ]
 build = "build/rust_build.rs"
 
+[features]
+default = ["global_static"]
+global_static = []
+
 [lib]
 name = "rlibphonenumber"
 path = "src/lib.rs"

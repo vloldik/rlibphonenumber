@@ -15,6 +15,7 @@
 
 use std::collections::{HashMap, HashSet};
 
+use fast_cat::concat_str;
 use protobuf::Message;
 use strum::IntoEnumIterator;
 

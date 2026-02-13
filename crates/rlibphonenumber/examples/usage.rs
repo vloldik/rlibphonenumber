@@ -2,6 +2,7 @@ use rlibphonenumber::{
     // or instead you can use PhoneNumberUtil::new()
     PHONE_NUMBER_UTIL,
     PhoneNumberFormat,
+    PhoneNumberStaticExt,
     Region,
 };
 
@@ -23,7 +24,7 @@ fn main() {
             // 2. Validate the number
             // `is_valid_number` performs a full validation, checking length,
             // prefix, and other region-specific rules.
-            let is_valid = PHONE_NUMBER_UTIL.is_valid_number(&number);
+            let is_valid = number.is_valid();
             println!(
                 "\nIs the number valid? {}",
                 if is_valid { "Yes" } else { "No" }
@@ -37,8 +38,8 @@ fn main() {
             let international_format =
                 PHONE_NUMBER_UTIL.format(&number, PhoneNumberFormat::International);
             let national_format = PHONE_NUMBER_UTIL.format(&number, PhoneNumberFormat::National);
-            let e164_format = PHONE_NUMBER_UTIL.format(&number, PhoneNumberFormat::E164);
-            let rfc3966_format = PHONE_NUMBER_UTIL.format(&number, PhoneNumberFormat::RFC3966);
+            let e164_format = number.format(PhoneNumberFormat::E164);
+            let rfc3966_format = number.format(PhoneNumberFormat::RFC3966);
 
             println!("\nFormatted Outputs:");
             println!("   - International: {}", international_format);
@@ -47,7 +48,7 @@ fn main() {
             println!("   - RFC3966:       {}", rfc3966_format);
 
             // 4. Get additional information about the number
-            let number_type = PHONE_NUMBER_UTIL.get_number_type(&number);
+            let number_type = number.get_type();
             let number_region = PHONE_NUMBER_UTIL.get_region_code_for_number(&number);
 
             println!("\nAdditional Information:");
