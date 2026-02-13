@@ -6,7 +6,7 @@ fuzz_target!(|data: (String, String)| {
     let (number_str, region_str) = data;
     let util = &PHONE_NUMBER_UTIL;
 
-    if let Ok(phone_number) = util.parse(&number_str, &region_str) {
+    if let Ok(phone_number) = util.parse_with_default_region(&number_str, &region_str) {
         let _ = util.is_valid_number(&phone_number);
         let _ = util.is_possible_number(&phone_number);
         let _ = util.is_number_geographical(&phone_number);
