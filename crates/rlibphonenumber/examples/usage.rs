@@ -53,7 +53,7 @@ fn main() {
 
             println!("\nAdditional Information:");
             println!("   - Number Type:   {:?}", number_type); // e.g., FixedLine
-            println!("   - Number Region: {}", number_region); // e.g., US
+            println!("   - Number Region: {}", number_region.unwrap_or("Unknown")); // e.g., US
         }
         Err(e) => {
             // Handle parsing errors, e.g., if the number is invalid or not a number.

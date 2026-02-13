@@ -28,7 +28,7 @@ pub trait PhoneNumberStaticExt {
         region_calling_from: impl AsRef<str>,
     ) -> Cow<'_, str>;
 
-    fn get_region_code<'a>(&self) -> &'a str;
+    fn get_region_code<'a>(&self) -> Option<&'a str>;
 
     fn get_type(&self) -> PhoneNumberType;
 
@@ -90,7 +90,7 @@ impl PhoneNumberStaticExt for PhoneNumber {
         PHONE_NUMBER_UTIL.format_out_of_country_keeping_alpha_chars(self, region_calling_from)
     }
 
-    fn get_region_code<'a>(&self) -> &'a str {
+    fn get_region_code<'a>(&self) -> Option<&'a str> {
         PHONE_NUMBER_UTIL.get_region_code_for_number(self)
     }
 

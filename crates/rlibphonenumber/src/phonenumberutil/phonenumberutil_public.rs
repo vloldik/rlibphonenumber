@@ -418,7 +418,7 @@ impl PhoneNumberUtil {
     /// # Panics
     ///
     /// Panics on invalid metadata, indicating a library bug.
-    pub fn get_region_code_for_number(&self, phone_number: &PhoneNumber) -> &str {
+    pub fn get_region_code_for_number(&self, phone_number: &PhoneNumber) -> Option<&str> {
         self.util_internal
             .get_region_code_for_number(phone_number)
             // This should not never happen
@@ -609,6 +609,15 @@ impl PhoneNumberUtil {
             .map_err(|err| err.into_public())
     }
 
+    /// Parses a string into a `PhoneNumber`, keeping the raw input string.
+    ///
+    /// # Parameters
+    ///
+    /// * `number_to_parse`: The phone number string.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the parsed `PhoneNumber` on success, or a `ParseError` on failure.
     pub fn parse_and_keep_raw_input(
         &self,
         number_to_parse: impl AsRef<str>,
@@ -637,7 +646,25 @@ impl PhoneNumberUtil {
         default_region: impl AsRef<str>,
     ) -> Result<PhoneNumber, ParseError> {
         self.util_internal
-            .parse_with_default_region(number_to_parse.as_ref(), default_region.as_ref())
+            .parse(number_to_parse.as_ref(), Some(default_region.as_ref()))
+            .map_err(|err| err.into_public())
+    }
+
+    /// Parses a string into a `PhoneNumber`.
+    ///
+    /// This is the primary method for converting a string representation of a number
+    /// into a structured `PhoneNumber` object.
+    ///
+    /// # Parameters
+    ///
+    /// * `number_to_parse`: The phone number string.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the parsed `PhoneNumber` on success, or a `ParseError` on failure.
+    pub fn parse(&self, number_to_parse: impl AsRef<str>) -> Result<PhoneNumber, ParseError> {
+        self.util_internal
+            .parse(number_to_parse.as_ref(), None)
             .map_err(|err| err.into_public())
     }
 

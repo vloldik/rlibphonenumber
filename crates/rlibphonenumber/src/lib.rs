@@ -20,7 +20,6 @@ mod phonenumberutil;
 mod regex_based_matcher;
 pub(crate) mod regex_util;
 mod regexp_cache;
-pub mod region_code;
 pub(crate) mod string_util;
 
 /// I decided to create this module because there are many
