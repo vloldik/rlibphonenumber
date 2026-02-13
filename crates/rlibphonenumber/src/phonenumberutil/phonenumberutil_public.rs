@@ -400,7 +400,7 @@ impl PhoneNumberUtil {
     /// # Returns
     ///
     /// A string slice with the corresponding two-letter region code. Returns "ZZ" for invalid codes.
-    pub fn get_region_code_for_country_code(&self, country_code: i32) -> &str {
+    pub fn get_region_code_for_country_code(&self, country_code: i32) -> Option<&str> {
         self.util_internal
             .get_region_code_for_country_code(country_code)
     }
@@ -599,13 +599,22 @@ impl PhoneNumberUtil {
     /// # Returns
     ///
     /// A `Result` containing the parsed `PhoneNumber` on success, or a `ParseError` on failure.
-    pub fn parse_and_keep_raw_input(
+    pub fn parse_and_keep_raw_input_with_default_region(
         &self,
         number_to_parse: impl AsRef<str>,
         default_region: impl AsRef<str>,
     ) -> Result<PhoneNumber, ParseError> {
         self.util_internal
-            .parse_and_keep_raw_input(number_to_parse.as_ref(), default_region.as_ref())
+            .parse_and_keep_raw_input(number_to_parse.as_ref(), Some(default_region.as_ref()))
+            .map_err(|err| err.into_public())
+    }
+
+    pub fn parse_and_keep_raw_input(
+        &self,
+        number_to_parse: impl AsRef<str>,
+    ) -> Result<PhoneNumber, ParseError> {
+        self.util_internal
+            .parse_and_keep_raw_input(number_to_parse.as_ref(), None)
             .map_err(|err| err.into_public())
     }
 
@@ -622,13 +631,13 @@ impl PhoneNumberUtil {
     /// # Returns
     ///
     /// A `Result` containing the parsed `PhoneNumber` on success, or a `ParseError` on failure.
-    pub fn parse(
+    pub fn parse_with_default_region(
         &self,
         number_to_parse: impl AsRef<str>,
         default_region: impl AsRef<str>,
     ) -> Result<PhoneNumber, ParseError> {
         self.util_internal
-            .parse(number_to_parse.as_ref(), default_region.as_ref())
+            .parse_with_default_region(number_to_parse.as_ref(), default_region.as_ref())
             .map_err(|err| err.into_public())
     }
 

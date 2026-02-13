@@ -32,7 +32,11 @@ fn convert_to_rlp_numbers(numbers: &[TestEntity]) -> Vec<rlp::PhoneNumber> {
 fn convert_to_rlibphonenumber_numbers(numbers: &[TestEntity]) -> Vec<rlibphonenumber::PhoneNumber> {
     numbers
         .iter()
-        .map(|s| PHONE_NUMBER_UTIL.parse(s.0, s.1).unwrap())
+        .map(|s| {
+            PHONE_NUMBER_UTIL
+                .parse_with_default_region(s.0, s.1)
+                .unwrap()
+        })
         .collect()
 }
 

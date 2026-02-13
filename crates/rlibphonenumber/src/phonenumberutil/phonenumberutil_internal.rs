@@ -364,8 +364,9 @@ impl PhoneNumberUtilInternal {
         // rules are contained by Russia. French Indian Ocean country rules are
         // contained by Réunion.
         let region_code = self.get_region_code_for_country_code(country_calling_code);
-        let metadata =
-            self.get_metadata_for_region_or_calling_code(country_calling_code, region_code);
+        let metadata = region_code.and_then(|region_code| {
+            self.get_metadata_for_region_or_calling_code(country_calling_code, region_code)
+        });
 
         if let Some(metadata) = metadata {
             if let Cow::Owned(s) = self.format_nsn(&formatted_number, metadata, number_format)? {
@@ -408,11 +409,12 @@ impl PhoneNumberUtilInternal {
     /// # Arguments
     ///
     /// * `country_calling_code` - The country calling code.
-    pub(crate) fn get_region_code_for_country_code(&self, country_calling_code: i32) -> &str {
+    pub(crate) fn get_region_code_for_country_code(
+        &self,
+        country_calling_code: i32,
+    ) -> Option<&str> {
         let region_codes = self.get_region_codes_for_country_calling_code(country_calling_code);
-        region_codes
-            .and_then(|mut codes| codes.next())
-            .unwrap_or(RegionCode::get_unknown())
+        region_codes.and_then(|mut codes| codes.next())
     }
 
     /// Returns the region codes that matches the specific country calling code. In
@@ -436,6 +438,13 @@ impl PhoneNumberUtilInternal {
                     .iter()
                     .map(|v| v.as_str())
             })
+    }
+
+    fn get_metadata_for_calling_code(&self, country_calling_code: i32) -> Option<&PhoneMetadata> {
+        let region_code = self.get_region_code_for_country_code(country_calling_code);
+        region_code.and_then(|region_code| {
+            self.get_metadata_for_region_or_calling_code(country_calling_code, region_code)
+        })
     }
 
     pub(crate) fn get_metadata_for_region_or_calling_code(
@@ -659,10 +668,7 @@ impl PhoneNumberUtilInternal {
         // Note GetRegionCodeForCountryCode() is used because formatting information
         // contained in the metadata for US.
         let national_significant_number = self.get_national_significant_number(phone_number);
-        let region_code = self.get_region_code_for_country_code(country_calling_code);
-        let Some(metadata) =
-            self.get_metadata_for_region_or_calling_code(country_calling_code, region_code)
-        else {
+        let Some(metadata) = self.get_metadata_for_calling_code(country_calling_code) else {
             return Ok(national_significant_number);
         };
 
@@ -728,13 +734,10 @@ impl PhoneNumberUtilInternal {
     ) -> RegexResult<String> {
         let country_calling_code = phone_number.country_code();
         let national_significant_number = self.get_national_significant_number(phone_number);
-        let region_code = self.get_region_code_for_country_code(country_calling_code);
 
         // Note GetRegionCodeForCountryCode() is used because formatting information
         // contained in the metadata for US.
-        let Some(metadata) =
-            self.get_metadata_for_region_or_calling_code(country_calling_code, region_code)
-        else {
+        let Some(metadata) = self.get_metadata_for_calling_code(country_calling_code) else {
             return Ok(national_significant_number);
         };
 
@@ -821,7 +824,9 @@ impl PhoneNumberUtilInternal {
         let region_code = self.get_region_code_for_country_code(country_calling_code);
         let number_type = self.get_number_type(&number_no_extension)?;
         let is_valid_number = !matches!(number_type, PhoneNumberType::Unknown);
-        if calling_from == region_code {
+        if let Some(region_code) = region_code
+            && calling_from == region_code
+        {
             let is_fixed_line_or_mobile = matches!(
                 number_type,
                 PhoneNumberType::FixedLine
@@ -1206,10 +1211,9 @@ impl PhoneNumberUtilInternal {
                 ""
             };
 
-        let region_code = self.get_region_code_for_country_code(country_code);
         // Metadata cannot be NULL because the country_code is valid.
         let metadata_for_region = self
-            .get_metadata_for_region_or_calling_code(country_code, region_code)
+            .get_metadata_for_calling_code(country_code)
             .ok_or(InvalidMetadataForValidRegionError {})?;
 
         let formatted_nsn = self.format_nsn(
@@ -1254,10 +1258,7 @@ impl PhoneNumberUtilInternal {
         phone_number: &PhoneNumber,
     ) -> RegexResult<bool> {
         let country_calling_code = phone_number.country_code();
-        let region_code = self.get_region_code_for_country_code(country_calling_code);
-        let Some(metadata) =
-            self.get_metadata_for_region_or_calling_code(country_calling_code, region_code)
-        else {
+        let Some(metadata) = self.get_metadata_for_calling_code(country_calling_code) else {
             return Ok(false);
         };
         let national_number = self.get_national_significant_number(phone_number);
@@ -1303,12 +1304,14 @@ impl PhoneNumberUtilInternal {
                     self.get_region_code_for_country_code(phone_number.country_code());
                 // We strip non-digits from the NDD here, and from the raw input later, so
                 // that we can compare them easily.
-                let Some(national_prefix) =
+                let Some(national_prefix) = region_code.and_then(|region_code| {
                     self.get_ndd_prefix_for_region(region_code, true /* strip non-digits */)
-                else {
+                }) else {
                     break 'default_block format_national()?;
                 };
-                let Some(metadata) = self.region_to_metadata_map.get(region_code) else {
+                let Some(metadata) = region_code
+                    .and_then(|region_code| self.region_to_metadata_map.get(region_code))
+                else {
                     // If the region doesn't have a national prefix at all, we can safely
                     // return the national format without worrying about a national prefix
                     // being added.
@@ -1399,7 +1402,7 @@ impl PhoneNumberUtilInternal {
         &self,
         raw_input: &str,
         national_prefix: &str,
-        region_code: &str,
+        region_code: Option<&str>,
     ) -> RegexResult<bool> {
         let normalized_national_number = self.normalize_digits_only(raw_input);
         if let Some(stripped) = normalized_national_number.strip_prefix(national_prefix) {
@@ -1408,7 +1411,10 @@ impl PhoneNumberUtilInternal {
             // do prefix matching. To tackle that, we check the validity of the
             // number if the assumed national prefix is removed (777123 won't be
             // valid in Japan).
-            if let Ok(number_without_national_prefix) = self.parse(stripped, region_code) {
+            if let Ok(number_without_national_prefix) = region_code.map_or_else(
+                || self.parse(stripped),
+                |region_code| self.parse_with_default_region(stripped, region_code),
+            ) {
                 return self.is_valid_number(&number_without_national_prefix);
             }
         }
@@ -1421,12 +1427,16 @@ impl PhoneNumberUtilInternal {
     ///
     /// * `number_to_parse` - The number string to parse.
     /// * `default_region` - The region to assume if the number is not in international format.
-    pub(crate) fn parse(
+    pub(crate) fn parse_with_default_region(
         &self,
         number_to_parse: &str,
         default_region: &str,
     ) -> ParseResult<PhoneNumber> {
-        self.parse_helper(number_to_parse, default_region, false, true)
+        self.parse_helper(number_to_parse, Some(default_region), false, true)
+    }
+
+    pub(crate) fn parse(&self, number_to_parse: &str) -> ParseResult<PhoneNumber> {
+        self.parse_helper(number_to_parse, None, false, true)
     }
 
     /// Parses a string into a phone number object, keeping the raw input.
@@ -1438,7 +1448,7 @@ impl PhoneNumberUtilInternal {
     pub(crate) fn parse_and_keep_raw_input(
         &self,
         number_to_parse: &str,
-        default_region: &str,
+        default_region: Option<&str>,
     ) -> ParseResult<PhoneNumber> {
         self.parse_helper(number_to_parse, default_region, true, true)
     }
@@ -1607,10 +1617,9 @@ impl PhoneNumberUtilInternal {
             );
             formatted_number
         };
-        let region_code = self.get_region_code_for_country_code(country_code);
         // Metadata cannot be null because the country code is valid.
         let metadata_for_region = self
-            .get_metadata_for_region_or_calling_code(country_code, region_code)
+            .get_metadata_for_calling_code(country_code)
             .ok_or(InvalidMetadataForValidRegionError {})?;
 
         // Strip any extension
@@ -1830,7 +1839,7 @@ impl PhoneNumberUtilInternal {
         phone_number: &str,
         region_dialing_from: &str,
     ) -> bool {
-        match self.parse(phone_number, region_dialing_from) {
+        match self.parse_with_default_region(phone_number, region_dialing_from) {
             Ok(number_proto) => self.is_possible_number(&number_proto),
 
             Err(err) => {
@@ -1868,11 +1877,8 @@ impl PhoneNumberUtilInternal {
         if !self.has_valid_country_calling_code(country_code) {
             return Err(ValidationError::InvalidCountryCode);
         }
-        let region_code = self.get_region_code_for_country_code(country_code);
         // Metadata cannot be NULL because the country calling code is valid.
-        let Some(metadata) =
-            self.get_metadata_for_region_or_calling_code(country_code, region_code)
-        else {
+        let Some(metadata) = self.get_metadata_for_calling_code(country_code) else {
             return Err(ValidationError::InvalidCountryCode);
         };
         test_number_length(&national_number, metadata, phone_number_type)
@@ -1916,7 +1922,7 @@ impl PhoneNumberUtilInternal {
     pub(crate) fn parse_helper(
         &self,
         number_to_parse: &str,
-        default_region: &str,
+        default_region: Option<&str>,
         keep_raw_input: bool,
         check_region: bool,
     ) -> ParseResult<PhoneNumber> {
@@ -1928,7 +1934,10 @@ impl PhoneNumberUtilInternal {
             );
         }
 
-        if check_region && !self.check_region_for_parsing(&national_number, default_region) {
+        if let Some(default_region) = default_region
+            && check_region
+            && !self.check_region_for_parsing(&national_number, default_region)
+        {
             trace!("Missing or invalid default country.");
             return Err(ParseError::InvalidCountryCode.into());
         }
@@ -1944,7 +1953,7 @@ impl PhoneNumberUtilInternal {
         if let Some(extension) = extension {
             temp_number.set_extension(extension.to_owned());
         }
-        let mut country_metadata = self.get_metadata_for_region(default_region);
+        let mut country_metadata = default_region.and_then(|m| self.get_metadata_for_region(m));
         // Check to see if the number is given in international format so we know
         // whether this number is from the default country or not.
         let mut normalized_national_number = self
@@ -1983,8 +1992,9 @@ impl PhoneNumberUtilInternal {
         if country_code != 0 {
             let phone_number_region = self.get_region_code_for_country_code(country_code);
             if phone_number_region != default_region {
-                country_metadata =
-                    self.get_metadata_for_region_or_calling_code(country_code, phone_number_region);
+                country_metadata = phone_number_region.and_then(|phone_number_region| {
+                    self.get_metadata_for_region_or_calling_code(country_code, phone_number_region)
+                });
             }
         } else if let Some(country_metadata) = country_metadata {
             // If no extracted country calling code, use the region supplied instead.
@@ -2162,12 +2172,8 @@ impl PhoneNumberUtilInternal {
     ) -> ParseResult<Cow<'a, str>> {
         // Set the default prefix to be something that will never match if there is no
         // default region.
-        let possible_country_idd_prefix =
-            if let Some(default_region_metadata) = default_region_metadata {
-                default_region_metadata.international_prefix()
-            } else {
-                "NonMatch"
-            };
+        let possible_country_idd_prefix = default_region_metadata
+            .map(|default_region_metadata| default_region_metadata.international_prefix());
 
         let phone_number_with_country_code_source = self
             .maybe_strip_international_prefix_and_normalize(
@@ -2308,7 +2314,9 @@ impl PhoneNumberUtilInternal {
             (MIN_LENGTH_FOR_NSN..=example_number.len().saturating_sub(1)).rev()
         {
             let number_to_try = &example_number[0..phone_number_length];
-            let Ok(possibly_valid_number) = self.parse(number_to_try, region_code) else {
+            let Ok(possibly_valid_number) =
+                self.parse_with_default_region(number_to_try, region_code)
+            else {
                 continue;
             };
             // We don't check the return value since we have already checked the
@@ -2340,7 +2348,7 @@ impl PhoneNumberUtilInternal {
         let desc = get_number_desc_by_type(region_metadata, phone_number_type);
         if desc.has_example_number() {
             return Ok(self
-                .parse(desc.example_number(), region_code)
+                .parse_with_default_region(desc.example_number(), region_code)
                 .inspect_err(|err| error!("Error parsing example number ({:?})", err))?);
         }
         Err(GetExampleNumberError::CouldNotGetNumber.into())
@@ -2379,7 +2387,7 @@ impl PhoneNumberUtilInternal {
                 if desc.has_example_number() {
                     let mut buf = itoa::Buffer::new();
                     return Some(
-                        self.parse(
+                        self.parse_with_default_region(
                             &fast_cat::concat_str!(
                                 PLUS_SIGN,
                                 buf.format(country_calling_code),
@@ -2439,7 +2447,7 @@ impl PhoneNumberUtilInternal {
                 continue;
             }
             let mut buf = itoa::Buffer::new();
-            return Ok(self.parse(
+            return Ok(self.parse_with_default_region(
                 &fast_cat::concat_str!(
                     PLUS_SIGN,
                     buf.format(country_calling_code),
@@ -2463,7 +2471,7 @@ impl PhoneNumberUtilInternal {
     pub(crate) fn maybe_strip_international_prefix_and_normalize<'a>(
         &self,
         phone_number: &'a str,
-        possible_idd_prefix: &str,
+        possible_idd_prefix: Option<&str>,
     ) -> RegexResult<PhoneNumberWithCountryCodeSource<'a>> {
         if phone_number.is_empty() {
             Ok(PhoneNumberWithCountryCodeSource::new(
@@ -2480,11 +2488,12 @@ impl PhoneNumberUtilInternal {
             ))
         } else {
             // Attempt to parse the first digits as an international prefix.
-            let idd_pattern = self.reg_exps.regexp_cache.get_regex(possible_idd_prefix)?;
             let normalized_number = self.normalize(phone_number);
-            let value = if let Some(stripped_prefix_number) =
-                self.parse_prefix_as_idd(&normalized_number, idd_pattern)
-            {
+            let value = if let Some(idd_prefix) = possible_idd_prefix
+                && let Some(stripped_prefix_number) = self.parse_prefix_as_idd(
+                    &normalized_number,
+                    self.reg_exps.regexp_cache.get_regex(idd_prefix)?,
+                ) {
                 PhoneNumberWithCountryCodeSource::new(
                     Cow::Owned(stripped_prefix_number.to_owned()),
                     CountryCodeSource::FROM_NUMBER_WITH_IDD,
@@ -2705,7 +2714,7 @@ impl PhoneNumberUtilInternal {
                 continue;
             };
             let region_code = self.get_region_code_for_country_code(potential_country_code);
-            if region_code != RegionCode::get_unknown() {
+            if region_code != None {
                 return match national_number {
                     Cow::Borrowed(s) => Some((Cow::Borrowed(&s[i..]), potential_country_code)),
                     Cow::Owned(mut s) => {
@@ -2912,7 +2921,7 @@ impl PhoneNumberUtilInternal {
         first_number: &str,
         second_number: &str,
     ) -> MatchResult {
-        match self.parse(first_number, RegionCode::get_unknown()) {
+        match self.parse(first_number) {
             Ok(first_number_as_proto) => {
                 return self.is_number_match_with_one_string(&first_number_as_proto, second_number);
             }
@@ -2925,7 +2934,7 @@ impl PhoneNumberUtilInternal {
                 }
             }
         }
-        match self.parse(second_number, RegionCode::get_unknown()) {
+        match self.parse(second_number) {
             Ok(second_number_as_proto) => {
                 self.is_number_match_with_one_string(&second_number_as_proto, first_number)
             }
@@ -2936,10 +2945,9 @@ impl PhoneNumberUtilInternal {
                 ) {
                     return Err(err.into());
                 }
-                let first_number_as_proto =
-                    self.parse_helper(first_number, RegionCode::get_unknown(), false, false)?;
+                let first_number_as_proto = self.parse_helper(first_number, None, false, false)?;
                 let second_number_as_proto =
-                    self.parse_helper(second_number, RegionCode::get_unknown(), false, false)?;
+                    self.parse_helper(second_number, None, false, false)?;
                 Ok(self.is_number_match(&first_number_as_proto, &second_number_as_proto))
             }
         }
@@ -2959,7 +2967,7 @@ impl PhoneNumberUtilInternal {
     ) -> MatchResult {
         // First see if the second number has an implicit country calling code, by
         // attempting to parse it.
-        match self.parse(second_number, RegionCode::get_unknown()) {
+        match self.parse_with_default_region(second_number, RegionCode::get_unknown()) {
             Ok(second_number_as_proto) => {
                 return Ok(self.is_number_match(first_number, &second_number_as_proto));
             }
@@ -2978,9 +2986,9 @@ impl PhoneNumberUtilInternal {
         // NSN_MATCH.
         let first_number_region =
             self.get_region_code_for_country_code(first_number.country_code());
-        if first_number_region != RegionCode::get_unknown() {
+        if let Some(first_number_region) = first_number_region {
             let second_number_with_first_number_region =
-                self.parse(second_number, first_number_region)?;
+                self.parse_with_default_region(second_number, first_number_region)?;
             Ok(
                 match self.is_number_match(first_number, &second_number_with_first_number_region) {
                     MatchType::ExactMatch => MatchType::NsnMatch,
@@ -2990,8 +2998,7 @@ impl PhoneNumberUtilInternal {
         } else {
             // If the first number didn't have a valid country calling code, then we
             // parse the second number without one as well.
-            let second_number_as_proto =
-                self.parse_helper(second_number, RegionCode::get_unknown(), false, false)?;
+            let second_number_as_proto = self.parse_helper(second_number, None, false, false)?;
             Ok(self.is_number_match(first_number, &second_number_as_proto))
         }
     }

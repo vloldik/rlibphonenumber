@@ -28,17 +28,3 @@ use crate::phonenumberutil::phonenumberutil_public::PhoneNumberUtil;
 
 /// Singleton instance of phone number util for general use
 pub static PHONE_NUMBER_UTIL: LazyLock<PhoneNumberUtil> = LazyLock::new(PhoneNumberUtil::new);
-
-#[cfg(test)]
-mod test {
-    use crate::PHONE_NUMBER_UTIL;
-
-    #[test]
-    fn test_phone() {
-        println!(
-            "{:#?}",
-            PHONE_NUMBER_UTIL
-                .get_number_type(&PHONE_NUMBER_UTIL.parse("+38670262346", "RU").unwrap())
-        )
-    }
-}

@@ -1,6 +1,6 @@
 // benches/parsing_benchmark.rs
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 
 // --- Импорты из вашей библиотеки ---
 use rlibphonenumber::PHONE_NUMBER_UTIL;
@@ -50,7 +50,8 @@ fn parsing_benchmark(c: &mut Criterion) {
                 // Вызываем parse, обернув аргументы в black_box.
                 // Это гарантирует, что компилятор не оптимизирует вызов.
                 // Мы не используем результат, так как нас интересует только скорость выполнения.
-                let _ = PHONE_NUMBER_UTIL.parse(black_box(number_str), black_box(region));
+                let _ = PHONE_NUMBER_UTIL
+                    .parse_with_default_region(black_box(number_str), black_box(region));
             }
         })
     });

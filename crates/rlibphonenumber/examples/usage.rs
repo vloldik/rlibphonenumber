@@ -10,7 +10,7 @@ fn main() {
     let number_string = "+1-587-530-2271";
 
     // 1. Parse the number
-    match PHONE_NUMBER_UTIL.parse(number_string, Region::US) {
+    match PHONE_NUMBER_UTIL.parse_with_default_region(number_string, Region::US) {
         Ok(number) => {
             println!("✅ Successfully parsed number.");
             println!(
