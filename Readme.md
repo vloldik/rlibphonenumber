@@ -4,6 +4,7 @@
 [![Crates.io](https://img.shields.io/crates/v/rlibphonenumber.svg)](https://crates.io/crates/rlibphonenumber)
 [![Docs.rs](https://docs.rs/rlibphonenumber/badge.svg)](https://docs.rs/rlibphonenumber)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Update Metadata & Push](https://github.com/vloldik/rlibphonenumber/actions/workflows/update-metadata.yaml/badge.svg)](https://github.com/vloldik/rlibphonenumber/actions/workflows/update-metadata.yaml)
 
 A high-performance Rust port of Google's `libphonenumber` library for parsing, formatting, and validating international phone numbers.
 
