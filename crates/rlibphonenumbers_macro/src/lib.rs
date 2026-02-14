@@ -35,18 +35,50 @@ pub fn countries_enum(name: TokenStream) -> TokenStream {
         quote! { Self::#item => #value }
     });
 
+    let from_str_mapper = country_list.iter().map(|country| {
+        let item = format_ident!("{}", country.to_uppercase());
+        let value = proc_macro2::Literal::string(country);
+        quote! { #value => ::core::result::Result::Ok(Self::#item) }
+    });
+
     let name = format_ident!("{}", name.to_string());
 
     quote! {
-        #[derive(Debug)]
+        #[derive(
+            ::core::fmt::Debug,
+            ::core::clone::Clone,
+            ::core::marker::Copy,
+            ::core::cmp::PartialEq,
+            ::core::cmp::Eq,
+            ::core::hash::Hash,
+            ::core::cmp::PartialOrd,
+            ::core::cmp::Ord
+        )]
         pub enum #name {
             #(#countries),*
         }
 
-        impl AsRef<str> for #name {
+        impl ::core::convert::AsRef<str> for #name {
             fn as_ref(&self) -> &str {
                 match self {
                     #(#str_mapper),*
+                }
+            }
+        }
+
+        impl ::core::fmt::Display for #name {
+            fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                f.write_str(self.as_ref())
+            }
+        }
+
+        impl ::core::str::FromStr for #name {
+            type Err = String;
+
+            fn from_str(s: &str) -> ::core::result::Result<Self, Self::Err> {
+                match s {
+                    #(#from_str_mapper,)*
+                    _ => ::core::result::Result::Err(format!("Unknown country code: {}", s)),
                 }
             }
         }
