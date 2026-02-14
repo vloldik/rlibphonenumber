@@ -15,7 +15,7 @@ fn main() {
             println!(
                 "   - Original input: '{}' (in '{}')",
                 number_string,
-                Region::US.as_ref()
+                Region::US
             );
             println!("   - Country Code: {}", number.country_code());
             println!("   - National Number: {}", number.national_number());
