@@ -20,12 +20,9 @@
 //! around the world. This utility is designed to handle the complexities of international
 //! phone number formats, country codes, and numbering plans.
 
-use std::{
-    borrow::Cow,
-    fmt::{Debug, Display},
-};
+use std::{borrow::Cow, collections::HashSet};
 
-use crate::{InternalError, generated::proto::phonenumber::PhoneNumber, unwrap_internal};
+use crate::{generated::proto::phonenumber::PhoneNumber, unwrap_internal};
 
 use super::{
     enums::{MatchType, NumberLengthType, PhoneNumberFormat, PhoneNumberType},
@@ -314,7 +311,135 @@ impl PhoneNumberUtil {
             .get_invalid_example_number(region_code.as_ref())
             .map_err(unwrap_internal)
     }
+    /// Gets a valid example number for the specified non-geographical entity.
+    ///
+    /// # Arguments
+    ///
+    /// * `country_calling_code` - The country calling code for the non-geographical entity (e.g., +800 for Universal International Freephone Service).
+    ///
+    /// # Returns
+    ///
+    /// A `PhoneNumber` object for the given calling code, or an error if the code is invalid or unsupported.
+    pub fn get_example_number_for_non_geo_entity(
+        &self,
+        country_calling_code: i32,
+    ) -> Result<PhoneNumber, GetExampleNumberError> {
+        self.util_internal
+            .get_example_number_for_non_geo_entity(country_calling_code)
+            .map_err(unwrap_internal)
+    }
 
+    /// Checks whether a phone number string is a "possible" number, given the region where the number is being dialed from.
+    ///
+    /// This is a fast, "weak" check that only looks at the length and structure of the number,
+    /// without verifying if it is an actual valid number in that region.
+    ///
+    /// # Arguments
+    ///
+    /// * `phone_number` - The phone number string to check.
+    /// * `region_dialing_from` - The CLDR region code (e.g., "US", "GB") where the number is being dialed from.
+    pub fn is_possible_number_for_string(
+        &self,
+        phone_number: &str,
+        region_dialing_from: &str,
+    ) -> bool {
+        self.util_internal
+            .is_possible_number_for_string(phone_number, region_dialing_from)
+    }
+
+    /// Checks whether a phone number is "possible" for a specific type (e.g., Mobile, Fixed Line).
+    ///
+    /// This performs a length-based check for the specified region and type.
+    ///
+    /// # Arguments
+    ///
+    /// * `phone_number` - The phone number object to check.
+    /// * `phone_number_type` - The specific type (e.g., `PhoneNumberType::Mobile`).
+    pub fn is_possible_number_for_type(
+        &self,
+        phone_number: &PhoneNumber,
+        phone_number_type: PhoneNumberType,
+    ) -> bool {
+        self.util_internal
+            .is_possible_number_for_type(phone_number, phone_number_type)
+    }
+
+    /// Gets an iterator over all supported global network calling codes.
+    /// These are country codes for non-geographical entities, such as satellite services.
+    pub fn get_supported_global_network_calling_codes(&self) -> impl Iterator<Item = i32> {
+        self.util_internal
+            .get_supported_global_network_calling_codes()
+    }
+
+    /// Gets an iterator over all supported country calling codes.
+    pub fn get_supported_calling_codes(&self) -> impl Iterator<Item = i32> {
+        self.util_internal.get_supported_calling_codes()
+    }
+
+    /// Gets a list of all supported phone number types for a given region.
+    ///
+    /// # Arguments
+    ///
+    /// * `region_code` - The CLDR region code (e.g., "US", "CH").
+    ///
+    /// # Returns
+    ///
+    /// An `Option` containing a `HashSet` of supported `PhoneNumberType`s, or `None` if the region is unknown.
+    pub fn get_supported_types_for_region(
+        &self,
+        region_code: &str,
+    ) -> Option<HashSet<PhoneNumberType>> {
+        self.util_internal
+            .get_supported_types_for_region(region_code)
+    }
+
+    /// Gets a list of all supported phone number types for a given non-geographical country calling code.
+    ///
+    /// # Arguments
+    ///
+    /// * `country_calling_code` - The non-geographical country calling code.
+    ///
+    /// # Returns
+    ///
+    /// An `Option` containing a `HashSet` of supported `PhoneNumberType`s, or `None` if the code is unknown.
+    pub fn get_supported_types_for_non_geo_entity(
+        &self,
+        country_calling_code: i32,
+    ) -> Option<HashSet<PhoneNumberType>> {
+        self.util_internal
+            .get_supported_types_for_non_geo_entity(country_calling_code)
+    }
+
+    /// Trims unwanted characters from the end of a phone number string.
+    ///
+    /// This removes characters that are unlikely to be part of a phone number, such as
+    /// trailing punctuation or whitespace.
+    ///
+    /// # Arguments
+    ///
+    /// * `phone_number` - The phone number string to trim.
+    pub fn trim_unwanted_end_chars<'a>(&self, phone_number: &'a str) -> &'a str {
+        self.util_internal.trim_unwanted_end_chars(phone_number)
+    }
+
+    /// Normalizes a string of characters representing a phone number.
+    ///
+    /// # Arguments
+    ///
+    /// * `phone_number` - The phone number string to normalize.
+    pub fn normalize_digits_only(&self, phone_number: &str) -> String {
+        self.util_internal.normalize_digits_only(phone_number)
+    }
+
+    /// Normalizes a string of characters to only those that can be dialed from a keypad.
+    ///
+    /// # Arguments
+    ///
+    /// * `phone_number` - The phone number string to normalize.
+    pub fn normalize_diallable_chars_only(&self, phone_number: &str) -> String {
+        self.util_internal
+            .normalize_diallable_chars_only(phone_number)
+    }
     /// Gets the length of the geographical area code from a `PhoneNumber`.
     ///
     /// # Parameters
