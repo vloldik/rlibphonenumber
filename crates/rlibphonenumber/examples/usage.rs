@@ -1,6 +1,7 @@
 use rlibphonenumber::{
     // or instead you can use PhoneNumberUtil::new()
     PHONE_NUMBER_UTIL,
+    PhoneNumber,
     PhoneNumberFormat,
     Region,
 };
@@ -9,7 +10,7 @@ fn main() {
     let number_string = "+1-587-530-2271";
 
     // 1. Parse the number
-    match PHONE_NUMBER_UTIL.parse_with_default_region(number_string, Region::US) {
+    match number_string.parse::<PhoneNumber>() {
         Ok(number) => {
             println!("✅ Successfully parsed number.");
             println!(
@@ -37,6 +38,8 @@ fn main() {
             let international_format =
                 PHONE_NUMBER_UTIL.format(&number, PhoneNumberFormat::International);
             let national_format = PHONE_NUMBER_UTIL.format(&number, PhoneNumberFormat::National);
+
+            // Or more simple way can be used
             let e164_format = number.format_as(PhoneNumberFormat::E164);
             let rfc3966_format = number.format_as(PhoneNumberFormat::RFC3966);
 
@@ -48,7 +51,7 @@ fn main() {
 
             // 4. Get additional information about the number
             let number_type = number.get_type();
-            let number_region = PHONE_NUMBER_UTIL.get_region_code_for_number(&number);
+            let number_region = number.get_region_code();
 
             println!("\nAdditional Information:");
             println!("   - Number Type:   {:?}", number_type); // e.g., FixedLine
