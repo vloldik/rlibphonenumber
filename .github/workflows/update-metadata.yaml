@@ -29,7 +29,7 @@ jobs:
         run: sudo apt-get install -y protobuf-compiler
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@1.85.0
+        uses: dtolnay/rust-toolchain@1.88.0
 
       - name: Generate Metadata
         id: generate_metadata

@@ -3,7 +3,7 @@ name = "rlibphonenumber"
 version = "0.3.0"
 edition = "2024"
 
-rust-version = "1.85"
+rust-version = "1.88"
 authors = ["Vladislav K. https://t.me/vloldik"]
 description = "A high-performance Rust port of Google's libphonenumber for parsing, formatting, and validating international phone numbers."
 repository = "https://github.com/vloldik/rlibphonenumber"
