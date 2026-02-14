@@ -2,13 +2,11 @@ name: Publish to Crates.io
 
 on:
   push:
-    branches:
-      - master
+    tags:
+      - 'v*'
 
 jobs:
   publish:
-    if: startsWith(github.event.head_commit.message, '[release]')
-    
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -24,22 +22,4 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: cargo publish
-      
-      - name: Create Git Tag
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const toml = fs.readFileSync('crates/rlibphonenumber/Cargo.toml', 'utf8');
-            const version = toml.match(/version = "(.*)"/)[1];
-            
-            try {
-              await github.rest.git.createRef({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                ref: `refs/tags/v${version}`,
-                sha: context.sha
-              });
-            } catch (e) {
-              console.log('Tag probably already exists or error creating tag:', e);
-            }
+        
