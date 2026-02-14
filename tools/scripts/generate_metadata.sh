@@ -49,6 +49,20 @@ done
 
 if [ -n "$tag_name" ]; then
     echo "Downloading metadata for tag: $tag_name..."
+
+    if [[ "$tag_name" == "latest-supported" ]]; then
+        echo "Fetching latest supported tag (9.0.x)..."
+        tag_name=$(git ls-remote --tags https://github.com/google/libphonenumber.git | \
+                   grep -o 'v9\.0\.[0-9]\+' | \
+                   sort -V | \
+                   tail -n 1)
+        
+        if [ -z "$tag_name" ]; then
+            echo "Error: Could not find any tag matching v9.0.x"
+            exit 1
+        fi
+        echo "Resolved latest-supported to: $tag_name"
+    fi
     
     temp_dir=$(mktemp -d)
     git clone --depth 1 --branch "$tag_name" https://github.com/google/libphonenumber.git "$temp_dir"
