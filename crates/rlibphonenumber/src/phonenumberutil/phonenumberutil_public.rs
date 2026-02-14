@@ -20,15 +20,21 @@
 //! around the world. This utility is designed to handle the complexities of international
 //! phone number formats, country codes, and numbering plans.
 
-use std::borrow::Cow;
+use std::{
+    borrow::Cow,
+    fmt::{Debug, Display},
+};
 
-use crate::generated::proto::phonenumber::PhoneNumber;
+use crate::{InternalError, generated::proto::phonenumber::PhoneNumber, unwrap_internal};
 
 use super::{
     enums::{MatchType, NumberLengthType, PhoneNumberFormat, PhoneNumberType},
     errors::{GetExampleNumberError, ParseError, ValidationError},
     phonenumberutil_internal::PhoneNumberUtilInternal,
 };
+
+const REGEXP_ERROR_EXPECT_MESSAGE: &str =
+    "A valid regex is expected in metadata; this indicates a library bug.";
 
 /// The main struct for all phone number-related operations.
 ///
@@ -43,8 +49,7 @@ impl PhoneNumberUtil {
     /// Creates new `PhoneNumberUtil` instance
     pub fn new() -> Self {
         Self {
-            util_internal: PhoneNumberUtilInternal::new()
-                .expect("Metadata should be valid and all regex should compile"),
+            util_internal: PhoneNumberUtilInternal::new().expect(REGEXP_ERROR_EXPECT_MESSAGE),
         }
     }
 
@@ -66,7 +71,7 @@ impl PhoneNumberUtil {
         self.util_internal
             .can_be_internationally_dialled(phone_number)
             // This should not never happen
-            .expect("A valid regex is expected in metadata; this indicates a library bug.")
+            .expect(REGEXP_ERROR_EXPECT_MESSAGE)
     }
 
     /// Converts all alpha characters in a phone number string to their corresponding digits.
@@ -109,7 +114,7 @@ impl PhoneNumberUtil {
         self.util_internal
             .format(phone_number, number_format)
             // This should not never happen
-            .expect("A valid regex is expected in metadata; this indicates a library bug.")
+            .expect(REGEXP_ERROR_EXPECT_MESSAGE)
     }
 
     /// Formats a `PhoneNumber`, attempting to preserve original formatting and punctuation.
@@ -136,9 +141,7 @@ impl PhoneNumberUtil {
         self.util_internal
             .format_in_original_format(phone_number, region_calling_from.as_ref())
             // This should not never happen
-            .expect(
-                "A valid regex and region is expected in metadata; this indicates a library bug.",
-            )
+            .expect(REGEXP_ERROR_EXPECT_MESSAGE)
     }
 
     /// Formats a national number with a specified carrier code.
@@ -162,7 +165,7 @@ impl PhoneNumberUtil {
     ) -> String {
         self.util_internal
             .format_national_number_with_carrier_code(phone_number, carrier_code.as_ref())
-            .expect("A valid regex is expected in metadata; this indicates a library bug.")
+            .expect(REGEXP_ERROR_EXPECT_MESSAGE)
     }
 
     /// Formats a `PhoneNumber` for dialing from a mobile device.
@@ -185,14 +188,14 @@ impl PhoneNumberUtil {
         phone_number: &'a PhoneNumber,
         region_calling_from: impl AsRef<str>,
         with_formatting: bool,
-    ) -> Cow<'a, str> {
+    ) -> Option<Cow<'a, str>> {
         self.util_internal
             .format_number_for_mobile_dialing(
                 phone_number,
                 region_calling_from.as_ref(),
                 with_formatting,
             )
-            .expect("Formatting failed; this indicates a library bug.")
+            .expect(REGEXP_ERROR_EXPECT_MESSAGE)
     }
 
     /// Formats a `PhoneNumber` for out-of-country calling.
@@ -217,7 +220,7 @@ impl PhoneNumberUtil {
         self.util_internal
             .format_out_of_country_calling_number(phone_number, region_calling_from.as_ref())
             // This should not never happen
-            .expect("A valid regex is expected in metadata; this indicates a library bug.")
+            .expect(REGEXP_ERROR_EXPECT_MESSAGE)
     }
 
     /// Formats a `PhoneNumber` for out-of-country calling while preserving any alphabetic characters.
@@ -241,7 +244,7 @@ impl PhoneNumberUtil {
     ) -> Cow<'a, str> {
         self.util_internal
             .format_out_of_country_keeping_alpha_chars(phone_number, region_calling_from.as_ref())
-            .expect("Formatting failed; this indicates a library bug.")
+            .expect(REGEXP_ERROR_EXPECT_MESSAGE)
     }
 
     /// Retrieves the country calling code for a given region.
@@ -273,7 +276,7 @@ impl PhoneNumberUtil {
     ) -> Result<PhoneNumber, GetExampleNumberError> {
         self.util_internal
             .get_example_number(region_code.as_ref())
-            .map_err(|err| err.into_public())
+            .map_err(unwrap_internal)
     }
 
     /// Gets a valid example `PhoneNumber` for a specific number type.
@@ -291,7 +294,7 @@ impl PhoneNumberUtil {
     ) -> Result<PhoneNumber, GetExampleNumberError> {
         self.util_internal
             .get_example_number_for_type(number_type)
-            .map_err(|err| err.into_public())
+            .map_err(unwrap_internal)
     }
 
     /// Gets an invalid but plausible example `PhoneNumber` for a specific region.
@@ -309,7 +312,7 @@ impl PhoneNumberUtil {
     ) -> Result<PhoneNumber, GetExampleNumberError> {
         self.util_internal
             .get_invalid_example_number(region_code.as_ref())
-            .map_err(|err| err.into_public())
+            .map_err(unwrap_internal)
     }
 
     /// Gets the length of the geographical area code from a `PhoneNumber`.
@@ -328,7 +331,7 @@ impl PhoneNumberUtil {
     pub fn get_length_of_geographical_area_code(&self, phone_number: &PhoneNumber) -> usize {
         self.util_internal
             .get_length_of_geographical_area_code(phone_number)
-            .expect("A valid regex is expected in metadata; this indicates a library bug.")
+            .expect(REGEXP_ERROR_EXPECT_MESSAGE)
     }
 
     /// Gets the length of the national destination code from a `PhoneNumber`.
@@ -347,7 +350,7 @@ impl PhoneNumberUtil {
     pub fn get_length_of_national_destination_code(&self, phone_number: &PhoneNumber) -> usize {
         self.util_internal
             .get_length_of_national_destination_code(phone_number)
-            .expect("A valid regex is expected in metadata; this indicates a library bug.")
+            .expect(REGEXP_ERROR_EXPECT_MESSAGE)
     }
 
     /// Gets the National Significant Number (NSN) from a `PhoneNumber`.
@@ -422,7 +425,7 @@ impl PhoneNumberUtil {
         self.util_internal
             .get_region_code_for_number(phone_number)
             // This should not never happen
-            .expect("A valid regex is expected in metadata; this indicates a library bug.")
+            .expect(REGEXP_ERROR_EXPECT_MESSAGE)
     }
 
     /// Gets all region codes associated with a country calling code.
@@ -494,7 +497,7 @@ impl PhoneNumberUtil {
     pub fn is_number_geographical(&self, phone_number: &PhoneNumber) -> bool {
         self.util_internal
             .is_number_geographical(phone_number)
-            .expect("A valid regex is expected in metadata; this indicates a library bug.")
+            .expect(REGEXP_ERROR_EXPECT_MESSAGE)
     }
 
     /// Compares two phone numbers and returns their `MatchType`.
@@ -567,7 +570,7 @@ impl PhoneNumberUtil {
         self.util_internal
             .is_valid_number(phone_number)
             // This should not never happen
-            .expect("A valid regex is expected in metadata; this indicates a library bug.")
+            .expect(REGEXP_ERROR_EXPECT_MESSAGE)
     }
 
     /// Validates a `PhoneNumber` for a specific region.
@@ -606,7 +609,7 @@ impl PhoneNumberUtil {
     ) -> Result<PhoneNumber, ParseError> {
         self.util_internal
             .parse_and_keep_raw_input(number_to_parse.as_ref(), Some(default_region.as_ref()))
-            .map_err(|err| err.into_public())
+            .map_err(unwrap_internal)
     }
 
     /// Parses a string into a `PhoneNumber`, keeping the raw input string.
@@ -624,7 +627,7 @@ impl PhoneNumberUtil {
     ) -> Result<PhoneNumber, ParseError> {
         self.util_internal
             .parse_and_keep_raw_input(number_to_parse.as_ref(), None)
-            .map_err(|err| err.into_public())
+            .map_err(unwrap_internal)
     }
 
     /// Parses a string into a `PhoneNumber`.
@@ -647,7 +650,7 @@ impl PhoneNumberUtil {
     ) -> Result<PhoneNumber, ParseError> {
         self.util_internal
             .parse(number_to_parse.as_ref(), Some(default_region.as_ref()))
-            .map_err(|err| err.into_public())
+            .map_err(unwrap_internal)
     }
 
     /// Parses a string into a `PhoneNumber`.
@@ -665,7 +668,7 @@ impl PhoneNumberUtil {
     pub fn parse(&self, number_to_parse: impl AsRef<str>) -> Result<PhoneNumber, ParseError> {
         self.util_internal
             .parse(number_to_parse.as_ref(), None)
-            .map_err(|err| err.into_public())
+            .map_err(unwrap_internal)
     }
 
     /// Truncates a `PhoneNumber` that is too long to a valid length.
@@ -685,7 +688,17 @@ impl PhoneNumberUtil {
         self.util_internal
             .truncate_too_long_number(phone_number)
             // This should not never happen
-            .expect("A valid regex is expected in metadata; this indicates a library bug.")
+            .expect(REGEXP_ERROR_EXPECT_MESSAGE)
+    }
+
+    pub fn is_number_match_with_two_strings(
+        &self,
+        first_number: &str,
+        second_number: &str,
+    ) -> MatchType {
+        self.util_internal
+            .is_number_match_with_two_strings(first_number, second_number)
+            .expect(REGEXP_ERROR_EXPECT_MESSAGE)
     }
 }
 

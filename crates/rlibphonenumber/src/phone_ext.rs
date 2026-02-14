@@ -22,7 +22,7 @@ impl PhoneNumber {
         &self,
         region_calling_from: impl AsRef<str>,
         with_formatting: bool,
-    ) -> Cow<'_, str> {
+    ) -> Option<Cow<'_, str>> {
         PHONE_NUMBER_UTIL.format_number_for_mobile_dialing(
             self,
             region_calling_from,

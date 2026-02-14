@@ -13,40 +13,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::num::ParseIntError;
+use std::{
+    convert::Infallible,
+    fmt::{Debug, Display},
+    num::ParseIntError,
+};
 
 use thiserror::Error;
 
 use crate::regexp_cache::InvalidRegexError;
-
-/// Represents critical internal errors that indicate a bug within the library itself.
-/// These errors are not expected to be caught or handled by the user, as they
-/// signal a problem with the library's metadata or logic.
-#[derive(Debug, PartialEq, Error)]
-pub enum InternalLogicError {
-    /// An error indicating that a regular expression provided in the metadata is invalid.
-    /// This points to a bug in the library's bundled metadata files.
-    #[error("{0}")]
-    InvalidRegex(#[from] InvalidRegexError),
-
-    /// An error indicating that metadata for a valid, supported region is unexpectedly missing.
-    /// This points to a bug in the library's initialization or metadata loading.
-    #[error("{0}")]
-    InvalidMetadataForValidRegion(#[from] InvalidMetadataForValidRegionError),
-}
-
-/// An internal error type used during the parsing process.
-/// It distinguishes between a general parsing failure and a regex-specific issue.
-#[derive(Debug, PartialEq, Error)]
-pub enum ParseErrorInternal {
-    /// Wraps a public `ParseError`, representing a standard parsing failure.
-    #[error("{0}")]
-    FailedToParse(#[from] ParseError),
-    /// An error indicating that a regular expression was invalid during parsing.
-    /// This signals a bug in the library's metadata.
-    #[error("{0}")]
-    RegexError(#[from] InvalidRegexError),
-}
 
 /// Represents the possible errors that can occur when parsing a phone number string.
 /// This is a public-facing error enum.
@@ -109,17 +84,57 @@ pub enum ExtractNumberError {
     NotANumber,
 }
 
-/// Internal error type used when fetching an example number.
 #[derive(Debug, PartialEq, Error)]
-pub enum GetExampleNumberErrorInternal {
-    /// Wraps a public `GetExampleNumberError` for standard failures.
-    #[error("{0}")]
-    FailedToGetExampleNumber(#[from] GetExampleNumberError),
+pub enum InternalError<T: Debug + Display> {
+    #[error("Wrapped error: {0}")]
+    Wrapped(T),
     /// An error indicating that a regular expression was invalid while generating the example.
     /// This signals a bug in the library's metadata.
     #[error("{0}")]
     RegexError(#[from] InvalidRegexError),
 }
+
+pub type InternalRegexError = InternalError<Infallible>;
+
+impl<T: Debug + Display> InternalError<T> {
+    pub fn translate<O: From<T> + Debug + Display>(self) -> InternalError<O> {
+        match self {
+            Self::RegexError(e) => InternalError::RegexError(e),
+            Self::Wrapped(e) => InternalError::Wrapped(e.into()),
+        }
+    }
+}
+
+impl InternalError<Infallible> {
+    pub fn translate_internal<O: Debug + Display>(self) -> InternalError<O> {
+        match self {
+            InternalError::RegexError(invalid_regex_error) => {
+                InternalError::RegexError(invalid_regex_error)
+            }
+        }
+    }
+}
+
+macro_rules! delegate_from {
+    ($inner:ty : $($t:ty),*) => {
+        impl From<$inner> for InternalError<$inner> {
+            fn from(value: $inner) -> Self {
+                Self::Wrapped(value)
+            }
+        }
+        $(
+            impl From<$t> for InternalError<$inner> {
+                fn from(value: $t) -> Self {
+                    InternalError::from(<$inner>::from(value))
+                }
+            }
+        )*
+    };
+}
+
+delegate_from!(GetExampleNumberError: ParseError);
+delegate_from!(ParseError: NotANumberError);
+delegate_from!(NotANumberError: ExtractNumberError);
 
 /// Represents possible failures when requesting an example phone number.
 #[derive(Debug, PartialEq, Error)]
@@ -136,17 +151,6 @@ pub enum GetExampleNumberError {
     /// The provided region code is invalid or not supported by the library.
     #[error("Invalid country code provided")]
     InvalidRegionCode,
-}
-
-/// Internal error type used during number validation.
-#[derive(Debug, PartialEq, Error)]
-pub enum InvalidNumberErrorInternal {
-    /// Wraps a public `InvalidNumberError`.
-    #[error("{0}")]
-    InvalidNumber(#[from] InvalidNumberError),
-    /// An error indicating a regex was invalid during validation, signaling a library bug.
-    #[error("{0}")]
-    InvalidRegex(#[from] InvalidRegexError),
 }
 
 /// A specific error indicating that the provided input is not a number.
@@ -198,81 +202,12 @@ pub enum ValidationError {
     TooLong,
 }
 
-impl From<ParseErrorInternal> for GetExampleNumberErrorInternal {
-    /// Converts an internal parsing error into an internal "get example number" error.
-    /// This is used to propagate errors within the library's logic.
-    fn from(value: ParseErrorInternal) -> Self {
-        match value {
-            ParseErrorInternal::FailedToParse(err) => {
-                GetExampleNumberError::FailedToParse(err).into()
-            }
-            ParseErrorInternal::RegexError(err) => GetExampleNumberErrorInternal::RegexError(err),
-        }
-    }
-}
-
-impl From<ParseErrorInternal> for InvalidNumberErrorInternal {
-    /// Converts an internal parsing error into an internal "invalid number" error.
-    fn from(value: ParseErrorInternal) -> Self {
-        match value {
-            ParseErrorInternal::FailedToParse(err) => InvalidNumberError(err).into(),
-            ParseErrorInternal::RegexError(err) => InvalidNumberErrorInternal::InvalidRegex(err),
-        }
-    }
-}
-
-impl From<ExtractNumberError> for ParseError {
-    /// Converts a low-level `ExtractNumberError` into a public-facing `ParseError`.
-    /// This simplifies the error API by nesting specific errors within more general ones.
-    fn from(value: ExtractNumberError) -> Self {
-        NotANumberError::FailedToExtractNumber(value).into()
-    }
-}
-
-impl GetExampleNumberErrorInternal {
-    /// Converts an internal error into its public-facing equivalent.
-    ///
-    /// If the error is a `RegexError`, this method will panic, as this indicates a
-    /// non-recoverable library bug that should be fixed.
-    pub fn into_public(self) -> GetExampleNumberError {
-        match self {
-            GetExampleNumberErrorInternal::FailedToGetExampleNumber(err) => err,
-            GetExampleNumberErrorInternal::RegexError(err) => panic!(
-                "A valid regex is expected in metadata; this indicates a library bug! {}",
-                err
-            ),
-        }
-    }
-}
-
-impl ParseErrorInternal {
-    /// Converts an internal parsing error into its public-facing `ParseError`.
-    ///
-    /// If the error is a `RegexError`, this method will panic, enforcing that the
-    /// library's metadata must be valid.
-    pub fn into_public(self) -> ParseError {
-        match self {
-            ParseErrorInternal::FailedToParse(err) => err,
-            ParseErrorInternal::RegexError(err) => panic!(
-                "A valid regex is expected in metadata; this indicates a library bug! {}",
-                err
-            ),
-        }
-    }
-}
-
-impl InvalidNumberErrorInternal {
-    /// Converts an internal validation error into its public `InvalidNumberError`.
-    ///
-    /// If the error is a `RegexError`, this method will panic, as it signifies a
-    /// critical library bug.
-    pub fn into_public(self) -> InvalidNumberError {
-        match self {
-            InvalidNumberErrorInternal::InvalidNumber(err) => err,
-            InvalidNumberErrorInternal::InvalidRegex(err) => panic!(
-                "A valid regex is expected in metadata; this indicates a library bug! {}",
-                err
-            ),
-        }
+pub(crate) fn unwrap_internal<T: Debug + Display>(err: InternalError<T>) -> T {
+    match err {
+        InternalError::Wrapped(err) => err,
+        InternalError::RegexError(invalid_regex_error) => panic!(
+            "A valid regex is expected in metadata; this indicates a library bug: {}",
+            invalid_regex_error
+        ),
     }
 }
