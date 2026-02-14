@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 filedir="./$(dirname "$0")"
 javadir="$filedir/../java"
