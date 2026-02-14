@@ -21,5 +21,4 @@ jobs:
       - name: Publish to Crates.io
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: cargo publish
-        
+        run: cargo publish --package rlibphonenumber --package rlibphonenumbers_macro
