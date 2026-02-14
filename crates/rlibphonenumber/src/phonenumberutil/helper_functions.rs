@@ -38,8 +38,7 @@ use super::{
 
 /// Loads metadata from helper constants METADATA array
 pub fn load_compiled_metadata() -> Result<PhoneMetadataCollection, protobuf::Error> {
-    let result = PhoneMetadataCollection::parse_from_bytes(&METADATA)?;
-    Ok(result)
+    PhoneMetadataCollection::parse_from_bytes(&METADATA)
 }
 
 /// Returns a pointer to the description inside the metadata of the appropriate

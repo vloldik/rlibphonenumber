@@ -22,7 +22,7 @@
 
 use std::{borrow::Cow, collections::HashSet};
 
-use crate::{generated::proto::phonenumber::PhoneNumber, unwrap_internal};
+use crate::{generated::proto::phonenumber::PhoneNumber, phonemetadata::PhoneMetadataCollection, unwrap_internal};
 
 use super::{
     enums::{MatchType, NumberLengthType, PhoneNumberFormat, PhoneNumberType},
@@ -48,6 +48,10 @@ impl PhoneNumberUtil {
         Self {
             util_internal: PhoneNumberUtilInternal::new().expect(REGEXP_ERROR_EXPECT_MESSAGE),
         }
+    }
+
+    pub fn new_for_metadata(metadata_collection: PhoneMetadataCollection) -> Self {
+        Self { util_internal: PhoneNumberUtilInternal::new_for_metadata(metadata_collection) }
     }
 
     /// Checks if a `PhoneNumber` can be dialed internationally.

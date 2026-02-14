@@ -27,4 +27,5 @@ use std::sync::LazyLock;
 use crate::phonenumberutil::phonenumberutil_public::PhoneNumberUtil;
 
 /// Singleton instance of phone number util for general use
+#[cfg(feature = "global_static")]
 pub static PHONE_NUMBER_UTIL: LazyLock<PhoneNumberUtil> = LazyLock::new(PhoneNumberUtil::new);
