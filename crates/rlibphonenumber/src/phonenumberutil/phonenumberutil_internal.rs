@@ -770,15 +770,6 @@ impl PhoneNumberUtilInternal {
         self.format_national_number_with_carrier_code(phone_number, carrier_code)
     }
 
-    pub(crate) fn has_valid_country_calling_code(&self, country_calling_code: i32) -> bool {
-        // Create an IntRegionsPair with the country_code passed in, and use it to
-        // locate the pair with the same country_code in the sorted vector.
-
-        self.country_calling_code_to_region_code_map
-            .binary_search_by_key(&country_calling_code, |(k, _)| *k)
-            .is_ok()
-    }
-
     /// Formats a phone number for dialing from a mobile device in a specific region.
     ///
     /// # Arguments
@@ -1844,10 +1835,6 @@ impl PhoneNumberUtilInternal {
         // Cuñha), but this is handled by putting all possible lengths for any country
         // with this country calling code in the metadata for the default region in
         // this case.
-        if !self.has_valid_country_calling_code(country_code) {
-            return Err(ValidationError::InvalidCountryCode);
-        }
-        // Metadata cannot be NULL because the country calling code is valid.
         let Some(metadata) = self.get_metadata_for_calling_code(country_code) else {
             return Err(ValidationError::InvalidCountryCode);
         };
