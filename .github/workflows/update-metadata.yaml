@@ -29,13 +29,19 @@ jobs:
         run: sudo apt-get install -y protobuf-compiler
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.85.0
+        with:
+          components: cargo-edit
 
       - name: Generate Metadata
         id: generate_metadata
         run: |
           chmod +x ./tools/scripts/generate_metadata.sh
           ./tools/scripts/generate_metadata.sh --tag latest-supported --update-version
+      
+      - name: Run Tests
+        if: steps.generate_metadata.outputs.changes == 'true'
+        run: cargo test
 
       - name: Create Pull Request
         if: steps.generate_metadata.outputs.changes == 'true'
