@@ -13,7 +13,8 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@1.88.0
+        # Multipackage publish
+        uses: dtolnay/rust-toolchain@1.90.0
 
       - name: Run Tests
         run: cargo test
