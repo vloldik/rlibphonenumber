@@ -10,7 +10,7 @@ A high-performance Rust port of Google's `libphonenumber` library for parsing, f
 ## Min supported Rust version is 1.88.0
 
 **Built on base libphonenumber 9.0.8**
-**Used metadata version: v9.0.23**
+**Used metadata version: v9.0.24**
 
 ## Overview
 
@@ -40,7 +40,7 @@ Add `rlibphonenumber` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rlibphonenumber = "0.3.0"
+rlibphonenumber = "0.3.1"
 ```
 
 ### Enabling Serde
