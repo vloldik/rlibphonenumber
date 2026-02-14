@@ -41,7 +41,7 @@ jobs:
         id: generate_metadata
         run: |
           chmod +x ./tools/scripts/generate_metadata.sh
-          ./tools/scripts/generate_metadata.sh --tag latest-supported
+          ./tools/scripts/generate_metadata.sh --tag latest-supported --update-version
 
       - name: Run Tests
         if: steps.generate_metadata.outputs.changes == 'true'
