@@ -1,6 +1,6 @@
 [package]
 name = "rlibphonenumbers_macro"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 license = "Apache-2.0"
 description = "Package for \"Region\" enum generation for a high-performance Rust port of Google's libphonenumber for parsing, formatting, and validating international phone numbers."
