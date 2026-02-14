@@ -1,43 +1,35 @@
+
 # Rlibphonenumber
 
 [![Crates.io](https://img.shields.io/crates/v/rlibphonenumber.svg)](https://crates.io/crates/rlibphonenumber)
-[![Docs.rs](https://docs.rs/phonenumber/badge.svg)](https://docs.rs/rlibphonenumber)
+[![Docs.rs](https://docs.rs/rlibphonenumber/badge.svg)](https://docs.rs/rlibphonenumber)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-A Rust port of Google's comprehensive library for parsing, formatting, and validating international phone numbers.
+A high-performance Rust port of Google's `libphonenumber` library for parsing, formatting, and validating international phone numbers.
 
 **Built on base libphonenumber 9.0.8**
 **Used metadata version: 9.0.23**
 
 ## Overview
 
-This library is a new adaptation of Google's `libphonenumber` for Rust. Its primary goal is to provide a powerful and efficient tool for handling phone numbers, with a structure that is intuitively close to the original C++ version.
+This library is a fresh adaptation of Google's `libphonenumber` for Rust. Its primary goal is to provide a powerful and efficient tool for handling phone numbers, with a structure that is intuitively close to the original C++ version, but adapted for Rust ergonomics.
 
-You might be aware of an existing Rust implementation of `libphonenumber`. However, its maintenance has slowed, and I believe that a fresh start is the best path forward. This project aims to deliver a more direct and familiar port for developers acquainted with the C++ or Java versions of the original library.
-
-This library gives you access to a wide range of functionalities, including:
+Key capabilities include:
 *   Parsing and formatting phone numbers.
 *   Validating phone numbers for all regions of the world.
 *   Determining the number type (e.g., Mobile, Fixed-line, Toll-free).
-*   Providing example numbers for every country.
+*   Serde support (optional).
+*   Thread-safe and high performance.
 
 ## Performance
 
-The following benchmarks were run against the `rust-phonenumber` crate. All tests were performed on the same machine and dataset. *Lower is better.*
-
-### Formatting
+`rlibphonenumber` is designed for speed. Benchmarks show significant improvements over existing alternatives, particularly in formatting operations.
 
 | Format | rlibphonenumber (this crate) | rust-phonenumber | Performance Gain |
 |:---|:---:|:---:|:---:|
 | **E164** | **~668 ns** | ~12.82 µs | **~19x faster** |
 | **International** | **~11.76 µs** | ~17.20 µs | **~1.5x faster** |
 | **National** | **~15.19 µs** | ~22.66 µs | **~1.5x faster** |
-| **RFC3966** | **~13.41 µs** | ~18.59 µs | **~1.4x faster** |
-
-### Parsing
-
-| Task | rlibphonenumber (this crate) | rust-phonenumber | Performance Gain |
-|:--- |:---:|:---:|:---:|
 | **Parse** | **~11.60 µs** | ~13.45 µs | **~16% faster** |
 
 ## Installation
@@ -46,113 +38,110 @@ Add `rlibphonenumber` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rlibphonenumber = "0.2.1" # Please use the latest version from crates.io
+rlibphonenumber = "0.3.0"
 ```
 
-## Getting Started: A Detailed Example
+### Enabling Serde
 
-Using the library is straightforward. The `PhoneNumberUtil` struct is the main entry point for all operations. For convenience, a thread-safe static instance, `PHONE_NUMBER_UTIL`, is provided.
+To enable `Serialize` and `Deserialize` support for `PhoneNumber`:
 
-Here is a detailed example that demonstrates how to parse a number, validate it, and format it in several standard ways.
+```toml
+[dependencies]
+rlibphonenumber = { version = "0.3.0", features = ["serde"] }
+```
+
+## Getting Started
+
+The library exposes a global static `PHONE_NUMBER_UTIL`, but for most common operations, you can now use methods directly on the `PhoneNumber` struct.
+
+### Complete Example
 
 ```rust
 use rlibphonenumber::{
-    // or instead you can use PhoneNumberUtil::new()
-    // BUT all extension methods like fromStr or number.is_valid() uses PHONE_NUMBER_UTIL internally!!
     PHONE_NUMBER_UTIL,
     PhoneNumber,
     PhoneNumberFormat,
-    Region,
+    ParseError,
 };
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let number_string = "+1-587-530-2271";
 
     // 1. Parse the number
-    match number_string.parse::<PhoneNumber>() {
-        Ok(number) => {
-            println!("✅ Successfully parsed number.");
-            println!(
-                "   - Original input: '{}' (in '{}')",
-                number_string,
-                Region::US
-            );
-            println!("   - Country Code: {}", number.country_code());
-            println!("   - National Number: {}", number.national_number());
+    // You can use the standard FromStr trait:
+    let number: PhoneNumber = number_string.parse()?;
+    
+    // Or explicitly via the utility:
+    // let number = PHONE_NUMBER_UTIL.parse(number_string)?;
 
-            // 2. Validate the number
-            // `is_valid_number` performs a full validation, checking length,
-            // prefix, and other region-specific rules.
-            let is_valid = number.is_valid();
-            println!(
-                "\nIs the number valid? {}",
-                if is_valid { "Yes" } else { "No" }
-            );
+    println!("✅ Successfully parsed number.");
+    println!("   - Country Code: {}", number.country_code());
+    println!("   - National Number: {}", number.national_number());
 
-            if !is_valid {
-                return;
-            }
+    // 2. Validate the number
+    // `is_valid()` performs a full validation (length, prefix, region rules)
+    let is_valid = number.is_valid();
+    println!(
+        "\nIs the number valid? {}",
+        if is_valid { "Yes" } else { "No" }
+    );
 
-            // 3. Format the number in different standard formats
-            let international_format =
-                PHONE_NUMBER_UTIL.format(&number, PhoneNumberFormat::International);
-            let national_format = PHONE_NUMBER_UTIL.format(&number, PhoneNumberFormat::National);
-
-            // Or more simple way can be used
-            let e164_format = number.format_as(PhoneNumberFormat::E164);
-            let rfc3966_format = number.format_as(PhoneNumberFormat::RFC3966);
-
-            println!("\nFormatted Outputs:");
-            println!("   - International: {}", international_format);
-            println!("   - National:      {}", national_format);
-            println!("   - E.164:         {}", e164_format);
-            println!("   - RFC3966:       {}", rfc3966_format);
-
-            // 4. Get additional information about the number
-            let number_type = number.get_type();
-            let number_region = number.get_region_code();
-
-            println!("\nAdditional Information:");
-            println!("   - Number Type:   {:?}", number_type); // e.g., FixedLine
-            println!("   - Number Region: {}", number_region.unwrap_or("Unknown")); // e.g., US
-        }
-        Err(e) => {
-            // Handle parsing errors, e.g., if the number is invalid or not a number.
-            println!("❌ Error parsing number: {:?}", e);
-        }
+    if !is_valid {
+        return Ok(());
     }
+
+    // 3. Format the number
+    // Display trait uses E164 by default
+    println!("\nDefault Display: {}", number); 
+
+    let e164_format = number.format_as(PhoneNumberFormat::E164);
+    let international_format = number.format_as(PhoneNumberFormat::International);
+    let national_format = number.format_as(PhoneNumberFormat::National);
+    let rfc3966_format = number.format_as(PhoneNumberFormat::RFC3966);
+
+    println!("Formatted Outputs:");
+    println!("   - E.164:         {}", e164_format);         // +15875302271
+    println!("   - International: {}", international_format); // +1 587-530-2271
+    println!("   - National:      {}", national_format);      // (587) 530-2271
+    println!("   - RFC3966:       {}", rfc3966_format);       // tel:+1-587-530-2271
+
+    // 4. Get additional information
+    let number_type = number.get_type(); // e.g., Mobile, FixedLine
+    let region_code = number.get_region_code(); // e.g., "CA"
+
+    println!("\nInfo:");
+    println!("   - Type:   {:?}", number_type);
+    println!("   - Region: {:?}", region_code.unwrap_or("Unknown"));
+
+    Ok(())
 }
 ```
 
-### Expected Output:
+### Serde Integration
 
-```text
-✅ Successfully parsed number.
-   - Original input: '+1-587-530-2271' (in 'US')
-   - Country Code: 1
-   - National Number: 5875302271
+When the `serde` feature is enabled, `PhoneNumber` serializes to a string (E.164 format) and can be deserialized from a string.
 
-Is the number valid? Yes
+```rust
+use rlibphonenumber::PhoneNumber;
+use serde_json::json;
 
-Formatted Outputs:
-   - International: +1 587-530-2271
-   - National:      (587) 530-2271
-   - E.164:         +15875302271
-   - RFC3966:       tel:+1-587-530-2271
+fn main() {
+    let raw = "+15875302271";
+    let number: PhoneNumber = raw.parse().unwrap();
 
-Additional Information:
-   - Number Type:   FixedLineOrMobile
-   - Number Region: CA
+    // Serializes to "+15875302271"
+    let json_output = json!({ "phone": number });
+    println!("{}", json_output); 
+}
 ```
 
 ## Project Status
 
 The library is under active development. The core `PhoneNumberUtil` is fully implemented and passes the original library's test suite.
 
-The project roadmap includes porting these additional components:
-
+Roadmap:
 *   **`AsYouTypeFormatter`**: For formatting phone numbers as a user types.
-*   **`PhoneNumberOfflineGeocoder`**: To provide geographical location information for a number.
+*   **`PhoneNumberOfflineGeocoder`**: To provide geographical location information.
 *   **`PhoneNumberToCarrierMapper`**: To identify the carrier associated with a number.
 
 ## Contributing
@@ -161,43 +150,17 @@ Contributions are highly welcome! Whether you are fixing a bug, improving docume
 
 ### Code Generation
 
-To maintain consistency with the original library, this project uses pre-compiled metadata. If you need to regenerate the metadata, for instance, after updating the `PhoneNumberMetadata.xml` file, you can use the provided tools.
-
-The `tools` directory contains a rewritten Rust-based code generator for the C++ pre-compiled metadata.
-
-To run the code generation process, execute the following script:
+To maintain consistency with the original library, this project uses pre-compiled metadata. If you need to regenerate the metadata (e.g., after updating `PhoneNumberMetadata.xml`), use the provided script:
 
 ```sh
-./tools/scripts/generate_metadata.sh
+./tools/scripts/generate_metadata.sh --tag v9.0.23
 ```
 
-This script will:
-1.  Build the Java-based tool that converts the XML metadata to a Rust-compatible format.
-2.  Run the generator for the main metadata and the test metadata.
-3.  Place the generated `.rs` files into the `src/generated/metadata` directory.
 
-You can skip the Java build step by passing the `--skip-install` flag, which is useful if no changes were made to the generator itself.
 
-```sh
-./tools/scripts/generate_metadata.sh --skip-install
-```
-
-**NEW**
-
-You can add --tag flag, this will clone original project's metadata and replace resources dir
-
-```sh
-./tools/scripts/generate_metadata.sh --skip-install --tag v9.0.23
-```
-
-## License
-
-This project is licensed under the Apache License, Version 2.0. Please see the `LICENSE` file for details.
-
-## Fuzz Testing & Code Robutsness
+## Fuzz Testing
 
 Beyond standard unit tests that cover expected behavior, `rlibphonenumber` undergoes rigorous fuzz testing to ensure its resilience against unexpected, malformed, and potentially malicious input. Given that phone number parsing often deals with untrusted data from users, stability is a primary design goal.
-**Our fuzzing suite has successfully executed over 58 million unique test cases without discovering any panics, crashes, memory safety violations, or performance regressions (ReDoS).**
 
 ### Running the Fuzzer
 
@@ -215,3 +178,52 @@ Beyond standard unit tests that cover expected behavior, `rlibphonenumber` under
     # Example for the main target
     cargo fuzz run full-cycle
     ```
+
+### Manual Instantiation & Feature Flags
+
+By default, this crate enables the `global_static` feature, which initializes a thread-safe, lazy-loaded static instance `PHONE_NUMBER_UTIL`. This allows you to use convenience methods directly on `PhoneNumber` (e.g., `number.is_valid()`).
+
+However, if you need granular control over memory usage, wish to avoid global state, or are working in an environment where lazy statics are undesirable, you can disable this feature.
+
+#### Disabling the Global Instance
+
+In your `Cargo.toml`, disable the default features:
+
+```toml
+[dependencies]
+rlibphonenumber = { version = "0.3.0", default-features = false }
+```
+
+#### Using `PhoneNumberUtil::new()`
+
+When `global_static` is disabled, the `PHONE_NUMBER_UTIL` constant and the helper methods on `PhoneNumber` (like `.format_as()`, `.is_valid()`) **will not be available**. You must instantiate the utility manually and pass it around.
+
+**⚠️ Performance Note:** `PhoneNumberUtil::new()` compiles regexes upon initialization. This is an expensive operation. Create it once and reuse it (e.g., wrap it in an `Arc` or pass it by reference).
+
+```rust
+use rlibphonenumber::{PhoneNumberUtil, PhoneNumber};
+
+fn main() {
+    // 1. Initialize the utility once (expensive operation)
+    let phone_util = PhoneNumberUtil::new();
+
+    let number_str = "+15550109988";
+
+    // 2. Parse using the instance
+    // Note: 'parse' is a method on phone_util, not a trait on str here
+    match phone_util.parse(number_str) {
+        Ok(number) => {
+            // 3. Use the instance for validation and formatting
+            // number.is_valid() is NOT available without 'global_static'
+            let is_valid = phone_util.is_valid_number(&number);
+            
+            println!("Valid: {}", is_valid);
+        }
+        Err(e) => eprintln!("Parse error: {:?}", e),
+    }
+}
+```
+
+## License
+
+This project is licensed under the Apache License, Version 2.0. Please see the `LICENSE` file for details.
