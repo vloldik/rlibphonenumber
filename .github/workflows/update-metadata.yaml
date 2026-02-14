@@ -4,12 +4,6 @@ on:
   schedule:
     - cron: '0 0 * * 0'
   workflow_dispatch: 
-    inputs:
-      skip_publish:
-        description: 'Skip publishing to Crates.io (Dry run)'
-        required: false
-        type: boolean
-        default: false
 
 
 permissions:
@@ -43,31 +37,18 @@ jobs:
           chmod +x ./tools/scripts/generate_metadata.sh
           ./tools/scripts/generate_metadata.sh --tag latest-supported --update-version
 
-      - name: Run Tests
-        if: steps.generate_metadata.outputs.changes == 'true'
-        run: cargo test
-
-      - name: Publish to Crates.io
-        if: |
-          steps.generate_metadata.outputs.changes == 'true' && 
-          github.event.inputs.skip_publish != 'true'
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: cargo publish --allow-dirty
-
       - name: Create Pull Request
         if: steps.generate_metadata.outputs.changes == 'true'
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore: update metadata to latest and bump version to ${{ steps.generate_metadata.outputs.new_version }}"
+          commit-message: "[release] Update metadata to latest and bump version to ${{ steps.generate_metadata.outputs.new_version }}"
           branch: "chore/update-metadata-${{ steps.generate_metadata.outputs.new_version }}"
-          title: "chore: Update metadata & Release ${{ steps.generate_metadata.outputs.new_version }} ${{ github.event.inputs.skip_publish == 'true' && '(Dry Run)' || '' }}"
+          title: "Release ${{ steps.generate_metadata.outputs.new_version }}. Update metadata"
           body: |
             Automated update of libphonenumber metadata.
             
             - Metadata updated using `latest-supported` tag.
             - Version bumped to `${{ steps.generate_metadata.outputs.new_version }}`.
             - `cargo test` passed.
-            ${{ github.event.inputs.skip_publish == 'true' && '- **SKIPPED**: Published to crates.io (Dry run mode)' || '- Published to crates.io successfully.' }}
           labels: automated-pr, release
