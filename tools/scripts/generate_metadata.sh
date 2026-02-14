@@ -29,6 +29,7 @@ copyright_header="\
 "
 
 skip_install=false
+update_version=false
 tag_name=""
 
 while [[ $# -gt 0 ]]; do
@@ -40,6 +41,10 @@ while [[ $# -gt 0 ]]; do
         --tag)
             tag_name="$2"
             shift 2
+            ;;
+        --update-version)
+            update_version=true
+            shift
             ;;
         *)
             shift
@@ -123,5 +128,30 @@ do
 done
 cp "$resources_dir/"*.proto "$rlibphonenumber_resources_dir"
 cp "$resources_dir/ShortNumberMetadata.xml" "$rlibphonenumber_macro_resources_dir"
+
+do_update_version() {
+    if git diff --quiet; then
+        echo "No changes detected."
+        echo "changes=false" >> $GITHUB_OUTPUT
+        return
+    else
+        echo "Changes detected."
+        echo "changes=true" >> $GITHUB_OUTPUT
+    fi
+    cargo install cargo-edit
+    cargo set-version --bump patch -p rlibphonenumber -p rlibphonenumbers_macro
+    
+    NEW_VERSION=$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[0].version')
+    echo "New version is $NEW_VERSION"
+    echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+    vdigits="[0-9]+\.[0-9]+\.[0-9]+"
+    sed -E -i "s/rlibphonenumber = \"$vdigits\"/rlibphonenumber = \"$NEW_VERSION\"/g" "$project_home/Readme.md"
+    sed -E -i "s/Used metadata version: v$vdigits/Used metadata version: $tag_name/g" "$project_home/Readme.md"
+}
+
+if [[ "$update_version" == "true" ]]; then 
+    do_update_version
+fi
 
 echo "Generation complete!"
