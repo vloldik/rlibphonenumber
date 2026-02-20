@@ -7,6 +7,8 @@ use phonenumber::{
     country::Id::{self, AR, AU, DE, GB, IT, US},
 };
 
+use phonelib::{PhoneFormat, PhoneNumber as PhonelibNumber};
+
 type TestEntity = (&'static str, &'static str, Id);
 
 fn setup_numbers() -> Vec<TestEntity> {
@@ -40,17 +42,25 @@ fn convert_to_rlibphonenumber_numbers(numbers: &[TestEntity]) -> Vec<rlibphonenu
         .collect()
 }
 
+fn convert_to_phonelib_numbers(numbers: &[TestEntity]) -> Vec<PhonelibNumber> {
+    numbers
+        .iter()
+        .flat_map(|s| PhonelibNumber::parse_with_country(s.0, s.1))
+        .collect()
+}
+
 fn formatting_benchmark(c: &mut Criterion) {
-    let numbers = setup_numbers();
-    let rlp_numbers = convert_to_rlp_numbers(&numbers);
-    let numbers = convert_to_rlibphonenumber_numbers(&numbers);
+    let numbers_data = setup_numbers();
+    let rlp_numbers = convert_to_rlp_numbers(&numbers_data);
+    let rlib_numbers = convert_to_rlibphonenumber_numbers(&numbers_data);
+    let phonelib_numbers = convert_to_phonelib_numbers(&numbers_data);
 
     let mut group = c.benchmark_group("Formatting Comparison");
 
-    let mut test = |format_a: PhoneNumberFormat, format_b: Mode| {
+    let mut test = |format_a: PhoneNumberFormat, format_b: Mode, format_c: PhoneFormat| {
         group.bench_function(format!("rlibphonenumber: format({:?})", format_a), |b| {
             b.iter(|| {
-                for number in &numbers {
+                for number in &rlib_numbers {
                     PHONE_NUMBER_UTIL.format(black_box(number), black_box(format_a));
                 }
             })
@@ -64,7 +74,15 @@ fn formatting_benchmark(c: &mut Criterion) {
             })
         });
 
-        for (number_a, number_b) in rlp_numbers.iter().zip(numbers.iter()) {
+        group.bench_function(format!("phonelib: format({:?})", format_a), |b| {
+            b.iter(|| {
+                for number in &phonelib_numbers {
+                    let _ = black_box(number.format(black_box(format_c)));
+                }
+            })
+        });
+
+        for (number_a, number_b) in rlp_numbers.iter().zip(rlib_numbers.iter()) {
             assert_eq!(
                 rlp::format(number_a).mode(format_b).to_string(),
                 PHONE_NUMBER_UTIL.format(number_b, format_a)
@@ -72,10 +90,23 @@ fn formatting_benchmark(c: &mut Criterion) {
         }
     };
 
-    test(PhoneNumberFormat::E164, Mode::E164);
-    test(PhoneNumberFormat::International, Mode::International);
-    test(PhoneNumberFormat::National, Mode::National);
-    test(PhoneNumberFormat::RFC3966, Mode::Rfc3966);
+    test(PhoneNumberFormat::E164, Mode::E164, PhoneFormat::E164);
+    test(
+        PhoneNumberFormat::International,
+        Mode::International,
+        PhoneFormat::International,
+    );
+    test(
+        PhoneNumberFormat::National,
+        Mode::National,
+        PhoneFormat::National,
+    );
+    test(
+        PhoneNumberFormat::RFC3966,
+        Mode::Rfc3966,
+        PhoneFormat::RFC3966,
+    );
+
     group.finish();
 }
 
