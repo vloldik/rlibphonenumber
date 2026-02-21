@@ -13,9 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::{HashMap, HashSet};
-
 use regex::Regex;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
     phonenumberutil::{
@@ -70,40 +69,40 @@ pub(super) struct PhoneNumberRegExpsAndMappings {
     /// A map that contains characters that are essential when dialling. That means
     /// any of the characters in this map must not be removed from a number when
     /// dialing, otherwise the call will not reach the intended destination.
-    pub diallable_char_mappings: HashMap<char, char>,
+    pub diallable_char_mappings: FxHashMap<char, char>,
     /// These mappings map a character (key) to a specific digit that should
     /// replace it for normalization purposes.
-    pub alpha_mappings: HashMap<char, char>,
+    pub alpha_mappings: FxHashMap<char, char>,
     /// For performance reasons, store a map of combining alpha_mappings with ASCII
     /// digits.
-    pub alpha_phone_mappings: HashMap<char, char>,
+    pub alpha_phone_mappings: FxHashMap<char, char>,
 
     /// Separate map of all symbols that we wish to retain when formatting alpha
     /// numbers. This includes digits, ascii letters and number grouping symbols
     /// such as "-" and " ".
-    pub all_plus_number_grouping_symbols: HashMap<char, char>,
+    pub all_plus_number_grouping_symbols: FxHashMap<char, char>,
 
     /// Map of country calling codes that use a mobile token before the area code.
     /// One example of when this is relevant is when determining the length of the
     /// national destination code, which should be the length of the area code plus
     /// the length of the mobile token.
-    pub mobile_token_mappings: HashMap<i32, char>,
+    pub mobile_token_mappings: FxHashMap<i32, char>,
 
     /// Set of country codes that doesn't have national prefix, but it has area
     /// codes.
-    pub countries_without_national_prefix_with_area_codes: HashSet<i32>,
+    pub countries_without_national_prefix_with_area_codes: FxHashSet<i32>,
 
     /// Set of country codes that have geographically assigned mobile numbers (see
     /// geo_mobile_countries_ below) which are not based on *area codes*. For
     /// example, in China mobile numbers start with a carrier indicator, and beyond
     /// that are geographically assigned: this carrier indicator is not considered
     /// to be an area code.
-    pub geo_mobile_countries_without_mobile_area_codes: HashSet<i32>,
+    pub geo_mobile_countries_without_mobile_area_codes: FxHashSet<i32>,
 
     /// Set of country calling codes that have geographically assigned mobile
     /// numbers. This may not be complete; we add calling codes case by case, as we
     /// find geographical mobile numbers or hear from user reports.
-    pub geo_mobile_countries: HashSet<i32>,
+    pub geo_mobile_countries: FxHashSet<i32>,
 
     /// Pattern that makes it easy to distinguish whether a region has a single
     /// international dialing prefix or not. If a region has a single international
@@ -214,12 +213,12 @@ impl PhoneNumberRegExpsAndMappings {
 
         // Simple ASCII digits map used to populate ALPHA_PHONE_MAPPINGS and
         // ALL_PLUS_NUMBER_GROUPING_SYMBOLS.
-        let mut ascii_digit_mappings = HashMap::with_capacity(10);
+        let mut ascii_digit_mappings = FxHashMap::default();
         for d in '0'..='9' {
             ascii_digit_mappings.insert(d, d);
         }
 
-        let mut alpha_map = HashMap::with_capacity(40);
+        let mut alpha_map = FxHashMap::default();
         alpha_map.insert('A', '2');
         alpha_map.insert('B', '2');
         alpha_map.insert('C', '2');
@@ -250,19 +249,19 @@ impl PhoneNumberRegExpsAndMappings {
 
         self.alpha_mappings = alpha_map;
 
-        let mut combined_map = HashMap::with_capacity(100);
+        let mut combined_map = FxHashMap::default();
         combined_map.extend(self.alpha_mappings.iter());
         combined_map.extend(ascii_digit_mappings.iter());
         self.alpha_phone_mappings = combined_map;
 
-        let mut dilatable_char_map = HashMap::new();
+        let mut dilatable_char_map = FxHashMap::default();
         dilatable_char_map.extend(ascii_digit_mappings.iter());
         dilatable_char_map.insert('+', '+');
         dilatable_char_map.insert('*', '*');
         dilatable_char_map.insert('#', '#');
         self.diallable_char_mappings = dilatable_char_map;
 
-        let mut all_plus_number_groupings = HashMap::new();
+        let mut all_plus_number_groupings = FxHashMap::default();
         // insert (lower letter -> upper letter) and (upper letter -> upper letter) mappings.
         for c in self.alpha_mappings.keys() {
             all_plus_number_groupings.insert(c.to_ascii_lowercase(), *c);

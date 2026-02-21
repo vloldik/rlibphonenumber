@@ -15,7 +15,7 @@
 
 use std::{
     borrow::Cow,
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{HashSet, VecDeque},
     sync::Arc,
 };
 
@@ -57,6 +57,7 @@ use crate::{
 use dec_from_char::DecimalExtended;
 use log::{error, trace, warn};
 use regex::Regex;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 // Helper type for Result
 
@@ -84,16 +85,16 @@ pub struct PhoneNumberUtilInternal {
     /// achieve better performance.
     country_calling_code_to_region_code_map: Vec<(i32, Vec<String>)>,
 
-    nanpa_regions: HashSet<String>,
+    nanpa_regions: FxHashSet<String>,
 
     /// A mapping from a region code to a PhoneMetadata for that region.
-    region_to_metadata_map: HashMap<String, PhoneMetadata>,
+    region_to_metadata_map: FxHashMap<String, PhoneMetadata>,
 
     /// A mapping from a country calling code for a non-geographical entity to the
     /// PhoneMetadata for that country calling code. Examples of the country
     /// calling codes include 800 (International Toll Free Service) and 808
     /// (International Shared Cost Service).
-    country_code_to_non_geographical_metadata_map: HashMap<i32, PhoneMetadata>,
+    country_code_to_non_geographical_metadata_map: FxHashMap<i32, PhoneMetadata>,
 }
 
 impl PhoneNumberUtilInternal {
@@ -108,7 +109,7 @@ impl PhoneNumberUtilInternal {
         };
 
         // that share a country calling code when inserting data.
-        let mut country_calling_code_to_region_map = HashMap::<i32, VecDeque<String>>::new();
+        let mut country_calling_code_to_region_map = FxHashMap::<i32, VecDeque<String>>::default();
         for metadata in metadata_collection.metadata {
             let region_code = &metadata.id().to_string();
             let main_country_code = metadata.main_country_for_code();
@@ -1135,14 +1136,11 @@ impl PhoneNumberUtilInternal {
     ///
     /// * `phone_number` - The phone number to format.
     /// * `calling_from` - The region where the call is being placed from.
-    pub(crate) fn format_out_of_country_calling_number<'a, 'b>(
-        &'b self,
+    pub(crate) fn format_out_of_country_calling_number<'a>(
+        &self,
         phone_number: &'a PhoneNumber,
         calling_from: &str,
-    ) -> RegexResult<Cow<'a, str>>
-    where
-        'b: 'a,
-    {
+    ) -> RegexResult<Cow<'a, str>> {
         let Some(metadata_calling_from) = self.region_to_metadata_map.get(calling_from) else {
             trace!(
                 "Trying to format number from invalid region {calling_from}\

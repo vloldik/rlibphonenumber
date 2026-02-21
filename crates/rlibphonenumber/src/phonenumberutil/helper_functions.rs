@@ -13,12 +13,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{
-    borrow::Cow,
-    collections::{HashMap, HashSet},
-};
+use std::{borrow::Cow, collections::HashSet};
 
 use protobuf::Message;
+use rustc_hash::FxHashMap;
 use strum::IntoEnumIterator;
 
 use crate::{
@@ -276,7 +274,7 @@ pub fn create_extn_pattern(for_parsing: bool) -> String {
 ///
 /// Returns: normalized_string
 pub fn normalize_helper(
-    normalization_replacements: &HashMap<char, char>,
+    normalization_replacements: &FxHashMap<char, char>,
     remove_non_matches: bool,
     phone_number: &str,
 ) -> String {

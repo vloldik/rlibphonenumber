@@ -219,7 +219,7 @@ impl PhoneNumberUtil {
     ///
     /// Panics on invalid metadata, indicating a library bug.
     pub fn format_out_of_country_calling_number<'a>(
-        &'a self,
+        &self,
         phone_number: &'a PhoneNumber,
         region_calling_from: impl AsRef<str>,
     ) -> Cow<'a, str> {

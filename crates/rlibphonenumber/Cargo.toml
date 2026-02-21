@@ -59,6 +59,8 @@ zeroes_itoa = { path = "../zeroes_itoa", version = "0.1" }
 
 serde = { version = "1", optional = true }
 
+rustc-hash = { version = "2.1" }
+
 [build-dependencies]
 thiserror = "1.0"
 protobuf-codegen = "3.7"
