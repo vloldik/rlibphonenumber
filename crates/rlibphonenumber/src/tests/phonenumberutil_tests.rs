@@ -9,6 +9,7 @@ use crate::{
     phonenumberutil::{
         enums::{NumberLengthType, PhoneNumberFormat, PhoneNumberType},
         errors::{ParseError, ValidationError},
+        helper_functions::get_national_significant_number,
         phonenumberutil_internal::PhoneNumberUtilInternal,
     },
     unwrap_internal,
@@ -261,47 +262,51 @@ fn get_instance_load_ar_metadata() {
 }
 
 #[test]
-fn get_national_significant_number() {
-    let phone_util = get_phone_util();
+fn get_national_significant_number_test() {
     let mut number = PhoneNumber::new();
     number.set_country_code(1);
     number.set_national_number(6502530000);
-    let national_significant_number = phone_util.get_national_significant_number(&number);
+    let mut buf = zeroes_itoa::LeadingZeroBuffer::new();
+    let national_significant_number = get_national_significant_number(&number, &mut buf);
     assert_eq!("6502530000", national_significant_number);
 
     number.clear();
     number.set_country_code(39);
     number.set_national_number(312345678);
-    let national_significant_number = phone_util.get_national_significant_number(&number);
+    let mut buf = zeroes_itoa::LeadingZeroBuffer::new();
+    let national_significant_number = get_national_significant_number(&number, &mut buf);
     assert_eq!("312345678", national_significant_number);
 
     number.clear();
     number.set_country_code(39);
     number.set_national_number(236618300);
     number.set_italian_leading_zero(true);
-    let national_significant_number = phone_util.get_national_significant_number(&number);
+    let mut buf = zeroes_itoa::LeadingZeroBuffer::new();
+    let national_significant_number = get_national_significant_number(&number, &mut buf);
     assert_eq!("0236618300", national_significant_number);
 
     number.clear();
     number.set_country_code(800);
     number.set_national_number(12345678);
-    let national_significant_number = phone_util.get_national_significant_number(&number);
+    let mut buf = zeroes_itoa::LeadingZeroBuffer::new();
+    let national_significant_number = get_national_significant_number(&number, &mut buf);
     assert_eq!("12345678", national_significant_number);
 }
 
 #[test]
 fn get_national_significant_number_many_leading_zeros() {
-    let phone_util = get_phone_util();
     let mut number = PhoneNumber::new();
     number.set_country_code(1);
     number.set_national_number(650);
     number.set_italian_leading_zero(true);
     number.set_number_of_leading_zeros(2);
-    let national_significant_number = phone_util.get_national_significant_number(&number);
+    let mut buf = zeroes_itoa::LeadingZeroBuffer::new();
+    let national_significant_number = get_national_significant_number(&number, &mut buf);
     assert_eq!("00650", national_significant_number);
 
     number.set_number_of_leading_zeros(-3);
-    let national_significant_number = phone_util.get_national_significant_number(&number);
+    let mut buf = zeroes_itoa::LeadingZeroBuffer::new();
+    let national_significant_number = get_national_significant_number(&number, &mut buf);
     assert_eq!("650", national_significant_number);
 }
 

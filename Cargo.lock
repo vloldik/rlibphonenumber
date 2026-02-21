@@ -923,6 +923,7 @@ dependencies = [
  "serde",
  "strum",
  "thiserror",
+ "zeroes_itoa",
 ]
 
 [[package]]
@@ -1395,3 +1396,7 @@ name = "xml"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8aa498d22c9bbaf482329839bc5620c46be275a19a812e9a22a2b07529a642a"
+
+[[package]]
+name = "zeroes_itoa"
+version = "0.1.0"

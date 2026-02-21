@@ -13,18 +13,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    borrow::Cow,
+    collections::{HashMap, HashSet},
+};
 
 use protobuf::Message;
 use strum::IntoEnumIterator;
 
 use crate::{
-    generated::metadata::METADATA,
-    generated::proto::{
-        phonemetadata::{PhoneMetadata, PhoneMetadataCollection, PhoneNumberDesc},
-        phonenumber::PhoneNumber,
+    generated::{
+        metadata::METADATA,
+        proto::{
+            phonemetadata::{PhoneMetadata, PhoneMetadataCollection, PhoneNumberDesc},
+            phonenumber::PhoneNumber,
+        },
     },
     interfaces::MatcherApi,
+    phonenumberutil::helper_types::PrefixParts,
 };
 
 use super::{
@@ -64,44 +70,25 @@ pub fn get_number_desc_by_type(
 }
 
 /// A helper function that is used by Format and FormatByPattern.
-pub fn prefix_number_with_country_calling_code(
-    country_calling_code: i32,
+pub fn get_number_prefix_by_format_and_calling_code(
+    country_calling_code: &'_ str,
     number_format: PhoneNumberFormat,
-    formatted_number: &mut String,
-) {
-    if let PhoneNumberFormat::National = number_format {
-        return;
-    }
-    let mut buf = itoa::Buffer::new();
-    let country_calling_code_str = buf.format(country_calling_code);
-
-    // we anyway allocate a new string in concatenation, so we'l do it once
-    // with capacity of resulting string
+) -> PrefixParts<'_> {
     match number_format {
         PhoneNumberFormat::E164 => {
-            let new_str =
-                fast_cat::concat_str!(PLUS_SIGN, country_calling_code_str, &formatted_number);
-            *formatted_number = new_str;
+            PrefixParts::Parts2([PLUS_SIGN.into(), country_calling_code.into()])
         }
         PhoneNumberFormat::International => {
-            let new_str =
-                fast_cat::concat_str!(PLUS_SIGN, country_calling_code_str, " ", &formatted_number);
-
-            *formatted_number = new_str;
+            PrefixParts::Parts3([PLUS_SIGN.into(), country_calling_code.into(), " ".into()])
         }
-        PhoneNumberFormat::RFC3966 => {
-            let new_str = fast_cat::concat_str!(
-                RFC3966_PREFIX,
-                PLUS_SIGN,
-                country_calling_code_str,
-                "-",
-                &formatted_number
-            );
-
-            *formatted_number = new_str;
-        }
+        PhoneNumberFormat::RFC3966 => PrefixParts::Parts4([
+            RFC3966_PREFIX.into(),
+            PLUS_SIGN.into(),
+            country_calling_code.into(),
+            "-".into(),
+        ]),
         // here code is already returned
-        PhoneNumberFormat::National => {}
+        PhoneNumberFormat::National => PrefixParts::Empty,
     }
 }
 
@@ -139,6 +126,23 @@ pub fn extn_digits(max_length: u32) -> String {
     expr.push_str("})");
 
     expr
+}
+
+pub fn get_national_significant_number<'b>(
+    phone_number: &PhoneNumber,
+    buf: &'b mut zeroes_itoa::LeadingZeroBuffer,
+) -> Cow<'b, str> {
+    buf.format(
+        phone_number.national_number(),
+        if phone_number.italian_leading_zero() {
+            phone_number
+                .number_of_leading_zeros()
+                .try_into()
+                .unwrap_or(0)
+        } else {
+            0
+        },
+    )
 }
 
 // Helper initialiser method to create the regular-expression pattern to match

@@ -22,7 +22,10 @@
 
 use std::{borrow::Cow, collections::HashSet};
 
-use crate::{generated::proto::phonenumber::PhoneNumber, phonemetadata::PhoneMetadataCollection, unwrap_internal};
+use crate::{
+    generated::proto::phonenumber::PhoneNumber, phonemetadata::PhoneMetadataCollection,
+    phonenumberutil::helper_functions::get_national_significant_number, unwrap_internal,
+};
 
 use super::{
     enums::{MatchType, NumberLengthType, PhoneNumberFormat, PhoneNumberType},
@@ -51,7 +54,9 @@ impl PhoneNumberUtil {
     }
 
     pub fn new_for_metadata(metadata_collection: PhoneMetadataCollection) -> Self {
-        Self { util_internal: PhoneNumberUtilInternal::new_for_metadata(metadata_collection) }
+        Self {
+            util_internal: PhoneNumberUtilInternal::new_for_metadata(metadata_collection),
+        }
     }
 
     /// Checks if a `PhoneNumber` can be dialed internationally.
@@ -214,7 +219,7 @@ impl PhoneNumberUtil {
     ///
     /// Panics on invalid metadata, indicating a library bug.
     pub fn format_out_of_country_calling_number<'a>(
-        &self,
+        &'a self,
         phone_number: &'a PhoneNumber,
         region_calling_from: impl AsRef<str>,
     ) -> Cow<'a, str> {
@@ -494,8 +499,8 @@ impl PhoneNumberUtil {
     ///
     /// A `String` containing the NSN.
     pub fn get_national_significant_number(&self, phone_number: &PhoneNumber) -> String {
-        self.util_internal
-            .get_national_significant_number(phone_number)
+        let mut buf = zeroes_itoa::LeadingZeroBuffer::new();
+        get_national_significant_number(phone_number, &mut buf).into()
     }
 
     /// Determines the `PhoneNumberType` of a given `PhoneNumber`.
