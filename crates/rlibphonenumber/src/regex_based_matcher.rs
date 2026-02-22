@@ -17,18 +17,13 @@ use super::regex_util::{RegexConsume, RegexFullMatch};
 use regex::Regex;
 
 use crate::{
-    interfaces, phonenumberutil::regex_wrapper_types::PhoneNumberDescWrapper,
-    regexp_cache::InvalidRegexError,
+    InvalidRegexError, interfaces, phonenumberutil::regex_wrapper_types::PhoneNumberDescWrapper,
 };
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RegexBasedMatcher {}
 
 impl RegexBasedMatcher {
-    pub fn new() -> Self {
-        Self {}
-    }
-
     fn match_number(
         &self,
         phone_number: &str,

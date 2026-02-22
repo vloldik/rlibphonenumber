@@ -205,7 +205,7 @@ impl PhoneNumberUtilInternal {
     ) -> Option<HashSet<PhoneNumberType>> {
         self.region_to_metadata_map
             .get(region_code)
-            .map(|metadata| get_supported_types_for_metadata(metadata))
+            .map(get_supported_types_for_metadata)
             .or_else(|| {
                 warn!("Invalid or unknown region code provided: {}", region_code);
                 None
@@ -223,7 +223,7 @@ impl PhoneNumberUtilInternal {
     ) -> Option<HashSet<PhoneNumberType>> {
         self.country_code_to_non_geographical_metadata_map
             .get(&country_calling_code)
-            .map(|metadata| get_supported_types_for_metadata(metadata))
+            .map(get_supported_types_for_metadata)
             .or_else(|| {
                 warn!(
                     "Unknown country calling code for a non-geographical entity provided: {}",

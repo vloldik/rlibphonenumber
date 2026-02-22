@@ -22,10 +22,7 @@ use strum::IntoEnumIterator;
 use crate::{
     generated::{
         metadata::METADATA,
-        proto::{
-            phonemetadata::{PhoneMetadata, PhoneMetadataCollection, PhoneNumberDesc},
-            phonenumber::PhoneNumber,
-        },
+        proto::{phonemetadata::PhoneMetadataCollection, phonenumber::PhoneNumber},
     },
     interfaces::MatcherApi,
     phonenumberutil::{
@@ -368,7 +365,7 @@ pub fn test_number_length(
     phone_metadata: &PhoneMetadataWrapper,
     phone_number_type: PhoneNumberType,
 ) -> Result<NumberLengthType, ValidationError> {
-    let desc_for_type = get_number_desc_by_type(&phone_metadata, phone_number_type);
+    let desc_for_type = get_number_desc_by_type(phone_metadata, phone_number_type);
     // There should always be "possibleLengths" set for every element. This is
     // declared in the XML schema which is verified by
     // PhoneNumberMetadataSchemaTest. For size efficiency, where a

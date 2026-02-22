@@ -25,6 +25,7 @@ macro_rules! wrapper {
         )?
     }) => {
         #[derive(Debug, Clone)]
+        #[allow(dead_code)]
         pub struct $name {
             $(
             $($field: OnceLock<RegResult>,)*
@@ -59,6 +60,7 @@ macro_rules! wrapper {
             )*
             paste!{
                 $(
+                #[allow(dead_code)]
                 pub fn [<set_ $field>](&mut self, value: OnceLock<RegResult>) {
                     self.$field = value;
                 }

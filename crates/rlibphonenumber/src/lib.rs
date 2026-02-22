@@ -19,7 +19,6 @@ mod interfaces;
 mod phonenumberutil;
 mod regex_based_matcher;
 pub(crate) mod regex_util;
-mod regexp_cache;
 pub(crate) mod string_util;
 
 pub use generated::proto::phonemetadata;
@@ -35,5 +34,4 @@ pub use crate::phonenumberutil::PHONE_NUMBER_UTIL;
 pub mod serde;
 
 pub use phonenumberutil::{enums::*, errors::*, phonenumberutil_public::PhoneNumberUtil};
-pub use regexp_cache::InvalidRegexError;
 mod tests;
