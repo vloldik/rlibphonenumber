@@ -14,6 +14,7 @@
 // limitations under the License.
 
 
+#[allow(clippy::module_inception)]
 mod metadata;
 
 // use only in test case 

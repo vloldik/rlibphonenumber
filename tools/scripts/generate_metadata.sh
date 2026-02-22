@@ -112,6 +112,7 @@ generate "PhoneNumberMetadataForTesting.xml" "test_metadata" "metadata" "TEST_ME
 echo "\
 $copyright_header
 
+#[allow(clippy::module_inception)]
 mod metadata;
 
 // use only in test case 
