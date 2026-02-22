@@ -24,16 +24,24 @@ Key capabilities include:
 *   Serde support (optional).
 *   Thread-safe and high performance.
 
-## Performance
+## Performance & Architecture
 
-`rlibphonenumber` is designed for speed. Benchmarks show significant improvements over existing alternatives, particularly in formatting operations.
+`rlibphonenumber` is strictly designed for low latency and minimal memory overhead. The latest benchmarks show a significant performance advantage over existing alternatives.
 
-| Format | rlibphonenumber (this crate) | rust-phonenumber | Performance Gain |
+| Operation | rlibphonenumber (this crate) | rust-phonenumber | Difference |
 |:---|:---:|:---:|:---:|
-| **E164** | **~668 ns** | ~12.82 µs | **~19x faster** |
-| **International** | **~11.76 µs** | ~17.20 µs | **~1.5x faster** |
-| **National** | **~15.19 µs** | ~22.66 µs | **~1.5x faster** |
-| **Parse** | **~11.60 µs** | ~13.45 µs | **~16% faster** |
+| **Format (E164)** | **~262 ns** | ~9.20 µs | **~35x faster** |
+| **Format (International)** | **~4.57 µs** | ~11.89 µs | **~2.6x faster** |
+| **Format (National)** | **~6.03 µs** | ~15.30 µs | **~2.5x faster** |
+| **Format (RFC3966)** | **~6.04 µs** | ~12.91 µs | **~2.1x faster** |
+| **Parse** | **~6.12 µs** | ~8.55 µs | **~1.4x faster** |
+
+### Under the Hood
+The high performance is achieved through several architectural optimizations:
+* **Zero-allocation formatting:** Extensive use of stack-allocated buffers (e.g., custom `itoa` with zero-padding), `Cow<str>`, and a specialized Builder pattern. This prevents intermediate heap allocations and unnecessary string concatenations during number formatting.
+* **Fast Hashing:** Replaced default `SipHash` with `FxHash` (`rustc_hash`) for low-latency metadata lookups by region code and integer keys.
+* **Lazy Regex Initialization:** Regular expressions are compiled and cached on-demand directly inside metadata wrappers using `std::sync::OnceLock`, eliminating the synchronization overhead of a centralized regex cache.
+* **Static Dispatch:** Core matching and validation logic relies on monomorphization rather than dynamic dispatch (`dyn Trait`), allowing the compiler to aggressively inline execution paths.
 
 ## Installation
 
@@ -50,7 +58,7 @@ To enable `Serialize` and `Deserialize` support for `PhoneNumber`:
 
 ```toml
 [dependencies]
-rlibphonenumber = { version = "0.3.0", features = ["serde"] }
+rlibphonenumber = { version = "0.3.1", features = ["serde"] }
 ```
 
 ## Getting Started
@@ -159,8 +167,6 @@ To maintain consistency with the original library, this project uses pre-compile
 ./tools/scripts/generate_metadata.sh --tag v9.0.23
 ```
 
-
-
 ## Fuzz Testing
 
 Beyond standard unit tests that cover expected behavior, `rlibphonenumber` undergoes rigorous fuzz testing to ensure its resilience against unexpected, malformed, and potentially malicious input. Given that phone number parsing often deals with untrusted data from users, stability is a primary design goal.
@@ -194,31 +200,31 @@ In your `Cargo.toml`, disable the default features:
 
 ```toml
 [dependencies]
-rlibphonenumber = { version = "0.3.0", default-features = false }
+rlibphonenumber = { version = "0.3.1", default-features = false }
 ```
 
 #### Using `PhoneNumberUtil::new()`
 
 When `global_static` is disabled, the `PHONE_NUMBER_UTIL` constant and the helper methods on `PhoneNumber` (like `.format_as()`, `.is_valid()`) **will not be available**. You must instantiate the utility manually and pass it around.
 
-**⚠️ Performance Note:** `PhoneNumberUtil::new()` compiles regexes upon initialization. This is an expensive operation. Create it once and reuse it (e.g., wrap it in an `Arc` or pass it by reference).
+**⚠️ Performance Note:** Regex compilation happens on-demand per metadata field. While faster than upfront initialization, the first time a specific pattern is evaluated, it incurs a one-time compilation cost. It is highly recommended to instantiate `PhoneNumberUtil` once and reuse it (e.g., wrap it in an `Arc` or pass it by reference).
 
 ```rust
 use rlibphonenumber::{PhoneNumberUtil, PhoneNumber};
 
 fn main() {
-    // 1. Initialize the utility once (expensive operation)
+    // 1. Initialize the utility once
     let phone_util = PhoneNumberUtil::new();
 
     let number_str = "+15550109988";
 
     // 2. Parse using the instance
     // Note: 'parse' is a method on phone_util, not a trait on str here
-    match phone_util.parse(number_str) {
+    match phone_util.parse(number_str, None) {
         Ok(number) => {
             // 3. Use the instance for validation and formatting
             // number.is_valid() is NOT available without 'global_static'
-            let is_valid = phone_util.is_valid_number(&number);
+            let is_valid = phone_util.is_valid_number(&number).unwrap_or(false);
             
             println!("Valid: {}", is_valid);
         }
