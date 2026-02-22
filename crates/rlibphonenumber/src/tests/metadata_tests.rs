@@ -13,12 +13,14 @@ fn test_metadata_regexps() {
     use regex::Regex;
 
     load_metadata().metadata.iter().for_each(|metadata| {
+        #[allow(deprecated)]
         metadata.number_format.iter().for_each(|f| {
             if f.has_pattern() {
                 Regex::new(f.pattern()).expect("Regexp MUST be valid");
             }
         });
 
+        #[allow(deprecated)]
         metadata.intl_number_format.iter().for_each(|f| {
             if f.has_pattern() {
                 Regex::new(f.pattern()).expect("Regexp MUST be valid");

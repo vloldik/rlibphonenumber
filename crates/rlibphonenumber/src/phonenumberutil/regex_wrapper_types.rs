@@ -70,7 +70,7 @@ macro_rules! wrapper {
         )?
 
         impl From<$wraps> for $name {
-            #[allow(unused_mut)]
+            #[allow(unused_mut, deprecated)]
             fn from(mut value: $wraps) -> Self {
                 Self {
                     $(

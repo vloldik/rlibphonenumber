@@ -2021,10 +2021,13 @@ fn parse_italian_leading_zeros() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn maybe_strip_national_prefix_and_carrier_code() {
     let phone_util = get_phone_util();
     let mut metadata = PhoneMetadata::new();
     let general_desc = PhoneNumberDesc::new();
+
+    // Metadata used without wrapper
     metadata.general_desc = MessageField::some(general_desc);
     if let Some(m) = metadata.general_desc.as_mut() {
         m.set_national_number_pattern("\\d{4,8}".to_string())

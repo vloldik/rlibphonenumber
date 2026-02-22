@@ -1,6 +1,6 @@
 [package]
 name = "rlibphonenumber"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2024"
 
 rust-version = "1.88"
@@ -65,6 +65,7 @@ paste = "1.0"
 [build-dependencies]
 thiserror = "1.0"
 protobuf-codegen = "3.7"
+protobuf = "3.7"
 
 [dev-dependencies]
 colog = "1.3"
