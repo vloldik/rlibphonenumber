@@ -1,7 +1,13 @@
 [package]
 name = "zeroes_itoa"
 version = "0.1.0"
+authors = ["Vladislav K. https://t.me/vloldik"]
 edition = "2024"
-readme.workspace = true
+rust-version = "1.85"
+description = "A high-performance integer-to-string formatter with support for dynamic leading zeros and smart allocation."
+readme = "Readme.md"
+repository = "https://github.com/youruser/leading-zero-buffer"
+license = "MIT OR Apache-2.0"
+keywords = ["itoa", "string", "formatting", "performance", "padding"]
 
 [dependencies]
