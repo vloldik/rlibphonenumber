@@ -13,54 +13,51 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use super::regex_util::{RegexConsume, RegexFullMatch};
+use regex::Regex;
 
-use log::{error};
-use super::regex_util::{RegexFullMatch, RegexConsume};
+use crate::{
+    interfaces, phonenumberutil::regex_wrapper_types::PhoneNumberDescWrapper,
+    regexp_cache::InvalidRegexError,
+};
 
-use crate::{interfaces, generated::proto::phonemetadata::PhoneNumberDesc, regexp_cache::{InvalidRegexError, RegexCache}};
-
-pub struct RegexBasedMatcher {
-    cache: RegexCache,   
-}
+#[derive(Debug, Clone, Copy, Default)]
+pub struct RegexBasedMatcher {}
 
 impl RegexBasedMatcher {
     pub fn new() -> Self {
-        Self { cache: RegexCache::with_capacity(128) }
+        Self {}
     }
 
     fn match_number(
-        &self, phone_number: &str, 
-        number_pattern: &str,
-        allow_prefix_match: bool
-    ) -> Result<bool, InvalidRegexError> {
-        let regexp = self.cache.get_regex(number_pattern)?;
-
+        &self,
+        phone_number: &str,
+        number_pattern: &Regex,
+        allow_prefix_match: bool,
+    ) -> bool {
         // find first occurrence
         if allow_prefix_match {
-            Ok(regexp.matches_start(phone_number))
+            number_pattern.matches_start(phone_number)
         } else {
-            Ok(regexp.full_match(phone_number))
+            number_pattern.full_match(phone_number)
         }
     }
 }
 
 impl interfaces::MatcherApi for RegexBasedMatcher {
     fn match_national_number(
-        &self, number: &str, 
-        number_desc: &PhoneNumberDesc, 
-        allow_prefix_match: bool
-    ) -> bool {
-        let national_number_pattern = number_desc.national_number_pattern();
+        &self,
+        number: &str,
+        number_desc: &PhoneNumberDescWrapper,
+        allow_prefix_match: bool,
+    ) -> Result<bool, InvalidRegexError> {
+        let national_number_pattern = number_desc.national_number_pattern()?;
         // We don't want to consider it a prefix match when matching non-empty input
         // against an empty pattern.
-        if national_number_pattern.is_empty() {
-            return false;
+        if national_number_pattern.as_str().is_empty() {
+            return Ok(false);
         }
-        if let Ok(res) = self.match_number(number, national_number_pattern, allow_prefix_match) {
-            res
-        } else {
-            error!("Invalid regex! {}", national_number_pattern);
-            false
-        }
+
+        Ok(self.match_number(number, national_number_pattern, allow_prefix_match))
     }
 }

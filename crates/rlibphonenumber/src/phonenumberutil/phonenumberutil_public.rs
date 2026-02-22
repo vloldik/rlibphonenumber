@@ -724,6 +724,7 @@ impl PhoneNumberUtil {
     ) -> bool {
         self.util_internal
             .is_valid_number_for_region(phone_number, region.as_ref())
+            .expect(REGEXP_ERROR_EXPECT_MESSAGE)
     }
 
     /// Parses a string into a `PhoneNumber`, keeping the raw input string.

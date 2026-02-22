@@ -28,7 +28,10 @@ use crate::{
         },
     },
     interfaces::MatcherApi,
-    phonenumberutil::helper_types::PrefixParts,
+    phonenumberutil::{
+        helper_types::PrefixParts,
+        regex_wrapper_types::{PhoneMetadataWrapper, PhoneNumberDescWrapper},
+    },
 };
 
 use super::{
@@ -48,9 +51,9 @@ pub fn load_compiled_metadata() -> Result<PhoneMetadataCollection, protobuf::Err
 /// Returns a pointer to the description inside the metadata of the appropriate
 /// type.
 pub fn get_number_desc_by_type(
-    metadata: &PhoneMetadata,
+    metadata: &PhoneMetadataWrapper,
     phone_number_type: PhoneNumberType,
-) -> &PhoneNumberDesc {
+) -> &PhoneNumberDescWrapper {
     match phone_number_type {
         PhoneNumberType::PremiumRate => &metadata.premium_rate,
         PhoneNumberType::TollFree => &metadata.toll_free,
@@ -295,11 +298,12 @@ pub fn normalize_helper(
 
 /// Returns `true` if there is any possible number data set for a particular
 /// PhoneNumberDesc.
-pub fn desc_has_possible_number_data(desc: &PhoneNumberDesc) -> bool {
+pub fn desc_has_possible_number_data(desc: &PhoneNumberDescWrapper) -> bool {
     // If this is empty, it means numbers of this type inherit from the "general
     // desc" -> the value "-1" means that no numbers exist for this type.
-    desc.possible_length.len() != 1
+    desc.original.possible_length.len() != 1
         || desc
+            .original
             .possible_length
             .first()
             .map(|l| *l != -1)
@@ -315,21 +319,21 @@ pub fn desc_has_possible_number_data(desc: &PhoneNumberDesc) -> bool {
 /// mention why during a review without needing to change MetadataFilter.
 ///
 /// Returns `true` if there is any data set for a particular PhoneNumberDesc.
-pub fn desc_has_data(desc: &PhoneNumberDesc) -> bool {
+pub fn desc_has_data(desc: &PhoneNumberDescWrapper) -> bool {
     // Checking most properties since we don't know what's present, since a custom
     // build may have stripped just one of them (e.g. USE_METADATA_LITE strips
     // exampleNumber). We don't bother checking the PossibleLengthsLocalOnly,
     // since if this is the only thing that's present we don't really support the
     // type at all: no type-specific methods will work with only this data.
-    desc.has_example_number()
+    desc.original.has_example_number()
         || desc_has_possible_number_data(desc)
-        || desc.has_national_number_pattern()
+        || desc.original.has_national_number_pattern()
 }
 
 /// Returns the types we have metadata for based on the PhoneMetadata object
 /// passed in.
 pub fn populate_supported_types_for_metadata(
-    metadata: &PhoneMetadata,
+    metadata: &PhoneMetadataWrapper,
     types: &mut HashSet<PhoneNumberType>,
 ) {
     PhoneNumberType::iter()
@@ -348,7 +352,9 @@ pub fn populate_supported_types_for_metadata(
         });
 }
 
-pub fn get_supported_types_for_metadata(metadata: &PhoneMetadata) -> HashSet<PhoneNumberType> {
+pub fn get_supported_types_for_metadata(
+    metadata: &PhoneMetadataWrapper,
+) -> HashSet<PhoneNumberType> {
     const EFFECTIVE_NUMBER_TYPES: usize = 11 /* count */ - 2 /* filter type or unknown */;
     let mut types = HashSet::with_capacity(EFFECTIVE_NUMBER_TYPES);
     populate_supported_types_for_metadata(metadata, &mut types);
@@ -359,10 +365,10 @@ pub fn get_supported_types_for_metadata(metadata: &PhoneMetadata) -> HashSet<Pho
 /// type, and determine whether it matches, or is too short or too long.
 pub fn test_number_length(
     phone_number: &str,
-    phone_metadata: &PhoneMetadata,
+    phone_metadata: &PhoneMetadataWrapper,
     phone_number_type: PhoneNumberType,
 ) -> Result<NumberLengthType, ValidationError> {
-    let desc_for_type = get_number_desc_by_type(phone_metadata, phone_number_type);
+    let desc_for_type = get_number_desc_by_type(&phone_metadata, phone_number_type);
     // There should always be "possibleLengths" set for every element. This is
     // declared in the XML schema which is verified by
     // PhoneNumberMetadataSchemaTest. For size efficiency, where a
@@ -370,13 +376,13 @@ pub fn test_number_length(
     // parent, this is missing, so we fall back to the general desc (where no
     // numbers of the type exist at all, there is one possible length (-1) which
     // is guaranteed not to match the length of any real phone number).
-    let mut possible_lengths = if desc_for_type.possible_length.is_empty() {
-        phone_metadata.general_desc.possible_length.clone()
+    let mut possible_lengths = if desc_for_type.original.possible_length.is_empty() {
+        phone_metadata.general_desc.original.possible_length.clone()
     } else {
-        desc_for_type.possible_length.clone()
+        desc_for_type.original.possible_length.clone()
     };
 
-    let mut local_lengths = desc_for_type.possible_length_local_only.clone();
+    let mut local_lengths = desc_for_type.original.possible_length_local_only.clone();
     if phone_number_type == PhoneNumberType::FixedLineOrMobile {
         let fixed_line_desc = get_number_desc_by_type(phone_metadata, PhoneNumberType::FixedLine);
         if !desc_has_possible_number_data(fixed_line_desc) {
@@ -392,18 +398,19 @@ pub fn test_number_length(
                 // general desc and should be obtained from there.
 
                 // RUST NOTE: since merge adds elements to the end of the list, we can do the same
-                let len_to_append = if mobile_desc.possible_length.is_empty() {
-                    &phone_metadata.general_desc.possible_length
+                let len_to_append = if mobile_desc.original.possible_length.is_empty() {
+                    &phone_metadata.general_desc.original.possible_length
                 } else {
-                    &mobile_desc.possible_length
+                    &mobile_desc.original.possible_length
                 };
                 possible_lengths.extend_from_slice(len_to_append);
                 possible_lengths.sort();
 
                 if local_lengths.is_empty() {
-                    local_lengths = mobile_desc.possible_length_local_only.clone();
+                    local_lengths = mobile_desc.original.possible_length_local_only.clone();
                 } else {
-                    local_lengths.extend_from_slice(&mobile_desc.possible_length_local_only);
+                    local_lengths
+                        .extend_from_slice(&mobile_desc.original.possible_length_local_only);
                     local_lengths.sort();
                 }
             }
@@ -446,7 +453,7 @@ pub fn test_number_length(
 /// is too short or too long.
 pub fn test_number_length_with_unknown_type(
     phone_number: &str,
-    phone_metadata: &PhoneMetadata,
+    phone_metadata: &PhoneMetadataWrapper,
 ) -> Result<NumberLengthType, ValidationError> {
     test_number_length(phone_number, phone_metadata, PhoneNumberType::Unknown)
 }
@@ -473,6 +480,10 @@ pub(crate) fn copy_core_fields_only(from_number: &PhoneNumber) -> PhoneNumber {
 
 /// Determines whether the given number is a national number match for the given
 /// PhoneNumberDesc. Does not check against possible lengths!
-pub fn is_match(matcher_api: &dyn MatcherApi, number: &str, number_desc: &PhoneNumberDesc) -> bool {
+pub fn is_match(
+    matcher_api: &dyn MatcherApi,
+    number: &str,
+    number_desc: &PhoneNumberDescWrapper,
+) -> Result<bool, crate::InvalidRegexError> {
     matcher_api.match_national_number(number, number_desc, false)
 }

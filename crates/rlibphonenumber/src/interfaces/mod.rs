@@ -13,14 +13,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::generated::proto::phonemetadata::PhoneNumberDesc;
+use crate::{InvalidRegexError, phonenumberutil::regex_wrapper_types::PhoneNumberDescWrapper};
 
 /// Internal phonenumber matching API used to isolate the underlying
 /// implementation of the matcher and allow different implementations to be
 /// swapped in easily.
 pub(crate) trait MatcherApi: Send + Sync {
-  /// Returns whether the given national number (a string containing only decimal
-  /// digits) matches the national number pattern defined in the given
-  /// PhoneNumberDesc message.
-  fn match_national_number(&self, number: &str, number_desc: &PhoneNumberDesc, allow_prefix_match: bool) -> bool;
+    /// Returns whether the given national number (a string containing only decimal
+    /// digits) matches the national number pattern defined in the given
+    /// PhoneNumberDesc message.
+    fn match_national_number(
+        &self,
+        number: &str,
+        number_desc: &PhoneNumberDescWrapper,
+        allow_prefix_match: bool,
+    ) -> Result<bool, InvalidRegexError>;
 }

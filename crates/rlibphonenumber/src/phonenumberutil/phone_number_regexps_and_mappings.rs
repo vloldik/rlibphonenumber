@@ -16,16 +16,13 @@
 use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::{
-    phonenumberutil::{
-        helper_constants::{
-            CAPTURE_UP_TO_SECOND_NUMBER_START, DIGITS, MIN_LENGTH_FOR_NSN, PLUS_CHARS, PLUS_SIGN,
-            RFC3966_VISUAL_SEPARATOR, STAR_SIGN, VALID_ALPHA, VALID_ALPHA_INCL_UPPERCASE,
-            VALID_PUNCTUATION,
-        },
-        helper_functions::create_extn_pattern,
+use crate::phonenumberutil::{
+    helper_constants::{
+        CAPTURE_UP_TO_SECOND_NUMBER_START, DIGITS, MIN_LENGTH_FOR_NSN, PLUS_CHARS, PLUS_SIGN,
+        RFC3966_VISUAL_SEPARATOR, STAR_SIGN, VALID_ALPHA, VALID_ALPHA_INCL_UPPERCASE,
+        VALID_PUNCTUATION,
     },
-    regexp_cache::RegexCache,
+    helper_functions::create_extn_pattern,
 };
 
 #[allow(unused)]
@@ -63,8 +60,6 @@ pub(super) struct PhoneNumberRegExpsAndMappings {
     alphanum: String,
     rfc3966_domainlabel: String,
     rfc3966_toplabel: String,
-
-    pub regexp_cache: RegexCache,
 
     /// A map that contains characters that are essential when dialling. That means
     /// any of the characters in this map must not be removed from a number when
@@ -192,6 +187,8 @@ pub(super) struct PhoneNumberRegExpsAndMappings {
     /// has the first group only, i.e., does not start with the national prefix.
     /// Note that the pattern explicitly allows for unbalanced parentheses.
     pub formatting_rule_has_first_group_only_regex: Regex,
+
+    pub catch_all_formatting_regex: Regex,
 }
 
 impl PhoneNumberRegExpsAndMappings {
@@ -318,7 +315,6 @@ impl PhoneNumberRegExpsAndMappings {
             alphanum,
             rfc3966_domainlabel: rfc3966_domainlabel.clone(),
             rfc3966_toplabel: rfc3966_toplabel.clone(),
-            regexp_cache: RegexCache::with_capacity(128),
             diallable_char_mappings: Default::default(),
             alpha_mappings: Default::default(),
             alpha_phone_mappings: Default::default(),
@@ -372,6 +368,7 @@ impl PhoneNumberRegExpsAndMappings {
             ))
             .unwrap(),
             formatting_rule_has_first_group_only_regex: Regex::new("\\(?\\$1\\)?").unwrap(),
+            catch_all_formatting_regex: Regex::new("(\\d+)(.*)").unwrap(),
         };
         instance.initialize_regexp_mappings();
         instance

@@ -22,12 +22,6 @@ pub(crate) mod regex_util;
 mod regexp_cache;
 pub(crate) mod string_util;
 
-/// I decided to create this module because there are many
-/// boilerplate places in the code that can be replaced with macros,
-/// the name of which will describe what is happening more
-/// clearly than a few lines of code.
-mod macros;
-
 pub use generated::proto::phonemetadata;
 pub use generated::proto::phonenumber::PhoneNumber;
 pub use generated::proto::phonenumber::phone_number::CountryCodeSource;
