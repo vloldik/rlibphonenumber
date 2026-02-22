@@ -49,7 +49,7 @@ Add `rlibphonenumber` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rlibphonenumber = "0.3.1"
+rlibphonenumber = "0.3.3"
 ```
 
 ### Enabling Serde
@@ -58,7 +58,7 @@ To enable `Serialize` and `Deserialize` support for `PhoneNumber`:
 
 ```toml
 [dependencies]
-rlibphonenumber = { version = "0.3.1", features = ["serde"] }
+rlibphonenumber = { version = "0.3.3", features = ["serde"] }
 ```
 
 ## Getting Started
@@ -207,7 +207,7 @@ rlibphonenumber = { version = "0.3.1", default-features = false }
 
 When `global_static` is disabled, the `PHONE_NUMBER_UTIL` constant and the helper methods on `PhoneNumber` (like `.format_as()`, `.is_valid()`) **will not be available**. You must instantiate the utility manually and pass it around.
 
-**⚠️ Performance Note:** Regex compilation happens on-demand per metadata field. While faster than upfront initialization, the first time a specific pattern is evaluated, it incurs a one-time compilation cost. It is highly recommended to instantiate `PhoneNumberUtil` once and reuse it (e.g., wrap it in an `Arc` or pass it by reference).
+**⚠️ Performance Note:** `PhoneNumberUtil::new()` compiles regexes upon initialization. This is an expensive operation. Create it once and reuse it (e.g., wrap it in an `Arc` or pass it by reference).
 
 ```rust
 use rlibphonenumber::{PhoneNumberUtil, PhoneNumber};
