@@ -33,8 +33,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * This class generates the Rust code representation of the provided XML metadata file. It lets us
- * embed metadata directly in a native binary. We link the object resulting from the compilation of
+ * This class generates the Rust code representation of the provided XML
+ * metadata file. It lets us
+ * embed metadata directly in a native binary. We link the object resulting from
+ * the compilation of
  * the code emitted by this class with the Rust rlibphonenumber library.
  *
  * @author Philippe Liard
@@ -51,7 +53,8 @@ public class BuildMetadataRustFromXml extends Command {
     /** The test variant which contains fake data for tests. */
     TEST("test_%s"),
     /**
-     * The lite variant contains the same metadata as the full version but excludes any example
+     * The lite variant contains the same metadata as the full version but excludes
+     * any example
      * data. This is typically used for clients with space restrictions.
      */
     LITE("lite_%s");
@@ -63,18 +66,24 @@ public class BuildMetadataRustFromXml extends Command {
     }
 
     /**
-     * Returns the basename of the type by adding the name of the current variant. The basename of
-     * a Type is used to determine the name of the source file in which the metadata is defined.
+     * Returns the basename of the type by adding the name of the current variant.
+     * The basename of
+     * a Type is used to determine the name of the source file in which the metadata
+     * is defined.
      *
-     * <p>Note that when the variant is {@link Variant#FULL} this method just returns the type name.
+     * <p>
+     * Note that when the variant is {@link Variant#FULL} this method just returns
+     * the type name.
      */
     public String getBasename(Type type) {
       return String.format(template, type);
     }
 
     /**
-     * Parses metadata variant name. By default (for a name of {@code ""} or {@code null}) we return
-     * {@link Variant#FULL}, otherwise we match against the variant name (either "test" or "lite").
+     * Parses metadata variant name. By default (for a name of {@code ""} or
+     * {@code null}) we return
+     * {@link Variant#FULL}, otherwise we match against the variant name (either
+     * "test" or "lite").
      */
     public static Variant parse(String variantName) {
       if ("test".equalsIgnoreCase(variantName)) {
@@ -90,18 +99,18 @@ public class BuildMetadataRustFromXml extends Command {
   }
 
   /**
-   * An immutable options class for parsing and representing the command line options for this
+   * An immutable options class for parsing and representing the command line
+   * options for this
    * command.
    */
   // @VisibleForTesting
   static final class Options {
-    private static final Pattern BASENAME_PATTERN =
-        Pattern.compile("(?:(test|lite)_)?([a-z_]+)");
-    private static final Pattern CONSTANT_NAME_PATTERN = 
-        Pattern.compile("--const-name[ =]([a-zA-Z_]+)");
+    private static final Pattern BASENAME_PATTERN = Pattern.compile("(?:(test|lite)_)?([a-z_]+)");
+    private static final Pattern CONSTANT_NAME_PATTERN = Pattern.compile("--const-name[ =]([a-zA-Z_]+)");
     private static final String DEFAULT_METADATA_CONSTANT_NAME = "METADATA";
+
     public static Options parse(String commandName, String[] argsArray) {
-      ArrayList args = new ArrayList(Arrays.asList(argsArray));
+      ArrayList<String> args = new ArrayList<>(Arrays.asList(argsArray));
       String constantName = DEFAULT_METADATA_CONSTANT_NAME;
       if (args.size() == 5) {
         for (int i = 0; i < args.size(); i++) {
@@ -128,8 +137,8 @@ public class BuildMetadataRustFromXml extends Command {
       }
       throw new IllegalArgumentException(String.format(
           "Usage: %s <inputXmlFile> <outputDir> <output ( <type> | test_<type> | lite_<type> ) " +
-          "[--const-name <nameOfMetadataConstant>] \n" +
-          "       where <type> is one of: %s",
+              "[--const-name <nameOfMetadataConstant>] \n" +
+              "       where <type> is one of: %s",
           commandName, Arrays.asList(Type.values())));
     }
 
@@ -176,11 +185,13 @@ public class BuildMetadataRustFromXml extends Command {
   }
 
   /**
-   * Generates Rust source file to represent the metadata specified by this command's
-   * arguments. The metadata XML file is read and converted to a byte array before being written
+   * Generates Rust source file to represent the metadata specified by this
+   * command's
+   * arguments. The metadata XML file is read and converted to a byte array before
+   * being written
    * into a Rust source file as a static data array.
    *
-   * @return  true if the generation succeeded.
+   * @return true if the generation succeeded.
    */
   @Override
   public boolean start() {
@@ -214,7 +225,8 @@ public class BuildMetadataRustFromXml extends Command {
     try {
       writePhoneMetadataCollection(inputFilePath, liteMetadata, out);
     } catch (Exception e) {
-      // We cannot recover from any exceptions thrown here, so promote them to runtime exceptions.
+      // We cannot recover from any exceptions thrown here, so promote them to runtime
+      // exceptions.
       throw new RuntimeException(e);
     } finally {
       FileUtils.closeFiles(out);

@@ -17,7 +17,6 @@
 
 package com.google.i18n.phonenumbers;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import com.google.i18n.phonenumbers.RustMetadataGenerator.Type;
@@ -34,7 +33,8 @@ import java.util.Iterator;
 import java.util.List;
 
 /**
- * Tests that the CppXmlMetadata class emits the expected source and header files for metadata.
+ * Tests that the CppXmlMetadata class emits the expected source and header
+ * files for metadata.
  */
 public class RustMetadataGeneratorTest {
 
@@ -46,7 +46,6 @@ public class RustMetadataGeneratorTest {
       (byte) 0x78, (byte) 0x69, (byte) 0x5A, (byte) 0x4B,
       (byte) 0x3C, (byte) 0x2D, (byte) 0x1E, (byte) 0x0F,
   };
-  private static final int TEST_DATA_LEN = TEST_DATA.length;
   private static final String TEST_CONSTANT_NAME = "METADATA";
 
   @Test
@@ -69,7 +68,7 @@ public class RustMetadataGeneratorTest {
     metadata.outputSourceFile(writer);
     Iterator<String> lines = toLines(writer.toString()).iterator();
     // Sanity check that at least some of the expected lines are present.
-    assertTrue(consumeUntil("pub static "+TEST_CONSTANT_NAME+": [u8; "+testDataLen+"] = [", lines));
+    assertTrue(consumeUntil("pub static " + TEST_CONSTANT_NAME + ": [u8; " + testDataLen + "] = [", lines));
     assertTrue(consumeUntil("  0xCA, 0xFE, 0xBA, 0xBE", lines));
     assertTrue(consumeUntil("];", lines));
   }
@@ -85,8 +84,10 @@ public class RustMetadataGeneratorTest {
   }
 
   /**
-   * Consumes strings from the given iterator until the expected string is reached (it is also
-   * consumed). If the expected string is not found, the iterator is exhausted and {@code false} is
+   * Consumes strings from the given iterator until the expected string is reached
+   * (it is also
+   * consumed). If the expected string is not found, the iterator is exhausted and
+   * {@code false} is
    * returned.
    *
    * @return true if the expected string was found while consuming the iterator.

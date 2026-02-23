@@ -34,7 +34,8 @@ import java.io.OutputStream;
 import java.nio.charset.Charset;
 
 /**
- * Tests the BuildMetadataCppFromXml implementation to make sure it parses command line options and
+ * Tests the BuildMetadataCppFromXml implementation to make sure it parses
+ * command line options and
  * generates code correctly.
  */
 public class BuildMetadataRustFromXmlTest {
@@ -43,8 +44,7 @@ public class BuildMetadataRustFromXmlTest {
   private static final String IGNORED = "IGNORED";
   private static final String OUTPUT_DIR = "output/dir";
   private static final String INPUT_PATH_XML = "input/path.xml";
-  private static final byte[] TEST_DATA =
-      new byte[] { (byte) 0xCA, (byte) 0xFE, (byte) 0xBA, (byte) 0xBE };
+  private static final byte[] TEST_DATA = new byte[] { (byte) 0xCA, (byte) 0xFE, (byte) 0xBA, (byte) 0xBE };
   private static final int TEST_DATA_LEN = TEST_DATA.length;
   private static final String TEST_CONSTANT_NAME = "METADATA";
   private static final String OUTPUT_DATA = "0xCA, 0xFE, 0xBA, 0xBE";
@@ -73,7 +73,8 @@ public class BuildMetadataRustFromXmlTest {
   @Test
   public void parseGoodOptions() {
     Options opt = BuildMetadataRustFromXml.Options.parse("MyCommand",
-        new String[] { IGNORED, INPUT_PATH_XML, OUTPUT_DIR, "test_alternate_format", "--const-name=" + TEST_CONSTANT_NAME });
+        new String[] { IGNORED, INPUT_PATH_XML, OUTPUT_DIR, "test_alternate_format",
+            "--const-name=" + TEST_CONSTANT_NAME });
     assertEquals(Type.ALTERNATE_FORMAT, opt.getType());
     assertEquals(Variant.TEST, opt.getVariant());
     assertEquals(INPUT_PATH_XML, opt.getInputFilePath());
@@ -87,13 +88,13 @@ public class BuildMetadataRustFromXmlTest {
         IGNORED, INPUT_PATH_XML, OUTPUT_DIR, "metadata", "--const-name " + TEST_CONSTANT_NAME };
     // Most of the useful asserts are done in the mock class.
     MockedCommand command = new MockedCommand(
-        INPUT_PATH_XML, false, OUTPUT_DIR, Type.METADATA, Variant.FULL, TEST_CONSTANT_NAME
-    );
+        INPUT_PATH_XML, false, OUTPUT_DIR, Type.METADATA, Variant.FULL, TEST_CONSTANT_NAME);
     command.setArgs(args);
     command.start();
-    // Sanity check the captured data (asserting implicitly that the mocked methods were called).
+    // Sanity check the captured data (asserting implicitly that the mocked methods
+    // were called).
     String sourceString = command.capturedSourceFile();
-    assertTrue(sourceString.contains("pub static "+TEST_CONSTANT_NAME+": [u8; " + TEST_DATA_LEN + "] ="));
+    assertTrue(sourceString.contains("pub static " + TEST_CONSTANT_NAME + ": [u8; " + TEST_DATA_LEN + "] ="));
     assertTrue(sourceString.contains(OUTPUT_DATA));
     assertTrue(sourceString.contains("];"));
   }
@@ -101,18 +102,18 @@ public class BuildMetadataRustFromXmlTest {
   // no need test for metadata with other names since it's set with parameter
 
   /**
-   * Manually mocked subclass of BuildMetadataCppFromXml which overrides all file related behavior
-   * while asserting the validity of any parameters passed to the mocked methods. After starting
-   * this command, the captured header and source file contents can be retrieved for testing.
+   * Manually mocked subclass of BuildMetadataCppFromXml which overrides all file
+   * related behavior
+   * while asserting the validity of any parameters passed to the mocked methods.
+   * After starting
+   * this command, the captured header and source file contents can be retrieved
+   * for testing.
    */
   static class MockedCommand extends BuildMetadataRustFromXml {
     private static final Charset UTF_8 = Charset.forName("UTF-8");
     private final String expectedInputFilePath;
     private final boolean expectedLiteMetadata;
     private final String expectedOutputDirPath;
-    private final Type expectedType;
-    private final Variant expectedVariant;
-    private final String expectedConstantName;
     private final ByteArrayOutputStream sourceOut = new ByteArrayOutputStream();
 
     public MockedCommand(String expectedInputFilePath, boolean expectedLiteMetadata,
@@ -122,21 +123,22 @@ public class BuildMetadataRustFromXmlTest {
       this.expectedInputFilePath = expectedInputFilePath;
       this.expectedLiteMetadata = expectedLiteMetadata;
       this.expectedOutputDirPath = expectedOutputDirPath;
-      this.expectedType = expectedType;
-      this.expectedConstantName = expectedConstantName;
-      this.expectedVariant = expectedVariant;
     }
-    @Override void writePhoneMetadataCollection(
+
+    @Override
+    void writePhoneMetadataCollection(
         String inputFilePath, boolean liteMetadata, OutputStream out) throws Exception {
       assertEquals(expectedInputFilePath, inputFilePath);
       assertEquals(expectedLiteMetadata, liteMetadata);
       out.write(TEST_DATA, 0, TEST_DATA.length);
     }
-    @Override OutputStream openSourceStream(File dir) {
+
+    @Override
+    OutputStream openSourceStream(File dir) {
       assertEquals(expectedOutputDirPath, dir.getPath());
       return sourceOut;
     }
-    
+
     String capturedSourceFile() {
       return new String(sourceOut.toByteArray(), UTF_8);
     }
