@@ -17,6 +17,10 @@
 
 package com.google.i18n.phonenumbers;
 
+import com.google.i18n.phonenumbers.Phonemetadata.NumberFormat;
+import com.google.i18n.phonenumbers.Phonemetadata.PhoneMetadata;
+import com.google.i18n.phonenumbers.Phonemetadata.PhoneMetadataCollection;
+import com.google.i18n.phonenumbers.Phonemetadata.PhoneNumberDesc;
 import com.google.i18n.phonenumbers.RustMetadataGenerator.Type;
 
 import java.io.ByteArrayOutputStream;
@@ -234,10 +238,113 @@ public class BuildMetadataRustFromXml extends Command {
     return out.toByteArray();
   }
 
+  private String wrapRegex(String pattern) {
+    if (pattern == null || pattern.isEmpty()) {
+      return pattern;
+    }
+    return "^(?:" + pattern + ")$";
+  }
+
+  private PhoneNumberDesc transformDesc(PhoneNumberDesc desc) {
+    if (desc == null || !desc.hasNationalNumberPattern()) {
+      return desc;
+    }
+    return desc.toBuilder()
+        .setNationalNumberPattern(wrapRegex(desc.getNationalNumberPattern()))
+        .build();
+  }
+
+  private NumberFormat transformFormat(NumberFormat format) {
+    if (format == null)
+      return format;
+
+    NumberFormat.Builder builder = format.toBuilder();
+
+    if (builder.hasPattern()) {
+      builder.setPattern(wrapRegex(builder.getPattern()));
+    }
+
+    int count = builder.getLeadingDigitsPatternCount();
+    for (int i = 0; i < count; i++) {
+      builder.setLeadingDigitsPattern(i, wrapRegex(builder.getLeadingDigitsPattern(i)));
+    }
+
+    return builder.build();
+  }
+
+  PhoneMetadataCollection transformForRust(PhoneMetadataCollection collection) {
+    PhoneMetadataCollection.Builder collectionBuilder = collection.toBuilder();
+
+    for (int i = 0; i < collectionBuilder.getMetadataCount(); i++) {
+      PhoneMetadata originalMeta = collectionBuilder.getMetadata(i);
+      PhoneMetadata.Builder metaBuilder = originalMeta.toBuilder();
+
+      if (metaBuilder.hasLeadingDigits()) {
+        metaBuilder.setLeadingDigits(wrapRegex(metaBuilder.getLeadingDigits()));
+      }
+      if (metaBuilder.hasInternationalPrefix()) {
+        metaBuilder.setInternationalPrefix(wrapRegex(metaBuilder.getInternationalPrefix()));
+      }
+      if (metaBuilder.hasNationalPrefixForParsing()) {
+        metaBuilder.setNationalPrefixForParsing(wrapRegex(metaBuilder.getNationalPrefixForParsing()));
+      }
+
+      if (metaBuilder.hasGeneralDesc())
+        metaBuilder.setGeneralDesc(transformDesc(metaBuilder.getGeneralDesc()));
+      if (metaBuilder.hasFixedLine())
+        metaBuilder.setFixedLine(transformDesc(metaBuilder.getFixedLine()));
+      if (metaBuilder.hasMobile())
+        metaBuilder.setMobile(transformDesc(metaBuilder.getMobile()));
+      if (metaBuilder.hasTollFree())
+        metaBuilder.setTollFree(transformDesc(metaBuilder.getTollFree()));
+      if (metaBuilder.hasPremiumRate())
+        metaBuilder.setPremiumRate(transformDesc(metaBuilder.getPremiumRate()));
+      if (metaBuilder.hasSharedCost())
+        metaBuilder.setSharedCost(transformDesc(metaBuilder.getSharedCost()));
+      if (metaBuilder.hasPersonalNumber())
+        metaBuilder.setPersonalNumber(transformDesc(metaBuilder.getPersonalNumber()));
+      if (metaBuilder.hasVoip())
+        metaBuilder.setVoip(transformDesc(metaBuilder.getVoip()));
+      if (metaBuilder.hasPager())
+        metaBuilder.setPager(transformDesc(metaBuilder.getPager()));
+      if (metaBuilder.hasUan())
+        metaBuilder.setUan(transformDesc(metaBuilder.getUan()));
+      if (metaBuilder.hasEmergency())
+        metaBuilder.setEmergency(transformDesc(metaBuilder.getEmergency()));
+      if (metaBuilder.hasVoicemail())
+        metaBuilder.setVoicemail(transformDesc(metaBuilder.getVoicemail()));
+      if (metaBuilder.hasShortCode())
+        metaBuilder.setShortCode(transformDesc(metaBuilder.getShortCode()));
+      if (metaBuilder.hasStandardRate())
+        metaBuilder.setStandardRate(transformDesc(metaBuilder.getStandardRate()));
+      if (metaBuilder.hasCarrierSpecific())
+        metaBuilder.setCarrierSpecific(transformDesc(metaBuilder.getCarrierSpecific()));
+      if (metaBuilder.hasSmsServices())
+        metaBuilder.setSmsServices(transformDesc(metaBuilder.getSmsServices()));
+      if (metaBuilder.hasNoInternationalDialling())
+        metaBuilder.setNoInternationalDialling(transformDesc(metaBuilder.getNoInternationalDialling()));
+
+      for (int j = 0; j < metaBuilder.getNumberFormatCount(); j++) {
+        NumberFormat wrappedFormat = transformFormat(metaBuilder.getNumberFormat(j));
+        metaBuilder.setNumberFormat(j, wrappedFormat);
+      }
+
+      // Оборачиваем списки IntlNumberFormat (международные)
+      for (int j = 0; j < metaBuilder.getIntlNumberFormatCount(); j++) {
+        NumberFormat wrappedFormat = transformFormat(metaBuilder.getIntlNumberFormat(j));
+        metaBuilder.setIntlNumberFormat(j, wrappedFormat);
+      }
+
+      collectionBuilder.setMetadata(i, metaBuilder.build());
+    }
+
+    return collectionBuilder.build();
+  }
+
   // @VisibleForTesting
   void writePhoneMetadataCollection(
       String inputFilePath, boolean liteMetadata, OutputStream out) throws IOException, Exception {
-    BuildMetadataFromXml.buildPhoneMetadataCollection(inputFilePath, liteMetadata, false)
+    transformForRust(BuildMetadataFromXml.buildPhoneMetadataCollection(inputFilePath, liteMetadata, false))
         .writeTo(out);
   }
 
