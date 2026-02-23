@@ -7,6 +7,9 @@ fn main() {
         .flag_if_supported("-std=c++17")
         .compile("phonenumber_cpp_bridge");
 
+    println!("cargo:rustc-link-search=native=/usr/local/lib");
+    println!("cargo:rustc-link-search=native=/usr/local/lib64");
+
     println!("cargo:rustc-link-lib=phonenumber");
     println!("cargo:rustc-link-lib=protobuf");
     println!("cargo:rustc-link-lib=re2");
