@@ -1,5 +1,8 @@
 #![no_main]
-use libfuzzer_sys::fuzz_target;
+use libfuzzer_sys::{
+    arbitrary::{Arbitrary, Error, Unstructured},
+    fuzz_target,
+};
 use rlibphonenumber::{PHONE_NUMBER_UTIL, PhoneNumberFormat};
 
 #[cxx::bridge]
@@ -15,6 +18,8 @@ mod ffi {
         format_natl: String,
         format_rfc3966: String,
         format_mobile: String,
+
+        error: String,
     }
 
     unsafe extern "C++" {
@@ -23,8 +28,27 @@ mod ffi {
     }
 }
 
-fuzz_target!(|data: (String, String)| {
-    let (number_str, region_str) = data;
+const ALPHABET: &[u8] = b"+0123456789()-=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+#[derive(Debug)]
+pub struct CustomString(pub String);
+
+impl<'a> Arbitrary<'a> for CustomString {
+    fn arbitrary(raw: &mut Unstructured<'a>) -> Result<Self, Error> {
+        let bytes = raw.bytes(raw.len())?;
+        let mut s = String::with_capacity(bytes.len());
+
+        for &b in bytes {
+            let char_idx = (b as usize) % ALPHABET.len();
+            s.push(ALPHABET[char_idx] as char);
+        }
+
+        Ok(CustomString(s))
+    }
+}
+
+fuzz_target!(|data: (CustomString, CustomString)| {
+    let (number_str, region_str) = (data.0.0, data.1.0);
 
     let cpp_res = ffi::test_cpp_impl(&number_str, &region_str);
 
@@ -34,9 +58,10 @@ fuzz_target!(|data: (String, String)| {
     assert_eq!(
         cpp_res.is_parsed,
         rust_parsed.is_ok(),
-        "Mismatch on parsing! Rust_OK={}, Cpp_OK={}. Input: '{}', Region: '{}'",
+        "Mismatch on parsing! Rust_OK={}, Cpp_OK={} (error = {}). Input: '{}', Region: '{}'",
         rust_parsed.is_ok(),
         cpp_res.is_parsed,
+        cpp_res.error,
         number_str,
         region_str
     );
