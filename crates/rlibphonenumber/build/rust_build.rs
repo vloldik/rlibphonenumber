@@ -20,6 +20,9 @@ fn main() {
     struct GenWarnings {}
 
     impl CustomizeCallback for GenWarnings {
+        fn file(&self, _file: &protobuf::reflect::FileDescriptor) -> Customize {
+            Customize::default().before("#![allow(deprecated)]")
+        }
         fn field(&self, field: &FieldDescriptor) -> Customize {
             let field_proto = field.proto();
             if field.containing_message().name() == "PhoneMetadata"
