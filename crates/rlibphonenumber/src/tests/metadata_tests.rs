@@ -1,8 +1,6 @@
 use crate::{
-    phonemetadata::{PhoneMetadataCollection, PhoneNumberDesc},
-    phonenumberutil::regex_wrapper_types::{
-        NumberFormatWrapper, PhoneMetadataWrapper, PhoneNumberDescWrapper, RegexTriplets,
-    },
+    phonemetadata::PhoneMetadataCollection,
+    phonenumberutil::regex_wrapper_types::{PhoneMetadataWrapper, RegexTriplets},
 };
 
 fn load_metadata() -> PhoneMetadataCollection {
