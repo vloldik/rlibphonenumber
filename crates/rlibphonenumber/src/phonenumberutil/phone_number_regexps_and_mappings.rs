@@ -290,15 +290,17 @@ impl PhoneNumberRegExpsAndMappings {
         let extn_patterns_for_parsing = create_extn_pattern(true);
         let valid_phone_number = format!(
             // moved 2-digits pattern to an end for match full number first
-            "[{}]*(?:[{}{}]*{}){{3,}}[{}{}{}{}]*|{}{{{}}}",
+            "[{}]*(?:[{}{}]*{}){{3,}}[{}{}{}{}]*\
+            |{}{{{}}}",
             PLUS_CHARS,
             VALID_PUNCTUATION,
             STAR_SIGN,
             DIGITS,
             VALID_PUNCTUATION,
             STAR_SIGN,
-            DIGITS,
             VALID_ALPHA,
+            DIGITS,
+            //
             DIGITS,
             MIN_LENGTH_FOR_NSN,
         );
