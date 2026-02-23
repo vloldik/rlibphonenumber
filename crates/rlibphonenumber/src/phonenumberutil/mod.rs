@@ -15,7 +15,7 @@
 
 pub mod enums;
 pub mod errors;
-mod helper_constants;
+pub(super) mod helper_constants;
 pub(super) mod helper_functions;
 mod helper_types;
 mod phone_number_regexps_and_mappings;

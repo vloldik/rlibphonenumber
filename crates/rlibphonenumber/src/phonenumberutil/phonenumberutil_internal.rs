@@ -47,10 +47,11 @@ use crate::{
     phonenumberutil::{
         helper_functions::get_national_significant_number,
         helper_types::{PrefixParts, new_formatted_number_builder},
-        regex_wrapper_types::{NumberFormatWrapper, PhoneMetadataWrapper, PhoneNumberDescWrapper},
+        regex_wrapper_types::{
+            NumberFormatWrapper, PhoneMetadataWrapper, PhoneNumberDescWrapper, RegexTriplets,
+        },
     },
     regex_based_matcher::RegexBasedMatcher,
-    regex_util::{RegexConsume, RegexFullMatch},
     string_util::strip_cow_prefix,
 };
 
@@ -245,8 +246,8 @@ impl PhoneNumberUtilInternal {
         for char in phone_number.chars().rev() {
             if !self
                 .reg_exps
-                .unwanted_end_char_pattern
-                .full_match(&char.to_string())
+                .unwanted_end_char_pattern_fullmatch
+                .is_match(&char.to_string())
             {
                 break;
             }
@@ -268,8 +269,8 @@ impl PhoneNumberUtilInternal {
         // group is present in the output pattern to ensure no data is lost while
         // formatting; when we format as you type, this should always be the case.
         self.reg_exps
-            .is_format_eligible_as_you_type_formatting_regex
-            .full_match(format)
+            .is_format_eligible_as_you_type_formatting_regex_fullmatch
+            .is_match(format)
     }
 
     #[allow(unused)]
@@ -280,8 +281,8 @@ impl PhoneNumberUtilInternal {
         national_prefix_formatting_rule.is_empty()
             || self
                 .reg_exps
-                .formatting_rule_has_first_group_only_regex
-                .full_match(national_prefix_formatting_rule)
+                .formatting_rule_has_first_group_only_regex_fullmatch
+                .is_match(national_prefix_formatting_rule)
     }
 
     /// Gets the national direct dialing (NDD) prefix for a given region.
@@ -479,17 +480,20 @@ impl PhoneNumberUtilInternal {
                 // detailed.
                 .last()
                 .map(|last| {
-                    last.as_ref()
-                        .map(|last| last.matches_start(national_number))
-                        .map_err(|err| err.clone())
+                    last.anchor_start()
+                        .map(|last| last.is_some_and(|p| p.is_match(national_number)))
                 })
                 // default not continue
                 .unwrap_or(Ok(true))?
             {
                 continue;
             }
-            let pattern_to_match = format.pattern()?;
-            if pattern_to_match.full_match(national_number) {
+            let pattern_to_match = format.pattern();
+
+            if pattern_to_match
+                .anchor_full()?
+                .is_some_and(|p| p.is_match(national_number))
+            {
                 return Ok(Some(format));
             }
         }
@@ -556,17 +560,19 @@ impl PhoneNumberUtilInternal {
             }
         }
 
-        let pattern_to_match = formatting_pattern.pattern()?;
+        let pattern_to_match = formatting_pattern.pattern();
 
-        let mut formatted_number =
-            pattern_to_match.replace_all(national_number, number_format_rule);
+        let mut formatted_number = pattern_to_match
+            .original()?
+            .map(|p| p.replace_all(national_number, number_format_rule))
+            .unwrap_or(national_number.into());
 
         if matches!(number_format, PhoneNumberFormat::RFC3966) {
             // First consume any leading punctuation, if any was present.
             if let Some(matches) = self
                 .reg_exps
-                .separator_pattern
-                .find_start(&formatted_number)
+                .separator_pattern_anchor_start
+                .find(&formatted_number)
             {
                 let rest = &formatted_number[matches.end()..];
                 formatted_number = Cow::Owned(rest.to_string());
@@ -991,8 +997,10 @@ impl PhoneNumberUtilInternal {
             let Some(metadata) = &self.region_to_metadata_map.get(code) else {
                 return Ok(None);
             };
-            if metadata.original.has_leading_digits()
-                && metadata.leading_digits()?.matches_start(&national_number)
+            if metadata
+                .leading_digits()
+                .anchor_start()?
+                .is_some_and(|a| a.is_match(&national_number))
                 || self.get_number_type_helper(&national_number, metadata)?
                     != PhoneNumberType::Unknown
             {
@@ -1184,7 +1192,7 @@ impl PhoneNumberUtilInternal {
             return self.format(phone_number, PhoneNumberFormat::National);
         }
         // Metadata cannot be NULL because we checked 'IsValidRegionCode()' above.
-        let international_prefix = metadata_calling_from.original.international_prefix();
+        let international_prefix = metadata_calling_from.international_prefix().original_base();
 
         // In general, if there is a preferred international prefix, use that.
         // international format of the number is returned since we would not know
@@ -1200,8 +1208,8 @@ impl PhoneNumberUtilInternal {
             )
         } else if self
             .reg_exps
-            .single_international_prefix
-            .full_match(international_prefix)
+            .single_international_prefix_fullmatch
+            .is_match(international_prefix)
         {
             Some(international_prefix)
         } else {
@@ -1543,10 +1551,13 @@ impl PhoneNumberUtilInternal {
             };
 
             let mut new_format = formatting_pattern.clone();
-
-            let new_value = OnceLock::new();
+            // TODO: optimize with more consistent logic
+            let mut new_value =
+                RegexTriplets::new(Some(self.reg_exps.catch_all_formatting_regex.to_string()));
+            let lock = OnceLock::new();
+            let _ = lock.set(Ok(Some(self.reg_exps.catch_all_formatting_regex.clone())));
+            new_value.original = lock;
             // We can ignore error since we just created lock
-            let _ = new_value.set(Ok(self.reg_exps.catch_all_formatting_regex.clone()));
             new_format.set_pattern(new_value);
 
             new_format.original.set_format("$1$2".to_owned());
@@ -1561,11 +1572,11 @@ impl PhoneNumberUtilInternal {
         }
 
         let international_prefix_for_formatting = metadata.map(|metadata| {
-            let international_prefix = metadata.original.international_prefix();
+            let international_prefix = metadata.international_prefix().original_base();
             if self
                 .reg_exps
-                .single_international_prefix
-                .full_match(international_prefix)
+                .single_international_prefix_fullmatch
+                .is_match(international_prefix)
             {
                 international_prefix
             } else {
@@ -1623,12 +1634,12 @@ impl PhoneNumberUtilInternal {
         // Does phone-context value match pattern of global-number-digits or
         // domainname
         self.reg_exps
-            .rfc3966_global_number_digits_pattern
-            .full_match(phone_context)
+            .rfc3966_global_number_digits_pattern_fullmatch
+            .is_match(phone_context)
             || self
                 .reg_exps
-                .rfc3966_domainname_pattern
-                .full_match(phone_context)
+                .rfc3966_domainname_pattern_fullmatch
+                .is_match(phone_context)
     }
 
     /// Converts number_to_parse to a form that we can parse and write it to
@@ -1746,8 +1757,8 @@ impl PhoneNumberUtilInternal {
         for c in phone_number.chars() {
             if self
                 .reg_exps
-                .valid_start_char_pattern
-                .full_match(&phone_number[i..i + c.len_utf8()])
+                .valid_start_char_pattern_fullmatch
+                .is_match(&phone_number[i..i + c.len_utf8()])
             {
                 break;
             }
@@ -1937,7 +1948,7 @@ impl PhoneNumberUtilInternal {
                 if !matches!(err, InternalError::Wrapped(ParseError::InvalidCountryCode)) {
                     return Err(err);
                 }
-                let plus_match = self.reg_exps.plus_chars_pattern.find_start(national_number);
+                let plus_match = self.reg_exps.plus_chars_pattern_start.find(national_number);
                 if let Some(plus_match) = plus_match {
                     let normalized_national_number = &national_number[plus_match.end()..];
                     // Strip the plus-char, and try again.
@@ -2059,8 +2070,8 @@ impl PhoneNumberUtilInternal {
             false
         } else {
             self.reg_exps
-                .valid_phone_number_pattern
-                .full_match(phone_number)
+                .valid_phone_number_pattern_fullmatch
+                .is_match(phone_number)
         }
     }
 
@@ -2077,8 +2088,8 @@ impl PhoneNumberUtilInternal {
             || number_to_parse.is_empty()
             || self
                 .reg_exps
-                .plus_chars_pattern
-                .matches_start(number_to_parse)
+                .plus_chars_pattern_start
+                .is_match(number_to_parse)
     }
 
     /// Strips any extension (as in, the part of the number dialled after the call is
@@ -2140,8 +2151,7 @@ impl PhoneNumberUtilInternal {
         // Set the default prefix to be something that will never match if there is no
         // default region.
         let possible_country_idd_prefix = default_region_metadata
-            .map(|default_region_metadata| default_region_metadata.international_prefix())
-            .transpose()?;
+            .map(|default_region_metadata| default_region_metadata.international_prefix());
 
         let phone_number_with_country_code_source = self
             .maybe_strip_international_prefix_and_normalize(
@@ -2445,14 +2455,14 @@ impl PhoneNumberUtilInternal {
     pub(crate) fn maybe_strip_international_prefix_and_normalize<'a>(
         &self,
         phone_number: &'a str,
-        possible_idd_prefix: Option<&Regex>,
+        possible_idd_prefix: Option<&RegexTriplets>,
     ) -> RegexResult<PhoneNumberWithCountryCodeSource<'a>> {
         if phone_number.is_empty() {
             Ok(PhoneNumberWithCountryCodeSource::new(
                 Cow::Borrowed(phone_number),
                 CountryCodeSource::FROM_DEFAULT_COUNTRY,
             ))
-        } else if let Some(plus_match) = self.reg_exps.plus_chars_pattern.find_start(phone_number) {
+        } else if let Some(plus_match) = self.reg_exps.plus_chars_pattern_start.find(phone_number) {
             let number_string_piece = &phone_number[plus_match.end()..];
             // Can now normalize the rest of the number since we've consumed the "+"
             // sign at the start.
@@ -2465,7 +2475,7 @@ impl PhoneNumberUtilInternal {
             let normalized_number = self.normalize(phone_number);
             let value = if let Some(idd_prefix) = possible_idd_prefix
                 && let Some(stripped_prefix_number) =
-                    self.parse_prefix_as_idd(&normalized_number, idd_prefix)
+                    self.parse_prefix_as_idd(&normalized_number, idd_prefix.anchor_start()?)
             {
                 PhoneNumberWithCountryCodeSource::new(
                     Cow::Owned(stripped_prefix_number.to_owned()),
@@ -2503,7 +2513,7 @@ impl PhoneNumberUtilInternal {
     pub(crate) fn normalize(&self, phone_number: &str) -> String {
         if self
             .reg_exps
-            .valid_alpha_phone_pattern
+            .valid_alpha_phone_pattern_fullmatch
             .is_match(phone_number)
         {
             normalize_helper(&self.reg_exps.alpha_phone_mappings, true, phone_number)
@@ -2517,11 +2527,12 @@ impl PhoneNumberUtilInternal {
     pub(crate) fn parse_prefix_as_idd<'a>(
         &self,
         phone_number: &'a str,
-        idd_pattern: &Regex,
+        idd_pattern_start: Option<&Regex>,
     ) -> Option<&'a str> {
+        let idd_pattern_start = idd_pattern_start?;
         // First attempt to strip the idd_pattern at the start, if present. We make a
         // copy so that we can revert to the original string if necessary.
-        let idd_pattern_match = idd_pattern.find_start(phone_number)?;
+        let idd_pattern_match = idd_pattern_start.find(phone_number)?;
         let captured_range_end = idd_pattern_match.end();
 
         // Only strip this if the first digit after the match is not a 0, since
@@ -2712,12 +2723,15 @@ impl PhoneNumberUtilInternal {
         metadata: &PhoneMetadataWrapper,
         phone_number: &'a str,
     ) -> RegexResult<(Cow<'a, str>, Option<&'a str>)> {
-        let possible_national_prefix_pattern = metadata.national_prefix_for_parsing()?;
-        if phone_number.is_empty() || possible_national_prefix_pattern.as_str().is_empty() {
+        let Some(possible_national_prefix_pattern) = metadata
+            .national_prefix_for_parsing()
+            .anchor_start()?
+            .take_if(|_| !phone_number.is_empty())
+        else {
             // Early return for numbers of zero length or with no national prefix
             // possible.
             return Ok((phone_number.into(), None));
-        }
+        };
         let general_desc = &metadata.general_desc;
         // Check if the original number is viable.
         let is_viable_original_number =
@@ -2726,7 +2740,7 @@ impl PhoneNumberUtilInternal {
         // copy so that we can revert to the original string if necessary.
         let transform_rule = metadata.original.national_prefix_transform_rule();
 
-        let captures = possible_national_prefix_pattern.captures_start(phone_number);
+        let captures = possible_national_prefix_pattern.captures(phone_number);
         let first_capture = captures.as_ref().and_then(|c| c.get(1));
         let second_capture = captures.as_ref().and_then(|c| c.get(2));
 
@@ -2974,6 +2988,8 @@ impl PhoneNumberUtilInternal {
         }
         // Copy the number, since we are going to try and strip the extension from it.
         let (number, _extension) = self.maybe_strip_extension(phone_number);
-        self.reg_exps.valid_alpha_phone_pattern.full_match(number)
+        self.reg_exps
+            .valid_alpha_phone_pattern_fullmatch
+            .is_match(number)
     }
 }

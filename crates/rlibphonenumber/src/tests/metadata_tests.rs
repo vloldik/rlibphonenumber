@@ -16,14 +16,14 @@ fn test_metadata_regexps() {
         #[allow(deprecated)]
         metadata.number_format.iter().for_each(|f| {
             if f.has_pattern() {
-                Regex::new(f.pattern()).expect("Regexp MUST be valid");
+                Regex::new(f.pattern.as_deref().unwrap_or("")).expect("Regexp MUST be valid");
             }
         });
 
         #[allow(deprecated)]
         metadata.intl_number_format.iter().for_each(|f| {
             if f.has_pattern() {
-                Regex::new(f.pattern()).expect("Regexp MUST be valid");
+                Regex::new(f.pattern.as_deref().unwrap_or("")).expect("Regexp MUST be valid");
             }
         });
     });

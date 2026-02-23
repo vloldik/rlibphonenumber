@@ -106,7 +106,7 @@ pub(super) struct PhoneNumberRegExpsAndMappings {
     /// the tone. If there are multiple available international prefixes in a
     /// region, they will be represented as a regex string that always contains one
     /// or more characters that are not ASCII digits or a tilde.
-    pub single_international_prefix: Regex,
+    pub single_international_prefix_fullmatch: Regex,
 
     pub digits_pattern: Regex,
     pub capturing_digit_pattern: Regex,
@@ -121,7 +121,7 @@ pub(super) struct PhoneNumberRegExpsAndMappings {
     /// parsing and is of no information value when parsing a number. The string
     /// starting with this valid character is captured.
     /// This corresponds to VALID_START_CHAR in the java version.
-    pub valid_start_char_pattern: Regex,
+    pub valid_start_char_pattern_fullmatch: Regex,
 
     /// Regular expression of valid characters before a marker that might indicate
     /// a second number.
@@ -133,9 +133,10 @@ pub(super) struct PhoneNumberRegExpsAndMappings {
     /// extension. Note the capturing block at the start to capture the rest of the
     /// number if this was a match.
     /// This corresponds to UNWANTED_END_CHAR_PATTERN in the java version.
-    pub unwanted_end_char_pattern: Regex,
+    pub unwanted_end_char_pattern_fullmatch: Regex,
 
     /// Regular expression of groups of valid punctuation characters.
+    pub separator_pattern_anchor_start: Regex,
     pub separator_pattern: Regex,
 
     /// Regexp of all possible ways to write extensions, for use when finding phone
@@ -150,26 +151,26 @@ pub(super) struct PhoneNumberRegExpsAndMappings {
     /// We append optionally the extension pattern to the end here, as a valid
     /// phone number may have an extension prefix appended, followed by 1 or more
     /// digits.
-    pub valid_phone_number_pattern: Regex,
+    pub valid_phone_number_pattern_fullmatch: Regex,
 
     /// We use this pattern to check if the phone number has at least three letters
     /// in it - if so, then we treat it as a number where some phone-number digits
     /// are represented by letters.
-    pub valid_alpha_phone_pattern: Regex,
+    pub valid_alpha_phone_pattern_fullmatch: Regex,
 
     pub first_group_capturing_pattern: Regex,
 
     pub carrier_code_pattern: Regex,
 
-    pub plus_chars_pattern: Regex,
+    pub plus_chars_pattern_start: Regex,
 
     /// Regular expression of valid global-number-digits for the phone-context
     /// parameter, following the syntax defined in RFC3966.
-    pub rfc3966_global_number_digits_pattern: Regex,
+    pub rfc3966_global_number_digits_pattern_fullmatch: Regex,
 
     /// Regular expression of valid domainname for the phone-context parameter,
     /// following the syntax defined in RFC3966.
-    pub rfc3966_domainname_pattern: Regex,
+    pub rfc3966_domainname_pattern_fullmatch: Regex,
 
     /// *Rust note*: It's for some reason calculated inside function in C++,
     /// so, we move it here
@@ -180,13 +181,13 @@ pub(super) struct PhoneNumberRegExpsAndMappings {
     /// followed by a single digit, separated by valid phone number punctuation.
     /// This prevents invalid punctuation (such as the star sign in Israeli star
     /// numbers) getting into the output of the AYTF.
-    pub is_format_eligible_as_you_type_formatting_regex: Regex,
+    pub is_format_eligible_as_you_type_formatting_regex_fullmatch: Regex,
 
     /// Added for function `formatting_rule_has_first_group_only`
     /// A pattern that is used to determine if the national prefix formatting rule
     /// has the first group only, i.e., does not start with the national prefix.
     /// Note that the pattern explicitly allows for unbalanced parentheses.
-    pub formatting_rule_has_first_group_only_regex: Regex,
+    pub formatting_rule_has_first_group_only_regex_fullmatch: Regex,
 
     pub catch_all_formatting_regex: Regex,
 }
@@ -325,27 +326,35 @@ impl PhoneNumberRegExpsAndMappings {
             countries_without_national_prefix_with_area_codes: Default::default(),
             geo_mobile_countries: Default::default(),
             geo_mobile_countries_without_mobile_area_codes: Default::default(),
-            single_international_prefix: Regex::new("[\\d]+(?:[~\u{2053}\u{223C}\u{FF5E}][\\d]+)?")
-                .unwrap(),
+            single_international_prefix_fullmatch: Regex::new(
+                "^(?:[\\d]+(?:[~\u{2053}\u{223C}\u{FF5E}][\\d]+)?)$",
+            )
+            .unwrap(),
             digits_pattern: Regex::new(&format!("[{}]*", DIGITS)).unwrap(),
             capturing_digit_pattern: Regex::new(&format!("([{}])", DIGITS)).unwrap(),
             capturing_ascii_digits_pattern: Regex::new("(\\d+)").unwrap(),
-            valid_start_char_pattern: Regex::new(&format!("[{}{}]", PLUS_CHARS, DIGITS)).unwrap(),
+            valid_start_char_pattern_fullmatch: Regex::new(&format!(
+                "^[{}{}]$",
+                PLUS_CHARS, DIGITS
+            ))
+            .unwrap(),
             capture_up_to_second_number_start_pattern: Regex::new(
                 CAPTURE_UP_TO_SECOND_NUMBER_START,
             )
             .unwrap(),
-            unwanted_end_char_pattern: Regex::new("[^\\p{N}\\p{L}#]").unwrap(),
+            unwanted_end_char_pattern_fullmatch: Regex::new("^[^\\p{N}\\p{L}#]$").unwrap(),
+            separator_pattern_anchor_start: Regex::new(&format!("^[{}]+", VALID_PUNCTUATION))
+                .unwrap(),
             separator_pattern: Regex::new(&format!("[{}]+", VALID_PUNCTUATION)).unwrap(),
             extn_patterns_for_matching: create_extn_pattern(false),
             extn_pattern: Regex::new(&format!("(?i)(?:{})$", &extn_patterns_for_parsing)).unwrap(),
-            valid_phone_number_pattern: Regex::new(&format!(
+            valid_phone_number_pattern_fullmatch: Regex::new(&format!(
                 "(?i)^(?:{})(?:{})?$",
                 &valid_phone_number, &extn_patterns_for_parsing
             ))
             .unwrap(),
             // from java
-            valid_alpha_phone_pattern: Regex::new("(?:.*?[A-Za-z]){3}.*").unwrap(),
+            valid_alpha_phone_pattern_fullmatch: Regex::new("^(?:.*?[A-Za-z]){3}.*$").unwrap(),
             // The first_group_capturing_pattern was originally set to $1 but there
             // are some countries for which the first group is not used in the
             // national pattern (e.g. Argentina) so the $1 group does not match
@@ -353,23 +362,24 @@ impl PhoneNumberRegExpsAndMappings {
             // used in the pattern will be matched.
             first_group_capturing_pattern: Regex::new("(\\$\\d)").unwrap(),
             carrier_code_pattern: Regex::new("\\$CC").unwrap(),
-            plus_chars_pattern: Regex::new(&format!("[{}]+", &PLUS_CHARS)).unwrap(),
-            rfc3966_global_number_digits_pattern: Regex::new(&format!(
+            plus_chars_pattern_start: Regex::new(&format!("^[{}]+", &PLUS_CHARS)).unwrap(),
+            rfc3966_global_number_digits_pattern_fullmatch: Regex::new(&format!(
                 "^\\{}{}*{}{}*$",
                 PLUS_SIGN, &rfc3966_phone_digit, DIGITS, rfc3966_phone_digit
             ))
             .unwrap(),
-            rfc3966_domainname_pattern: Regex::new(&format!(
+            rfc3966_domainname_pattern_fullmatch: Regex::new(&format!(
                 "^({}\\.)*{}\\.?$",
                 rfc3966_domainlabel, rfc3966_toplabel
             ))
             .unwrap(),
-            is_format_eligible_as_you_type_formatting_regex: Regex::new(&format!(
-                "[{}]*\\$1[{}]*(\\$\\d[{}]*)*",
+            is_format_eligible_as_you_type_formatting_regex_fullmatch: Regex::new(&format!(
+                "^(?:[{}]*\\$1[{}]*(\\$\\d[{}]*)*)$",
                 VALID_PUNCTUATION, VALID_PUNCTUATION, VALID_PUNCTUATION
             ))
             .unwrap(),
-            formatting_rule_has_first_group_only_regex: Regex::new("\\(?\\$1\\)?").unwrap(),
+            formatting_rule_has_first_group_only_regex_fullmatch: Regex::new("^\\(?\\$1\\)?$")
+                .unwrap(),
             catch_all_formatting_regex: Regex::new("(\\d+)(.*)").unwrap(),
         };
         instance.initialize_regexp_mappings();

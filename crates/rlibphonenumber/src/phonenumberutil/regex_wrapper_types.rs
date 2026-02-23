@@ -7,7 +7,76 @@ use crate::{
     InvalidRegexError,
     phonemetadata::{NumberFormat, PhoneMetadata, PhoneNumberDesc},
 };
-type RegResult = Result<Regex, InvalidRegexError>;
+
+#[derive(Debug, Clone)]
+pub struct RegexTriplets {
+    pub pattern_base: Option<String>,
+
+    pub original: OnceLock<Result<Option<Regex>, regex::Error>>,
+    pub anchor_start: OnceLock<Result<Option<Regex>, regex::Error>>,
+    pub anchor_full: OnceLock<Result<Option<Regex>, regex::Error>>,
+}
+
+impl RegexTriplets {
+    pub fn new(pattern_base: Option<String>) -> Self {
+        Self {
+            pattern_base,
+            original: OnceLock::new(),
+            anchor_start: OnceLock::new(),
+            anchor_full: OnceLock::new(),
+        }
+    }
+
+    pub fn original_base(&self) -> &str {
+        self.pattern_base
+            .as_ref()
+            .map(|base| &base[4..base.len() - 2])
+            .unwrap_or_default()
+    }
+
+    pub fn new_vec(vec: Vec<String>) -> Vec<Self> {
+        vec.into_iter().map(|s| Self::new(Some(s))).collect()
+    }
+
+    pub fn original(&self) -> Result<Option<&Regex>, InvalidRegexError> {
+        self.original
+            .get_or_init(|| {
+                self.pattern_base
+                    .as_ref()
+                    .map(|base| Regex::new(&base[1..base.len() - 1]))
+                    .transpose()
+            })
+            .as_ref()
+            .map(|v| v.as_ref())
+            .map_err(|e| e.clone().into())
+    }
+
+    pub fn anchor_start(&self) -> Result<Option<&Regex>, InvalidRegexError> {
+        self.anchor_start
+            .get_or_init(|| {
+                self.pattern_base
+                    .as_ref()
+                    .map(|base| Regex::new(&base[..base.len() - 1]))
+                    .transpose()
+            })
+            .as_ref()
+            .map(|v| v.as_ref())
+            .map_err(|e| e.clone().into())
+    }
+
+    pub fn anchor_full(&self) -> Result<Option<&Regex>, InvalidRegexError> {
+        self.anchor_full
+            .get_or_init(|| {
+                self.pattern_base
+                    .as_ref()
+                    .map(|base| Regex::new(base))
+                    .transpose()
+            })
+            .as_ref()
+            .map(|v| v.as_ref())
+            .map_err(|e| e.clone().into())
+    }
+}
 
 // Tf i was writing it for, but just leave it here...
 macro_rules! wrapper {
@@ -28,8 +97,8 @@ macro_rules! wrapper {
         #[allow(dead_code)]
         pub struct $name {
             $(
-            $($field: OnceLock<RegResult>,)*
-            $($($vec_field: OnceLock<Vec<RegResult>>,)*)?
+            $($field: RegexTriplets,)*
+            $($($vec_field: Vec<RegexTriplets>,)*)?
             )?
             $($($(pub $extra: $extra_type,)*)*)?
             pub original: $wraps,
@@ -38,30 +107,19 @@ macro_rules! wrapper {
         $(
         impl $name {
             $($(
-            pub fn $vec_field(&self) -> &Vec<RegResult> {
-                self.$vec_field.get_or_init(|| {
-                    self.original
-                        .$vec_field
-                        .iter()
-                        .map(|pat| Regex::new(pat).map_err(| err | err.into()))
-                        .collect()
-                })
+            pub fn $vec_field(&self) -> &Vec<RegexTriplets> {
+                    &self.$vec_field
             }
             )*)?
             $(
-            pub fn $field(&self) -> Result<&Regex, InvalidRegexError> {
-                self.$field.get_or_init(|| {
-                    Regex::new(
-                        self.original
-                       .$field()
-                    ).map_err(|err| err.into())
-                }).as_ref().map_err(| err | err.clone())
+            pub fn $field(&self) -> &RegexTriplets {
+                &self.$field
             }
             )*
             paste!{
                 $(
                 #[allow(dead_code)]
-                pub fn [<set_ $field>](&mut self, value: OnceLock<RegResult>) {
+                pub fn [<set_ $field>](&mut self, value: RegexTriplets) {
                     self.$field = value;
                 }
                 )*
@@ -74,13 +132,12 @@ macro_rules! wrapper {
             fn from(mut value: $wraps) -> Self {
                 Self {
                     $(
-                    $($field: ::std::default::Default::default(),)*
-                    $($($vec_field: ::std::default::Default::default(),)*)?
+                    $($field: RegexTriplets::new(::std::mem::take(&mut value.$field)),)*
+                    $($($vec_field: RegexTriplets::new_vec(::std::mem::take(&mut value.$vec_field)),)*)?
                     )?
                     $($($(
                         $extra: {
-                            let $extra_name = value.$extra;
-                            value.$extra = ::std::default::Default::default();
+                            let $extra_name = ::std::mem::take(&mut value.$extra);
                             $extra_convert
                         },
                     )*)*)?

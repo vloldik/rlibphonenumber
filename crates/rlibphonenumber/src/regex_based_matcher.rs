@@ -13,11 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::regex_util::{RegexConsume, RegexFullMatch};
-use regex::Regex;
-
 use crate::{
-    InvalidRegexError, interfaces, phonenumberutil::regex_wrapper_types::PhoneNumberDescWrapper,
+    InvalidRegexError, interfaces,
+    phonenumberutil::regex_wrapper_types::{PhoneNumberDescWrapper, RegexTriplets},
 };
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -27,15 +25,19 @@ impl RegexBasedMatcher {
     fn match_number(
         &self,
         phone_number: &str,
-        number_pattern: &Regex,
+        number_pattern: &RegexTriplets,
         allow_prefix_match: bool,
-    ) -> bool {
-        // find first occurrence
-        if allow_prefix_match {
-            number_pattern.matches_start(phone_number)
+    ) -> Result<bool, InvalidRegexError> {
+        let Some(rule) = (if allow_prefix_match {
+            number_pattern.anchor_start()?
         } else {
-            number_pattern.full_match(phone_number)
-        }
+            number_pattern.anchor_full()?
+        }) else {
+            return Ok(false);
+        };
+
+        // find first occurrence
+        Ok(rule.is_match(phone_number))
     }
 }
 
@@ -46,13 +48,10 @@ impl interfaces::MatcherApi for RegexBasedMatcher {
         number_desc: &PhoneNumberDescWrapper,
         allow_prefix_match: bool,
     ) -> Result<bool, InvalidRegexError> {
-        let national_number_pattern = number_desc.national_number_pattern()?;
+        let national_number_pattern = number_desc.national_number_pattern();
         // We don't want to consider it a prefix match when matching non-empty input
         // against an empty pattern.
-        if national_number_pattern.as_str().is_empty() {
-            return Ok(false);
-        }
 
-        Ok(self.match_number(number, national_number_pattern, allow_prefix_match))
+        self.match_number(number, national_number_pattern, allow_prefix_match)
     }
 }

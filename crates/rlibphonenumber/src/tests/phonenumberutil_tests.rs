@@ -1,5 +1,4 @@
 use protobuf::{Message, MessageField};
-use regex::Regex;
 
 use crate::{
     InternalError,
@@ -12,13 +11,17 @@ use crate::{
         errors::{ParseError, ValidationError},
         helper_functions::get_national_significant_number,
         phonenumberutil_internal::PhoneNumberUtilInternal,
-        regex_wrapper_types::NumberFormatWrapper,
+        regex_wrapper_types::{NumberFormatWrapper, RegexTriplets},
     },
     tests::common::{UNKNOWN_REGION_CODE, get_phone_util},
     unwrap_internal,
 };
 
 use super::region_code::RegionCode;
+
+fn wrap_regexp_str(regexp: &str) -> String {
+    format!("^(?:{})$", regexp)
+}
 
 #[test]
 fn interchange_invalid_codepoints() {
@@ -156,42 +159,37 @@ fn get_region_codes_for_country_calling_code() {
 #[test]
 fn get_instance_load_us_metadata() {
     let phone_util = get_phone_util();
+    let assert_pat_eq = |original: &str, pat: &RegexTriplets| {
+        assert_eq!(
+            format!("^(?:{})$", original),
+            pat.anchor_full().unwrap().unwrap().as_str()
+        );
+    };
     let metadata = phone_util
         .get_metadata_for_region(RegionCode::us())
         .unwrap();
     assert_eq!(RegionCode::us(), metadata.original.id());
     assert_eq!(1, metadata.original.country_code());
-    assert_eq!("011", metadata.original.international_prefix());
+    assert_eq!("011", metadata.international_prefix().original_base());
     assert!(metadata.original.has_national_prefix());
     assert_eq!(2, metadata.number_format.len());
-    assert_eq!(
+    assert_pat_eq(
         "(\\d{3})(\\d{3})(\\d{4})",
-        metadata.number_format[1].pattern().unwrap().as_str()
+        metadata.number_format[1].pattern(),
     );
     assert_eq!("$1 $2 $3", metadata.number_format[1].original.format());
-    assert_eq!(
+    assert_pat_eq(
         "[13-689]\\d{9}|2[0-35-9]\\d{8}",
-        metadata
-            .general_desc
-            .national_number_pattern()
-            .unwrap()
-            .as_str()
+        metadata.general_desc.national_number_pattern(),
     );
-    assert_eq!(
+    assert_pat_eq(
         "[13-689]\\d{9}|2[0-35-9]\\d{8}",
-        metadata
-            .fixed_line
-            .national_number_pattern()
-            .unwrap()
-            .as_str()
+        metadata.fixed_line.national_number_pattern(),
     );
     assert_eq!(1, metadata.general_desc.original.possible_length.len());
     assert_eq!(10, metadata.general_desc.original.possible_length[0]);
     assert_eq!(0, metadata.toll_free.original.possible_length.len());
-    assert_eq!(
-        "900\\d{7}",
-        metadata.premium_rate.original.national_number_pattern()
-    );
+    assert_pat_eq("900\\d{7}", metadata.premium_rate.national_number_pattern());
     assert!(!metadata.shared_cost.original.has_national_number_pattern());
 }
 
@@ -204,7 +202,10 @@ fn get_instance_load_de_metadata() {
     let metadata = &metadata_wrapper.original;
     assert_eq!(RegionCode::de(), metadata.id());
     assert_eq!(49, metadata.country_code());
-    assert_eq!("00", metadata.international_prefix());
+    assert_eq!(
+        "00",
+        metadata_wrapper.international_prefix().original_base()
+    );
     assert_eq!("0", metadata.national_prefix());
     assert_eq!(6, metadata_wrapper.number_format.len());
     assert_eq!(
@@ -213,18 +214,21 @@ fn get_instance_load_de_metadata() {
             .leading_digits_pattern()
             .len()
     );
-    assert_eq!(
+    let assert_pat_eq = |original: &str, pat: &RegexTriplets| {
+        assert_eq!(
+            format!("^(?:{})$", original),
+            pat.anchor_full().unwrap().unwrap().as_str()
+        );
+    };
+
+    assert_pat_eq(
         "900",
-        metadata_wrapper.number_format[5]
-            .original
-            .leading_digits_pattern[0]
+        &metadata_wrapper.number_format[5].leading_digits_pattern()[0],
     );
-    assert_eq!(
+
+    assert_pat_eq(
         "(\\d{3})(\\d{3,4})(\\d{4})",
-        metadata_wrapper.number_format[5]
-            .pattern()
-            .unwrap()
-            .as_str()
+        metadata_wrapper.number_format[5].pattern(),
     );
     assert_eq!(
         2,
@@ -247,26 +251,18 @@ fn get_instance_load_de_metadata() {
         "$1 $2 $3",
         metadata_wrapper.number_format[5].original.format()
     );
-    assert_eq!(
+    assert_pat_eq(
         "(?:[24-6]\\d{2}|3[03-9]\\d|[789](?:0[2-9]|[1-9]\\d))\\d{1,8}",
-        metadata_wrapper
-            .fixed_line
-            .national_number_pattern()
-            .unwrap()
-            .as_str()
+        metadata_wrapper.fixed_line.national_number_pattern(),
     );
     assert_eq!(
         "30123456",
         metadata_wrapper.fixed_line.original.example_number()
     );
     assert_eq!(10, metadata_wrapper.toll_free.original.possible_length[0]);
-    assert_eq!(
+    assert_pat_eq(
         "900([135]\\d{6}|9\\d{7})",
-        metadata_wrapper
-            .premium_rate
-            .national_number_pattern()
-            .unwrap()
-            .as_str()
+        metadata_wrapper.premium_rate.national_number_pattern(),
     );
 }
 
@@ -277,13 +273,28 @@ fn get_instance_load_ar_metadata() {
         .get_metadata_for_region(RegionCode::ar())
         .unwrap();
     let metadata = &metadata_wrapper.original;
+
+    let assert_pat_eq = |original: &str, pat: &RegexTriplets| {
+        assert_eq!(
+            format!("^(?:{})$", original),
+            pat.anchor_full().unwrap().unwrap().as_str()
+        );
+    };
     assert_eq!(RegionCode::ar(), metadata.id());
     assert_eq!(54, metadata.country_code());
-    assert_eq!("00", metadata.international_prefix());
-    assert_eq!("0", metadata.national_prefix());
     assert_eq!(
+        &wrap_regexp_str("00"),
+        metadata_wrapper
+            .international_prefix()
+            .pattern_base
+            .as_ref()
+            .unwrap()
+            .as_str()
+    );
+    assert_eq!("0", metadata.national_prefix());
+    assert_pat_eq(
         "0(?:(11|343|3715)15)?",
-        metadata.national_prefix_for_parsing()
+        metadata_wrapper.national_prefix_for_parsing(),
     );
     assert_eq!("9$1", metadata.national_prefix_transform_rule());
     assert_eq!(5, metadata_wrapper.number_format.len());
@@ -291,19 +302,13 @@ fn get_instance_load_ar_metadata() {
         "$2 15 $3-$4",
         metadata_wrapper.number_format[2].original.format()
     );
-    assert_eq!(
+    assert_pat_eq(
         "(\\d)(\\d{4})(\\d{2})(\\d{4})",
-        metadata_wrapper.number_format[3]
-            .pattern()
-            .unwrap()
-            .as_str()
+        metadata_wrapper.number_format[3].pattern(),
     );
-    assert_eq!(
+    assert_pat_eq(
         "(\\d)(\\d{4})(\\d{2})(\\d{4})",
-        metadata_wrapper.intl_number_format[3]
-            .pattern()
-            .unwrap()
-            .as_str()
+        metadata_wrapper.intl_number_format[3].pattern(),
     );
     assert_eq!(
         "$1 $2 $3 $4",
@@ -1472,7 +1477,7 @@ fn format_by_pattern() {
     test_number.set_country_code(1);
     test_number.set_national_number(6502530000);
 
-    number_format.set_pattern("(\\d{3})(\\d{3})(\\d{4})".to_string());
+    number_format.set_pattern(wrap_regexp_str("(\\d{3})(\\d{3})(\\d{4})"));
     number_format.set_format("($1) $2-$3".to_string());
 
     let number_formats = vec![NumberFormatWrapper::from(number_format.clone())];
@@ -1523,7 +1528,7 @@ fn format_by_pattern() {
     test_number.set_national_number(236618300);
     test_number.set_italian_leading_zero(true);
 
-    number_format.set_pattern("(\\d{2})(\\d{5})(\\d{3})".to_string());
+    number_format.set_pattern(wrap_regexp_str("(\\d{2})(\\d{5})(\\d{3})"));
     number_format.set_format("$1-$2 $3".to_string());
     number_format.clear_national_prefix_formatting_rule();
     let number_formats = vec![NumberFormatWrapper::from(number_format.clone())];
@@ -1547,7 +1552,7 @@ fn format_by_pattern() {
     test_number.set_italian_leading_zero(false);
 
     number_format.set_national_prefix_formatting_rule("$NP$FG".to_string());
-    number_format.set_pattern("(\\d{2})(\\d{4})(\\d{4})".to_string());
+    number_format.set_pattern(wrap_regexp_str("(\\d{2})(\\d{4})(\\d{4})"));
     number_format.set_format("$1 $2 $3".to_string());
     let mut number_formats = vec![NumberFormatWrapper::from(number_format.clone())]; // mutable vec to modify the element inside
 
@@ -2013,10 +2018,10 @@ fn maybe_strip_national_prefix_and_carrier_code() {
     // Metadata used without wrapper
     metadata.general_desc = MessageField::some(general_desc);
     if let Some(m) = metadata.general_desc.as_mut() {
-        m.set_national_number_pattern("\\d{4,8}".to_string())
+        m.set_national_number_pattern(wrap_regexp_str("\\d{4,8}"))
     }
 
-    metadata.set_national_prefix_for_parsing("34".to_string());
+    metadata.set_national_prefix_for_parsing(wrap_regexp_str("34"));
     let number_to_strip = "34356778".to_string();
     let phone_number_and_carrier_code = phone_util
         .maybe_strip_national_prefix_and_carrier_code(&metadata.clone().into(), &number_to_strip)
@@ -2054,7 +2059,7 @@ fn maybe_strip_national_prefix_and_carrier_code() {
     );
 
     // Если результирующий номер не соответствует национальному правилу, он не должен быть удален.
-    metadata.set_national_prefix_for_parsing("3".to_string());
+    metadata.set_national_prefix_for_parsing(wrap_regexp_str("3"));
     let number_to_strip = "3123".to_string();
     let phone_number_and_carrier_code = phone_util
         .maybe_strip_national_prefix_and_carrier_code(&metadata.clone().into(), &number_to_strip)
@@ -2065,7 +2070,7 @@ fn maybe_strip_national_prefix_and_carrier_code() {
     );
 
     // Тестируем извлечение кода выбора оператора.
-    metadata.set_national_prefix_for_parsing("0(81)?".to_string());
+    metadata.set_national_prefix_for_parsing(wrap_regexp_str("0(81)?"));
     let number_to_strip = "08122123456".to_string();
     let phone_number_and_carrier_code = phone_util
         .maybe_strip_national_prefix_and_carrier_code(&metadata.clone().into(), &number_to_strip)
@@ -2086,7 +2091,7 @@ fn maybe_strip_national_prefix_and_carrier_code() {
     // we can do this. But this should be handled on any changes
     metadata.set_national_prefix_transform_rule("5${1}5".to_string());
     // Обратите внимание, что здесь присутствует захватывающая группа.
-    metadata.set_national_prefix_for_parsing("0(\\d{2})".to_string());
+    metadata.set_national_prefix_for_parsing(wrap_regexp_str("0(\\d{2})"));
     let number_to_strip = "031123".to_string();
     let phone_number_and_carrier_code = phone_util
         .maybe_strip_national_prefix_and_carrier_code(&metadata.into(), &number_to_strip)
@@ -3494,7 +3499,7 @@ fn normalise_strip_non_diallable_characters() {
 #[test]
 fn maybe_strip_international_prefix() {
     let phone_util = get_phone_util();
-    let international_prefix = Regex::new("00[39]").unwrap();
+    let international_prefix = RegexTriplets::new(Some(wrap_regexp_str("00[39]")));
 
     let number_to_strip = "0034567700-3898003";
     // Примечание: дефис удаляется в процессе нормализации.

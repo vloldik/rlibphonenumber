@@ -45,13 +45,20 @@ fn main() {
                     //Vec<NumberFormatWrapper>
                     "number_format",
                     "intl_number_format",
+                    // Regexp
+                    "leading_digits",
+                    "international_prefix",
+                    "national_prefix_for_parsing",
                 ]
-                .iter()
-                .any(|name| *name == field_proto.name())
+                .contains(&field_proto.name())
+                || field.containing_message().name() == "PhoneNumberDesc"
+                    && field_proto.name() == "national_number_pattern"
+                || field.containing_message().name() == "NumberFormat"
+                    && ["leading_digits_pattern", "pattern"].contains(&field_proto.name())
             {
                 Customize::default().before(
                     "#[deprecated(note = \"This field is shadowed by the wrapper and is intentionally left empty. Access the underlying data via `.original`.\")]",
-                )
+                ).generate_getter(false)
             } else {
                 Default::default()
             }
