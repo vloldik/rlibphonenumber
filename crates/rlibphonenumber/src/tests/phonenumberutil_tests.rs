@@ -4,7 +4,7 @@ use regex::Regex;
 use crate::{
     InternalError,
     generated::proto::{
-        phonemetadata::{NumberFormat, PhoneMetadata, PhoneMetadataCollection, PhoneNumberDesc},
+        phonemetadata::{NumberFormat, PhoneMetadata, PhoneNumberDesc},
         phonenumber::{PhoneNumber, phone_number::CountryCodeSource},
     },
     phonenumberutil::{
@@ -14,28 +14,11 @@ use crate::{
         phonenumberutil_internal::PhoneNumberUtilInternal,
         regex_wrapper_types::NumberFormatWrapper,
     },
+    tests::common::{UNKNOWN_REGION_CODE, get_phone_util},
     unwrap_internal,
 };
 
 use super::region_code::RegionCode;
-use crate::generated::metadata::TEST_METADATA;
-
-static ONCE: std::sync::Once = std::sync::Once::new();
-
-const UNKNOWN_REGION_CODE: Option<&str> = Some("ZZ");
-
-#[cfg(test)]
-fn get_phone_util() -> PhoneNumberUtilInternal {
-    ONCE.call_once(|| {
-        colog::default_builder()
-            .filter_level(log::LevelFilter::Trace)
-            .init()
-    });
-
-    let metadata = PhoneMetadataCollection::parse_from_bytes(&TEST_METADATA)
-        .expect("Metadata should be valid");
-    PhoneNumberUtilInternal::new_for_metadata(metadata)
-}
 
 #[test]
 fn interchange_invalid_codepoints() {
