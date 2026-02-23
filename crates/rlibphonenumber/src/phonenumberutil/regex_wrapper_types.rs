@@ -17,6 +17,8 @@ pub struct RegexTriplets {
     pub anchor_full: OnceLock<Result<Option<Regex>, regex::Error>>,
 }
 
+const MIN_LENGTH_FOR_WRAPPED_PATTERN: usize = 6; // ^(?:)$
+
 impl RegexTriplets {
     pub fn new(pattern_base: Option<String>) -> Self {
         Self {
@@ -30,7 +32,13 @@ impl RegexTriplets {
     pub fn original_base(&self) -> &str {
         self.pattern_base
             .as_ref()
-            .map(|base| &base[4..base.len() - 2])
+            .map(|base| {
+                if base.len() >= MIN_LENGTH_FOR_WRAPPED_PATTERN {
+                    &base[4..base.len() - 2]
+                } else {
+                    ""
+                }
+            })
             .unwrap_or_default()
     }
 
@@ -43,7 +51,13 @@ impl RegexTriplets {
             .get_or_init(|| {
                 self.pattern_base
                     .as_ref()
-                    .map(|base| Regex::new(&base[1..base.len() - 1]))
+                    .map(|base| {
+                        if base.len() >= MIN_LENGTH_FOR_WRAPPED_PATTERN {
+                            Regex::new(&base[1..base.len() - 1])
+                        } else {
+                            Regex::new("")
+                        }
+                    })
                     .transpose()
             })
             .as_ref()
@@ -56,7 +70,13 @@ impl RegexTriplets {
             .get_or_init(|| {
                 self.pattern_base
                     .as_ref()
-                    .map(|base| Regex::new(&base[..base.len() - 1]))
+                    .map(|base| {
+                        if base.len() >= MIN_LENGTH_FOR_WRAPPED_PATTERN {
+                            Regex::new(&base[..base.len() - 1])
+                        } else {
+                            Regex::new("")
+                        }
+                    })
                     .transpose()
             })
             .as_ref()
@@ -69,7 +89,13 @@ impl RegexTriplets {
             .get_or_init(|| {
                 self.pattern_base
                     .as_ref()
-                    .map(|base| Regex::new(base))
+                    .map(|base| {
+                        if base.len() >= MIN_LENGTH_FOR_WRAPPED_PATTERN {
+                            Regex::new(base)
+                        } else {
+                            Regex::new("")
+                        }
+                    })
                     .transpose()
             })
             .as_ref()
