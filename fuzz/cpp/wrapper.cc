@@ -3,6 +3,25 @@
 
 using namespace i18n::phonenumbers;
 
+std::string ErrorTypeToString(PhoneNumberUtil::ErrorType error) {
+    switch (error) {
+        case PhoneNumberUtil::NO_PARSING_ERROR:
+            return "None";
+        case PhoneNumberUtil::INVALID_COUNTRY_CODE_ERROR:
+            return "INVALID_COUNTRY_CODE_ERROR";
+        case PhoneNumberUtil::NOT_A_NUMBER:
+            return "NOT_A_NUMBER";
+        case PhoneNumberUtil::TOO_SHORT_AFTER_IDD:
+            return "TOO_SHORT_AFTER_IDD";
+        case PhoneNumberUtil::TOO_SHORT_NSN:
+            return "TOO_SHORT_NSN";
+        case PhoneNumberUtil::TOO_LONG:
+            return "TOO_LONG";
+        default:
+            return "Unknown error";
+    }
+}
+
 CppResult test_cpp_impl(rust::Str number_str, rust::Str region_str) {
     CppResult res;
     res.is_parsed = false;
@@ -46,6 +65,8 @@ CppResult test_cpp_impl(rust::Str number_str, rust::Str region_str) {
         std::string mobile_fmt;
         util->FormatNumberForMobileDialing(number, reg_std, true, &mobile_fmt);
         res.format_mobile = mobile_fmt;
+    } else { 
+        res.error = ErrorTypeToString(status); 
     }
 
     return res;
