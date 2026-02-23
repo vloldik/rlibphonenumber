@@ -9,6 +9,10 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
+cxx = "1.0"
+
+[build-dependencies]
+cxx-build = "1.0"
 
 [dependencies.rlibphonenumber]
 path = "../crates/rlibphonenumber"
@@ -16,6 +20,13 @@ path = "../crates/rlibphonenumber"
 [[bin]]
 name = "full-cycle"
 path = "fuzz_targets/full-cycle.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "diff-test"
+path = "fuzz_targets/diff-test.rs"
 test = false
 doc = false
 bench = false

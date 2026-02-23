@@ -17,7 +17,12 @@
         "editor.formatOnSave": true
       },
       "extensions": [
-        "1YiB.rust-bundle"
+        "rust-lang.rust-analyzer",
+        "mads-hartmann.bash-ide-vscode",
+        "streetsidesoftware.code-spell-checker",
+        "tamasfe.even-better-toml",
+        "waderyan.gitblame",
+        "github.vscode-github-actions"
       ]
     }
   },

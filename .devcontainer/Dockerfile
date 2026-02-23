@@ -16,7 +16,10 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
        pkg-config \
        libssl-dev \
        lldb \
-       protobuf-compiler
+       protobuf-compiler \
+       libphonenumber-dev \
+       libprotobuf-dev \
+       libre2-dev
 
 
 RUN chown -R vscode:vscode /usr/local/cargo
