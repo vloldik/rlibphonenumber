@@ -122,7 +122,7 @@ pub(super) struct PhoneNumberRegExpsAndMappings {
     /// parsing and is of no information value when parsing a number. The string
     /// starting with this valid character is captured.
     /// This corresponds to VALID_START_CHAR in the java version.
-    pub valid_start_char_pattern_fullmatch: Regex,
+    pub valid_start_char_pattern_capture: Regex,
 
     /// Regular expression of valid characters before a marker that might indicate
     /// a second number.
@@ -134,7 +134,7 @@ pub(super) struct PhoneNumberRegExpsAndMappings {
     /// extension. Note the capturing block at the start to capture the rest of the
     /// number if this was a match.
     /// This corresponds to UNWANTED_END_CHAR_PATTERN in the java version.
-    pub unwanted_end_char_pattern_fullmatch: Regex,
+    pub unwanted_end_char_pattern_captures: Regex,
 
     /// Regular expression of groups of valid punctuation characters.
     pub separator_pattern_anchor_start: Regex,
@@ -334,16 +334,13 @@ impl PhoneNumberRegExpsAndMappings {
             digits_pattern: Regex::new(&format!("[{}]*", DIGITS)).unwrap(),
             capturing_digit_pattern: Regex::new(&format!("([{}])", DIGITS)).unwrap(),
             capturing_ascii_digits_pattern: Regex::new("(\\d+)").unwrap(),
-            valid_start_char_pattern_fullmatch: Regex::new(&format!(
-                "^[{}{}]$",
-                PLUS_CHARS, DIGITS
-            ))
-            .unwrap(),
+            valid_start_char_pattern_capture: Regex::new(&format!("([{}{}])", PLUS_CHARS, DIGITS))
+                .unwrap(),
             capture_up_to_second_number_start_pattern: Regex::new(
                 CAPTURE_UP_TO_SECOND_NUMBER_START,
             )
             .unwrap(),
-            unwanted_end_char_pattern_fullmatch: Regex::new("^[^\\p{N}\\p{L}#]$").unwrap(),
+            unwanted_end_char_pattern_captures: Regex::new("([^\\p{N}\\p{L}#]+)$").unwrap(),
             separator_pattern_anchor_start: Regex::new(&format!("^[{}]+", VALID_PUNCTUATION))
                 .unwrap(),
             separator_pattern: Regex::new(&format!("[{}]+", VALID_PUNCTUATION)).unwrap(),

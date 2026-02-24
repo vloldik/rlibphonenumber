@@ -240,25 +240,17 @@ impl PhoneNumberUtilInternal {
     }
 
     pub(crate) fn trim_unwanted_end_chars<'a>(&self, phone_number: &'a str) -> &'a str {
-        let mut bytes_to_trim = 0;
+        let Some(new_len) = self
+            .reg_exps
+            .unwanted_end_char_pattern_captures
+            .captures(phone_number)
+            .and_then(|c| c.get(1))
+            .map(|m| m.start())
+        else {
+            return phone_number;
+        };
 
-        for char in phone_number.chars().rev() {
-            if !self
-                .reg_exps
-                .unwanted_end_char_pattern_fullmatch
-                .is_match(&char.to_string())
-            {
-                break;
-            }
-            bytes_to_trim += char.len_utf8();
-        }
-
-        if bytes_to_trim > 0 {
-            let new_len = phone_number.len() - bytes_to_trim;
-            &phone_number[..new_len]
-        } else {
-            phone_number
-        }
+        &phone_number[..new_len]
     }
 
     /// formatter is not implemented yet, but ..
@@ -1747,23 +1739,17 @@ impl PhoneNumberUtilInternal {
         phone_number: &'a str,
     ) -> ExtractNumberResult<&'a str> {
         // Rust note: skip UTF-8 validation since in rust strings are already UTF-8 valid
-        let mut i: usize = 0;
-        for c in phone_number.chars() {
-            if self
-                .reg_exps
-                .valid_start_char_pattern_fullmatch
-                .is_match(&phone_number[i..i + c.len_utf8()])
-            {
-                break;
-            }
-            i += c.len_utf8();
-        }
-
-        if i == phone_number.len() {
+        let Some(i) = self
+            .reg_exps
+            .valid_start_char_pattern_capture
+            .captures(phone_number)
+            .and_then(|caps| caps.get(1))
+            .map(|m| m.start())
+        else {
             // No valid start character was found. extracted_number should be set to
             // empty string.
             return Err(ExtractNumberError::NoValidStartCharacter);
-        }
+        };
 
         let mut extracted_number = &phone_number[i..];
         extracted_number = self.trim_unwanted_end_chars(extracted_number);
