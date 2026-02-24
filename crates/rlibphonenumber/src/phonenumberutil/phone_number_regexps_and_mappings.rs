@@ -113,17 +113,6 @@ pub(super) struct PhoneNumberRegExpsAndMappings {
     pub capturing_digit_pattern: Regex,
     pub capturing_ascii_digits_pattern: Regex,
 
-    /// Regular expression of acceptable characters that may start a phone number
-    /// for the purposes of parsing. This allows us to strip away meaningless
-    /// prefixes to phone numbers that may be mistakenly given to us. This consists
-    /// of digits, the plus symbol and arabic-indic digits. This does not contain
-    /// alpha characters, although they may be used later in the number. It also
-    /// does not include other punctuation, as this will be stripped later during
-    /// parsing and is of no information value when parsing a number. The string
-    /// starting with this valid character is captured.
-    /// This corresponds to VALID_START_CHAR in the java version.
-    pub valid_start_char_pattern_capture: Regex,
-
     /// Regular expression of valid characters before a marker that might indicate
     /// a second number.
     pub capture_up_to_second_number_start_pattern: Regex,
@@ -334,8 +323,6 @@ impl PhoneNumberRegExpsAndMappings {
             digits_pattern: Regex::new(&format!("[{}]*", DIGITS)).unwrap(),
             capturing_digit_pattern: Regex::new(&format!("([{}])", DIGITS)).unwrap(),
             capturing_ascii_digits_pattern: Regex::new("(\\d+)").unwrap(),
-            valid_start_char_pattern_capture: Regex::new(&format!("([{}{}])", PLUS_CHARS, DIGITS))
-                .unwrap(),
             capture_up_to_second_number_start_pattern: Regex::new(
                 CAPTURE_UP_TO_SECOND_NUMBER_START,
             )

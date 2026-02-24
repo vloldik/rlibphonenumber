@@ -44,6 +44,7 @@ use crate::{
         phonenumber::{PhoneNumber, phone_number::CountryCodeSource},
     },
     phonenumberutil::{
+        helper_constants::PLUS_CHARS,
         helper_functions::get_national_significant_number,
         helper_types::{PrefixParts, new_formatted_number_builder},
         regex_wrapper_types::{
@@ -1739,12 +1740,9 @@ impl PhoneNumberUtilInternal {
         phone_number: &'a str,
     ) -> ExtractNumberResult<&'a str> {
         // Rust note: skip UTF-8 validation since in rust strings are already UTF-8 valid
-        let Some(i) = self
-            .reg_exps
-            .valid_start_char_pattern_capture
-            .captures(phone_number)
-            .and_then(|caps| caps.get(1))
-            .map(|m| m.start())
+
+        // inline regexp search
+        let Some(i) = phone_number.find(|c: char| c.is_decimal_utf8() || PLUS_CHARS.contains(c))
         else {
             // No valid start character was found. extracted_number should be set to
             // empty string.
