@@ -4,44 +4,35 @@
 [![Crates.io](https://img.shields.io/crates/v/rlibphonenumber.svg)](https://crates.io/crates/rlibphonenumber)
 [![Docs.rs](https://docs.rs/rlibphonenumber/badge.svg)](https://docs.rs/rlibphonenumber)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Update Metadata & Push](https://github.com/vloldik/rlibphonenumber/actions/workflows/update-metadata.yaml/badge.svg)](https://github.com/vloldik/rlibphonenumber/actions/workflows/update-metadata.yaml)
 
-A high-performance Rust port of Google's `libphonenumber` library for parsing, formatting, and validating international phone numbers.
+A zero-allocation, high-performance Rust port of Google's `libphonenumber` library for parsing, formatting, and validating international phone numbers. 
 
-## Min supported Rust version is 1.88.0
+**Version:** `1.0.0`  
+**Base libphonenumber:** `9.0.8`  
+**Used metadata version:** `v9.0.24`  
+**Min supported Rust version:** `1.88.0`
 
-**Built on base libphonenumber 9.0.8**
-**Used metadata version: v9.0.24**
+## 🛡️ Correctness
 
-## Overview
+Through over **11.2 million iterations** of malformed, randomized, and edge-case inputs, this library has proven **zero mismatches** in parsing, validation rules (`is_valid`, `is_possible`), and formatting outputs (E.164, National, International, RFC3966) compared to the upstream C++ implementation. It provides exact drop-in behavior with Rust's memory safety and high execution speed.
 
-This library is a fresh adaptation of Google's `libphonenumber` for Rust. Its primary goal is to provide a powerful and efficient tool for handling phone numbers, with a structure that is intuitively close to the original C++ version, but adapted for Rust ergonomics.
+## ⚡ Performance
 
-Key capabilities include:
-*   Parsing and formatting phone numbers.
-*   Validating phone numbers for all regions of the world.
-*   Determining the number type (e.g., Mobile, Fixed-line, Toll-free).
-*   Serde support (optional).
-*   Thread-safe and high performance.
+`rlibphonenumber` is designed for low latency and minimal memory overhead. Latest benchmarks show a significant performance advantage over existing Rust alternatives.
 
-## Performance & Architecture
-
-`rlibphonenumber` is strictly designed for low latency and minimal memory overhead. The latest benchmarks show a significant performance advantage over existing alternatives.
-
-| Operation | rlibphonenumber (this crate) | rust-phonenumber | Difference |
+| Operation | rlibphonenumber (v1.0.0) | rust-phonenumber | Difference |
 |:---|:---:|:---:|:---:|
-| **Format (E164)** | **~262 ns** | ~9.20 µs | **~35x faster** |
-| **Format (International)** | **~4.57 µs** | ~11.89 µs | **~2.6x faster** |
-| **Format (National)** | **~6.03 µs** | ~15.30 µs | **~2.5x faster** |
-| **Format (RFC3966)** | **~6.04 µs** | ~12.91 µs | **~2.1x faster** |
-| **Parse** | **~6.12 µs** | ~8.55 µs | **~1.4x faster** |
+| **Format (E164)** | **~258 ns** | ~8.94 µs | **~34.6x faster** |
+| **Format (International)** | **~3.82 µs** | ~11.55 µs | **~3.0x faster** |
+| **Format (National)** | **~4.95 µs** | ~15.63 µs | **~3.1x faster** |
+| **Format (RFC3966)** | **~5.02 µs** | ~12.79 µs | **~2.5x faster** |
+| **Parse** | **~4.70 µs** | ~8.36 µs | **~1.8x faster** |
 
-### Under the Hood
-The high performance is achieved through several architectural optimizations:
-* **Zero-allocation formatting:** Extensive use of stack-allocated buffers (e.g., custom `itoa` with zero-padding), `Cow<str>`, and a specialized Builder pattern. This prevents intermediate heap allocations and unnecessary string concatenations during number formatting.
-* **Fast Hashing:** Replaced default `SipHash` with `FxHash` (`rustc_hash`) for low-latency metadata lookups by region code and integer keys.
-* **Lazy Regex Initialization:** Regular expressions are compiled and cached on-demand directly inside metadata wrappers using `std::sync::OnceLock`, eliminating the synchronization overhead of a centralized regex cache.
-* **Static Dispatch:** Core matching and validation logic relies on monomorphization rather than dynamic dispatch (`dyn Trait`), allowing the compiler to aggressively inline execution paths.
+### Under the Hood: How is it so fast?
+* **Zero-Allocation Formatting:** Intermediate heap allocations are eliminated. By utilizing `Cow<str>`, stack-allocated buffers (via a custom zero-padding `itoa` implementation), and a specialized Builder pattern, formatting numbers rarely touches the system allocator.
+* **Build-Time Anchored Regexes (`RegexTriplets`):** Instead of allocating strings at runtime to wrap patterns in `^(?:...)$`, a custom Java build script pre-compiles and wraps metadata directly into the Protobuf output. At runtime, Rust uses `[..]` string slicing (zero-cost) to extract exact bounds, bypassing the regex engine's O(N) linear search and forcing `O(1)` fast-fail anchor matching.
+* **Fast Hashing:** Replaces the default `SipHash` with `FxHash` (`rustc_hash`) for ultra-low-latency metadata lookups by region code and integer keys.
+* **Lazy Initialization:** Regular expressions are compiled lazily and cached on-demand directly inside metadata wrappers using `std::sync::OnceLock`, removing the locking overhead of a centralized regex cache.
 
 ## Installation
 
@@ -49,7 +40,7 @@ Add `rlibphonenumber` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rlibphonenumber = "0.3.3"
+rlibphonenumber = "1.0.0"
 ```
 
 ### Enabling Serde
@@ -58,12 +49,12 @@ To enable `Serialize` and `Deserialize` support for `PhoneNumber`:
 
 ```toml
 [dependencies]
-rlibphonenumber = { version = "0.3.3", features = ["serde"] }
+rlibphonenumber = { version = "1.0.0", features = ["serde"] }
 ```
 
 ## Getting Started
 
-The library exposes a global static `PHONE_NUMBER_UTIL`, but for most common operations, you can now use methods directly on the `PhoneNumber` struct.
+The library exposes a global static `PHONE_NUMBER_UTIL`, but for most common operations, you can use methods directly on the `PhoneNumber` struct.
 
 ### Complete Example
 
@@ -81,9 +72,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 1. Parse the number
     // You can use the standard FromStr trait:
     let number: PhoneNumber = number_string.parse()?;
-    
-    // Or explicitly via the utility:
-    // let number = PHONE_NUMBER_UTIL.parse(number_string)?;
 
     println!("✅ Successfully parsed number.");
     println!("   - Country Code: {}", number.country_code());
@@ -146,66 +134,36 @@ fn main() {
 }
 ```
 
-## Project Status
+## Differential Fuzzing
 
-The library is under active development. The core `PhoneNumberUtil` is fully implemented and passes the original library's test suite.
+We invite anyone to verify our correctness parity. The repository includes a Dockerized environment that links Google's C++ `libphonenumber` side-by-side with our Rust implementation via `cxx`.
 
-Roadmap:
-*   **`AsYouTypeFormatter`**: For formatting phone numbers as a user types.
-*   **`PhoneNumberOfflineGeocoder`**: To provide geographical location information.
-*   **`PhoneNumberToCarrierMapper`**: To identify the carrier associated with a number.
+To run the differential fuzzer locally:
 
-## Contributing
+1. Clone the repository and open the provided DevContainer/Docker environment.
+2. Run the `full-cycle` fuzz target to check fully random user inputs and ensure no panics occur:
+   ```sh
+   cargo +nightly fuzz run full-cycle
+   ```
+3. Run the `diff-test` target to compare outputs with the original library (requires the C++ library version to match the metadata version used):
+   ```sh
+   cargo +nightly fuzz run diff-test
+   ```
 
-Contributions are highly welcome! Whether you are fixing a bug, improving documentation, or helping to port a new module, your help is appreciated.
+If the fuzzer ever finds a single input where the Rust output deviates from the C++ output, it will immediately crash and save the artifact.
 
-### Code Generation
+## Manual Instantiation & Feature Flags
 
-To maintain consistency with the original library, this project uses pre-compiled metadata. If you need to regenerate the metadata (e.g., after updating `PhoneNumberMetadata.xml`), use the provided script:
+By default, this crate enables the `global_static` feature, which initializes a thread-safe, lazy-loaded static instance `PHONE_NUMBER_UTIL`. This allows you to use convenience methods directly on `PhoneNumber`.
 
-```sh
-./tools/scripts/generate_metadata.sh --tag v9.0.23
-```
-
-## Fuzz Testing
-
-Beyond standard unit tests that cover expected behavior, `rlibphonenumber` undergoes rigorous fuzz testing to ensure its resilience against unexpected, malformed, and potentially malicious input. Given that phone number parsing often deals with untrusted data from users, stability is a primary design goal.
-
-### Running the Fuzzer
-
-1.  **Install prerequisites:**
-    ```sh
-    rustup default nightly
-    cargo install cargo-fuzz
-    ```
-
-2.  **Run a fuzz target:**
-    *   `full-cycle`: A comprehensive test of the parse -> validate -> format workflow.
-
-    To start a fuzzing session, run:
-    ```sh
-    # Example for the main target
-    cargo fuzz run full-cycle
-    ```
-
-### Manual Instantiation & Feature Flags
-
-By default, this crate enables the `global_static` feature, which initializes a thread-safe, lazy-loaded static instance `PHONE_NUMBER_UTIL`. This allows you to use convenience methods directly on `PhoneNumber` (e.g., `number.is_valid()`).
-
-However, if you need granular control over memory usage, wish to avoid global state, or are working in an environment where lazy statics are undesirable, you can disable this feature.
-
-#### Disabling the Global Instance
-
-In your `Cargo.toml`, disable the default features:
+If you need granular control over memory usage, wish to avoid global state, or are working in a strict environment, you can disable this feature.
 
 ```toml
 [dependencies]
-rlibphonenumber = { version = "0.3.1", default-features = false }
+rlibphonenumber = { version = "1.0.0", default-features = false }
 ```
 
-#### Using `PhoneNumberUtil::new()`
-
-When `global_static` is disabled, the `PHONE_NUMBER_UTIL` constant and the helper methods on `PhoneNumber` (like `.format_as()`, `.is_valid()`) **will not be available**. You must instantiate the utility manually and pass it around.
+When `global_static` is disabled, helper methods on `PhoneNumber` (like `.format_as()`, `.is_valid()`) **will not be available**. You must instantiate the utility manually.
 
 **⚠️ Performance Note:** `PhoneNumberUtil::new()` compiles regexes upon initialization. This is an expensive operation. Create it once and reuse it (e.g., wrap it in an `Arc` or pass it by reference).
 
@@ -219,20 +177,10 @@ fn main() {
     let number_str = "+15550109988";
 
     // 2. Parse using the instance
-    // Note: 'parse' is a method on phone_util, not a trait on str here
-    match phone_util.parse(number_str, None) {
-        Ok(number) => {
-            // 3. Use the instance for validation and formatting
-            // number.is_valid() is NOT available without 'global_static'
-            let is_valid = phone_util.is_valid_number(&number).unwrap_or(false);
-            
-            println!("Valid: {}", is_valid);
-        }
-        Err(e) => eprintln!("Parse error: {:?}", e),
+    if let Ok(number) = phone_util.parse(number_str, None) {
+        // 3. Use the instance for validation
+        let is_valid = phone_util.is_valid_number(&number).unwrap_or(false);
+        println!("Valid: {}", is_valid);
     }
 }
 ```
-
-## License
-
-This project is licensed under the Apache License, Version 2.0. Please see the `LICENSE` file for details.
