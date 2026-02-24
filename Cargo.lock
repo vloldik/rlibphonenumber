@@ -1018,6 +1018,7 @@ dependencies = [
  "rlibphonenumbers_macro",
  "rustc-hash",
  "serde",
+ "serde_json",
  "strum",
  "thiserror",
  "zeroes_itoa",
