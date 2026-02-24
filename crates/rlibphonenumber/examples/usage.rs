@@ -1,7 +1,4 @@
-use rlibphonenumber::{
-    PhoneNumber,
-    PhoneNumberFormat,
-};
+use rlibphonenumber::{PhoneNumber, PhoneNumberFormat};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let number_string = "+1-587-530-2271";
@@ -9,7 +6,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 1. Parse the number
     // You can use the standard FromStr trait:
     let number: PhoneNumber = number_string.parse()?;
-    
+
     // Or explicitly via the utility:
     // let number = PHONE_NUMBER_UTIL.parse(number_string)?;
 
@@ -31,7 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 3. Format the number
     // Display trait uses E164 by default
-    println!("\nDefault Display: {}", number); 
+    println!("\nDefault Display: {}", number);
 
     let e164_format = number.format_as(PhoneNumberFormat::E164);
     let international_format = number.format_as(PhoneNumberFormat::International);
@@ -39,10 +36,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let rfc3966_format = number.format_as(PhoneNumberFormat::RFC3966);
 
     println!("Formatted Outputs:");
-    println!("   - E.164:         {}", e164_format);         // +15875302271
+    println!("   - E.164:         {}", e164_format); // +15875302271
     println!("   - International: {}", international_format); // +1 587-530-2271
-    println!("   - National:      {}", national_format);      // (587) 530-2271
-    println!("   - RFC3966:       {}", rfc3966_format);       // tel:+1-587-530-2271
+    println!("   - National:      {}", national_format); // (587) 530-2271
+    println!("   - RFC3966:       {}", rfc3966_format); // tel:+1-587-530-2271
 
     // 4. Get additional information
     let number_type = number.get_type(); // e.g., Mobile, FixedLine
