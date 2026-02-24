@@ -23,6 +23,7 @@ use crate::phonenumberutil::{
         VALID_PUNCTUATION,
     },
     helper_functions::create_extn_pattern,
+    regex_wrapper_types::RegexTriplets,
 };
 
 #[allow(unused)]
@@ -189,7 +190,7 @@ pub(super) struct PhoneNumberRegExpsAndMappings {
     /// Note that the pattern explicitly allows for unbalanced parentheses.
     pub formatting_rule_has_first_group_only_regex_fullmatch: Regex,
 
-    pub catch_all_formatting_regex: Regex,
+    pub catch_all_formatting_regex: RegexTriplets,
 }
 
 impl PhoneNumberRegExpsAndMappings {
@@ -380,7 +381,7 @@ impl PhoneNumberRegExpsAndMappings {
             .unwrap(),
             formatting_rule_has_first_group_only_regex_fullmatch: Regex::new("^\\(?\\$1\\)?$")
                 .unwrap(),
-            catch_all_formatting_regex: Regex::new("(\\d+)(.*)").unwrap(),
+            catch_all_formatting_regex: RegexTriplets::new(Some("^(?:(\\d+)(.*))$".to_string())),
         };
         instance.initialize_regexp_mappings();
         instance

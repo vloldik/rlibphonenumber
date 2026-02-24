@@ -18,6 +18,7 @@ mod ffi {
         format_natl: String,
         format_rfc3966: String,
         format_mobile: String,
+        out_of_country_keeping_alpha: String,
 
         error: String,
     }
@@ -123,6 +124,13 @@ fuzz_target!(|data: (CustomString, CustomString)| {
                 cpp_res.format_mobile,
                 rust_mobile.as_ref(),
                 "Mismatch on Mobile Dialing Format"
+            );
+
+            let rust_ouc_keepeng_alpha =
+                util.format_out_of_country_keeping_alpha_chars(&rust_num, &region_str);
+            assert_eq!(
+                cpp_res.out_of_country_keeping_alpha, rust_ouc_keepeng_alpha,
+                "Mismatch on Out Of Country Format"
             );
         }
     }

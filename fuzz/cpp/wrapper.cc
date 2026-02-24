@@ -65,6 +65,10 @@ CppResult test_cpp_impl(rust::Str number_str, rust::Str region_str) {
         std::string mobile_fmt;
         util->FormatNumberForMobileDialing(number, reg_std, true, &mobile_fmt);
         res.format_mobile = mobile_fmt;
+
+        std::string ouc_alpha;
+        util->FormatOutOfCountryKeepingAlphaChars(number, reg_std, &mobile_fmt);
+        res.out_of_country_keeping_alpha = mobile_fmt;
     } else { 
         res.error = ErrorTypeToString(status); 
     }

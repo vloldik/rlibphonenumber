@@ -16,7 +16,6 @@
 use std::{
     borrow::Cow,
     collections::{HashSet, VecDeque},
-    sync::OnceLock,
 };
 
 use super::{
@@ -1552,13 +1551,8 @@ impl PhoneNumberUtilInternal {
 
             let mut new_format = formatting_pattern.clone();
             // TODO: optimize with more consistent logic
-            let mut new_value =
-                RegexTriplets::new(Some(self.reg_exps.catch_all_formatting_regex.to_string()));
-            let lock = OnceLock::new();
-            let _ = lock.set(Ok(Some(self.reg_exps.catch_all_formatting_regex.clone())));
-            new_value.original = lock;
             // We can ignore error since we just created lock
-            new_format.set_pattern(new_value);
+            new_format.set_pattern(self.reg_exps.catch_all_formatting_regex.clone());
 
             new_format.original.set_format("$1$2".to_owned());
 
