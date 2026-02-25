@@ -299,6 +299,9 @@ impl PhoneNumberRegExpsAndMappings {
         let rfc3966_phone_digit = format!("({}|{})", DIGITS, RFC3966_VISUAL_SEPARATOR);
         let rfc3966_domainlabel = format!("[{}]+((\\-)*[{}])*", alphanum, alphanum);
         let rfc3966_toplabel = format!("[{}]+((\\-)*[{}])*", VALID_ALPHA_INCL_UPPERCASE, alphanum);
+        let catch_all_formatting_regex = RegexTriplets::new(Some("^(?:(\\d+)(.*))$".to_string()));
+        // Initialize
+        catch_all_formatting_regex.original().unwrap();
 
         let mut instance = Self {
             // it'll be initialized only once, so we can use slow format!
@@ -365,7 +368,7 @@ impl PhoneNumberRegExpsAndMappings {
             .unwrap(),
             formatting_rule_has_first_group_only_regex_fullmatch: Regex::new("^\\(?\\$1\\)?$")
                 .unwrap(),
-            catch_all_formatting_regex: RegexTriplets::new(Some("^(?:(\\d+)(.*))$".to_string())),
+            catch_all_formatting_regex,
         };
         instance.initialize_regexp_mappings();
         instance

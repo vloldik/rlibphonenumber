@@ -2,7 +2,7 @@ use criterion::{Criterion, black_box, criterion_group, criterion_main};
 
 use phonelib::PhoneNumber as PhonelibNumber;
 use phonenumber::{self as rlp, country::Id};
-use rlibphonenumber::PHONE_NUMBER_UTIL;
+use rlibphonenumber::{PHONE_NUMBER_UTIL, PhoneNumberUtil};
 
 type TestEntity = (&'static str, &'static str, Id);
 
@@ -25,6 +25,11 @@ fn parsing_benchmark(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("Parsing Comparison");
 
+    group.bench_function("create::new", |b| {
+        b.iter(|| {
+            let _ = black_box(PhoneNumberUtil::new());
+        });
+    });
     group.bench_function("rlibphonenumber: parse()", |b| {
         b.iter(|| {
             for (number_str, region, _) in &numbers_to_parse {
