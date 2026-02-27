@@ -7,7 +7,7 @@
 
 A zero-allocation, high-performance Rust port of Google's `libphonenumber` library for parsing, formatting, and validating international phone numbers. 
 
-**Used metadata version: v9.0.24**  
+**Used metadata version: v9.0.25**  
 **Version:** `1.0.1`  
 **Base libphonenumber:** `9.0.8`  
 **Min supported Rust version:** `1.88.0`
@@ -59,7 +59,7 @@ Add `rlibphonenumber` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rlibphonenumber = "1.0.0"
+rlibphonenumber = "1.0.2"
 ```
 
 ### Enabling Serde
