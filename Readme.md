@@ -16,17 +16,36 @@ A zero-allocation, high-performance Rust port of Google's `libphonenumber` libra
 
 Through over **11.2 million iterations** of malformed, randomized, and edge-case inputs, this library has proven **zero mismatches** in parsing, validation rules (`is_valid`, `is_possible`), and formatting outputs (E.164, National, International, RFC3966) compared to the upstream C++ implementation. It provides exact drop-in behavior with Rust's memory safety and high execution speed.
 
-## ⚡ Performance
+## Performance
 
-`rlibphonenumber` is designed for low latency and minimal memory overhead. Latest benchmarks show a significant performance advantage over existing Rust alternatives.
+Performance is measured using `criterion`. We compare `rlibphonenumber` with the popular `rust-phonenumber` (the `phonenumber` crate) and `phonelib` crates.
 
-| Operation | rlibphonenumber (v1.0.0) | rust-phonenumber | Difference |
-|:---|:---:|:---:|:---:|
-| **Format (E164)** | **~258 ns** | ~8.94 µs | **~34.6x faster** |
-| **Format (International)** | **~3.82 µs** | ~11.55 µs | **~3.0x faster** |
-| **Format (National)** | **~4.95 µs** | ~15.63 µs | **~3.1x faster** |
-| **Format (RFC3966)** | **~5.02 µs** | ~12.79 µs | **~2.5x faster** |
-| **Parse** | **~4.70 µs** | ~8.36 µs | **~1.8x faster** |
+All benchmarks measure the average time required to process a **single phone number**.
+
+### Initialization
+`rlibphonenumber` requires initializing `PhoneNumberUtil`, which loads the necessary metadata. This is typically done once at application startup:
+* **`PhoneNumberUtil::new()`**: ~6.41 ms
+
+### Parsing
+Time required to parse a string representation into a phone number object:
+
+| Library | `parse()` | Notes |
+|---|---|---|
+| **`rlibphonenumber`** | **~568 ns** | **Fastest & most reliable** |
+| `rust-phonenumber` | ~832 ns | Fails on certain valid numbers.* |
+| `phonelib` | *Failed* | Fails on certain valid numbers. |
+
+*\* During testing, we found that `rust-phonenumber` (`rlp`) returns an error on valid phone numbers, such as the Brazilian number `"+55 11 98765-4321"`.*
+
+### Formatting
+Time required to format a parsed phone number object into various standards:
+
+| Format | `rlibphonenumber` | `rust-phonenumber` | `phonelib` |
+|---|---|---|---|
+| **E164** | **~33.7 ns** 🚀 | ~721 ns | ~710 ns |
+| **International** | **~423 ns** | ~1.01 µs | ~772 ns |
+| **National** | **~562 ns** | ~1.38 µs | ~752 ns |
+| **RFC3966** | **~587 ns** | ~1.18 µs | ~906 ns |
 
 ### Under the Hood: How is it so fast?
 * **Zero-Allocation Formatting:** Intermediate heap allocations are eliminated. By utilizing `Cow<str>`, stack-allocated buffers (via a custom zero-padding `itoa` implementation), and a specialized Builder pattern, formatting numbers rarely touches the system allocator.
