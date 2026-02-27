@@ -26,7 +26,7 @@ jobs:
           distribution: 'temurin'
 
       - name: Install Protobuf Compiler
-        run: sudo apt-get install -y protobuf-compiler
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
 
       - name: Set up Rust
         # Required for cargo-edit
