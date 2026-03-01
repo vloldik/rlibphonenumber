@@ -21,7 +21,7 @@ HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
   -H "User-Agent: rlibphonenumber-ci (githubactions)" \
   "https://crates.io/api/v1/crates/$CRATE_NAME/$VERSION")
 
-if[ "$HTTP_STATUS" -eq 200 ]; then
+if [ "$HTTP_STATUS" -eq 200 ]; then
   echo "$CRATE_NAME v$VERSION is already published. Skipping."
   echo "published=false" >> "$GITHUB_OUTPUT"
 else
