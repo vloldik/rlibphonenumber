@@ -2,8 +2,12 @@ name: Publish to Crates.io
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   publish:
@@ -13,13 +17,33 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Rust
-        # Multipackage publish
         uses: dtolnay/rust-toolchain@1.90.0
 
-      - name: Run Tests
-        run: cargo test
+      - name: Run Tests (Standard Regex)
+        run: cargo test -p rlibphonenumber --no-default-features --features "regex,global_static"
 
-      - name: Publish to Crates.io
+      - name: Run Tests (Lite Regex)
+        run: cargo test -p rlibphonenumber --no-default-features --features "lite,global_static"
+
+      - name: Make publish script executable
+        run: chmod +x tools/scripts/publish_if_changed.sh
+
+      - name: Publish rlibphonenumbers_macro (if changed)
+        id: pub_macro
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: cargo publish --package rlibphonenumber --package rlibphonenumbers_macro
+        run: ./tools/scripts/publish_if_changed.sh rlibphonenumbers_macro
+
+      - name: Publish rlibphonenumber (if changed)
+        id: pub_main
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: ./tools/scripts/publish_if_changed.sh rlibphonenumber
+
+      - name: Create GitHub Release
+        if: steps.pub_main.outputs.published == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.pub_main.outputs.version }}
+          name: Release v${{ steps.pub_main.outputs.version }}
+          generate_release_notes: true 
