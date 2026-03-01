@@ -7,8 +7,8 @@
 
 A zero-allocation, high-performance Rust port of Google's `libphonenumber` library for parsing, formatting, and validating international phone numbers. 
 
-**Used metadata version: v9.0.24**  
-**Version:** `1.0.2`  
+**Used metadata version: v9.0.25**  
+**Version:** `1.0.1`  
 **Base libphonenumber:** `9.0.8`  
 **Min supported Rust version:** `1.88.0`
 
