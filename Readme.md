@@ -4,8 +4,11 @@
 [![Crates.io](https://img.shields.io/crates/v/rlibphonenumber.svg)](https://crates.io/crates/rlibphonenumber)
 [![Docs.rs](https://docs.rs/rlibphonenumber/badge.svg)](https://docs.rs/rlibphonenumber)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![WASM Preview](https://img.shields.io/badge/Live-WASM_Preview-success.svg)](https://vloldik.github.io/rlibphonenumber-wasm/)
 
 A zero-allocation, high-performance Rust port of Google's `libphonenumber` library for parsing, formatting, and validating international phone numbers. 
+
+🌐 **Live WASM Preview:** [Try the library directly in browser!](https://vloldik.github.io/rlibphonenumber-wasm/)
 
 **Used metadata version: v9.0.25**  
 **Version:** `1.1.0`  
@@ -66,7 +69,9 @@ rlibphonenumber = "1.1.0"
 ```
 
 ### 2. Lite (Recommended for WASM/Embedded)
-Uses `regex-lite` to significantly reduce binary size. Parsing is slower than the standard backend but still efficient enough for UI/Validation tasks. Formatting speed remains virtually identical.
+Uses `regex-lite` to significantly reduce binary size. Parsing is slower than the standard backend but still efficient enough for UI/Validation tasks. Formatting speed remains virtually identical. 
+
+*(Check out our [Live WASM Preview](https://vloldik.github.io/rlibphonenumber-wasm/) to see it in action!)*
 
 ```toml
 [dependencies]
