@@ -8,7 +8,7 @@
 A zero-allocation, high-performance Rust port of Google's `libphonenumber` library for parsing, formatting, and validating international phone numbers. 
 
 **Used metadata version: v9.0.24**  
-**Version:** `1.0.1`  
+**Version:** `1.0.2`  
 **Base libphonenumber:** `9.0.8`  
 **Min supported Rust version:** `1.88.0`
 
@@ -53,23 +53,34 @@ Time required to format a parsed phone number object into various standards:
 * **Fast Hashing:** Replaces the default `SipHash` with `FxHash` (`rustc_hash`) for ultra-low-latency metadata lookups by region code and integer keys.
 * **Lazy Initialization:** Regular expressions are compiled lazily and cached on-demand directly inside metadata wrappers using `std::sync::OnceLock`, removing the locking overhead of a centralized regex cache.
 
-## Installation
+## Installation & Feature Flags
 
-Add `rlibphonenumber` to your `Cargo.toml`:
+Add `rlibphonenumber` to your `Cargo.toml`. You can choose between the standard regex engine (fastest parsing) or the lite engine (smallest binary size).
 
-```toml
-[dependencies]
-rlibphonenumber = "1.0.0"
-```
-
-### Enabling Serde
-
-To enable `Serialize` and `Deserialize` support for `PhoneNumber`:
+### 1. Standard (Recommended for Backend/Desktop)
+Uses the full `regex` crate. Provides maximum parsing performance.
 
 ```toml
 [dependencies]
-rlibphonenumber = { version = "1.0.0", features = ["serde"] }
+rlibphonenumber = "1.0.2"
 ```
+
+### 2. Lite (Recommended for WASM/Embedded)
+Uses `regex-lite` to significantly reduce binary size. Parsing is slower than the standard backend but still efficient enough for UI/Validation tasks. Formatting speed remains virtually identical.
+
+```toml
+[dependencies]
+rlibphonenumber = { version = "1.0.2", default-features = false, features = ["lite", "global_static"] }
+```
+
+### Available Features
+
+| Feature | Description | Default |
+|---|---|---|
+| `regex` | Uses the `regex` crate (SIMD optimizations, large Unicode tables). Best for speed. | ✅ |
+| `lite` | Uses `regex-lite`. Optimizes for binary size. Best for WASM or embedded targets. | ❌ |
+| `global_static` | Enables the lazy-loaded global `PHONE_NUMBER_UTIL` instance. | ✅ |
+| `serde` | Enables `Serialize`/`Deserialize` for `PhoneNumber`. | ❌ |
 
 ## Getting Started
 
@@ -171,7 +182,7 @@ To run the differential fuzzer locally:
 
 If the fuzzer ever finds a single input where the Rust output deviates from the C++ output, it will immediately crash and save the artifact.
 
-## Manual Instantiation & Feature Flags
+## Manual Instantiation
 
 By default, this crate enables the `global_static` feature, which initializes a thread-safe, lazy-loaded static instance `PHONE_NUMBER_UTIL`. This allows you to use convenience methods directly on `PhoneNumber`.
 
@@ -179,7 +190,7 @@ If you need granular control over memory usage, wish to avoid global state, or a
 
 ```toml
 [dependencies]
-rlibphonenumber = { version = "1.0.0", default-features = false }
+rlibphonenumber = { version = "1.0.2", default-features = false, features = ["regex"] }
 ```
 
 When `global_static` is disabled, helper methods on `PhoneNumber` (like `.format_as()`, `.is_valid()`) **will not be available**. You must instantiate the utility manually.
