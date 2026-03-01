@@ -8,6 +8,9 @@
       "installMaven": "true"
     }
   },
+  "runArgs": [
+    "--memory=10g"
+  ],
   "customizations": {
     "vscode": {
       "settings": {
