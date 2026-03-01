@@ -237,8 +237,8 @@ impl PhoneNumberRegExpsAndMappings {
         let extn_patterns_for_parsing = create_extn_pattern(true);
         let valid_phone_number = format!(
             // moved 2-digits pattern to an end for match full number first
-            "[{}]*(?:[{}{}]*{}){{3,}}[{}{}{}{}]*\
-            |{}{{{}}}",
+            "[{}]*(?:[{}{}]*[{}]){{3,}}[{}{}{}{}]*\
+            |[{}]{{{}}}",
             PLUS_CHARS,
             VALID_PUNCTUATION,
             STAR_SIGN,
@@ -252,7 +252,7 @@ impl PhoneNumberRegExpsAndMappings {
             MIN_LENGTH_FOR_NSN,
         );
 
-        let rfc3966_phone_digit = format!("({}|{})", DIGITS, RFC3966_VISUAL_SEPARATOR);
+        let rfc3966_phone_digit = format!("([{}]|{})", DIGITS, RFC3966_VISUAL_SEPARATOR);
         let rfc3966_domainlabel = format!("[{}]+((\\-)*[{}])*", alphanum, alphanum);
         let rfc3966_toplabel = format!("[{}]+((\\-)*[{}])*", VALID_ALPHA_INCL_UPPERCASE, alphanum);
         let catch_all_formatting_regex = RegexTriplets::new(Some("^(?:(\\d+)(.*))$".to_string()));
@@ -299,7 +299,7 @@ impl PhoneNumberRegExpsAndMappings {
             carrier_code_pattern: Regex::new("\\$CC").unwrap(),
             plus_chars_pattern_start: Regex::new(&format!("^[{}]+", &PLUS_CHARS)).unwrap(),
             rfc3966_global_number_digits_pattern_fullmatch: Regex::new(&format!(
-                "^\\{}{}*{}{}*$",
+                "^\\{}{}*[{}]{}*$",
                 PLUS_SIGN, &rfc3966_phone_digit, DIGITS, rfc3966_phone_digit
             ))
             .unwrap(),

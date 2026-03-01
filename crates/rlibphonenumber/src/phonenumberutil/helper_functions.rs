@@ -155,47 +155,84 @@ pub fn create_extn_pattern(for_parsing: bool) -> String {
     // length for extensions is actually 40, but we don't support this since we
     // haven't seen real examples and this introduces many false interpretations
     // as the extension labels are not standardized.
-    let ext_limit_after_explicit_label = 20;
-    let ext_limit_after_likely_label = 15;
-    let ext_limit_after_ambiguous_char = 9;
-    let ext_limit_when_not_sure = 6;
+    const EXT_LIMIT_AFTER_EXPLICIT_LABEL: u32 = 20;
+    const EXT_LIMIT_AFTER_LIKELY_LABEL: u32 = 15;
+    const EXT_LIMIT_AFTER_AMBIGUOUS_CHAR: u32 = 9;
+    const EXT_LIMIT_WHEN_NOT_SURE: u32 = 6;
 
-    // Canonical-equivalence doesn't seem to be an option with RE2, so we allow
-    // two options for representing any non-ASCII character like ó - the character
-    // itself, and one in the unicode decomposed form with the combining acute
-    // accent.
+    #[cfg(all(feature = "lite", not(feature = "regex")))]
+    const EXPLICIT_EXT_LABELS: &str = concat!(
+        "(?:",
+        "[eE]?[xX][tT]",
+        "(?:[eE][nN][sS][iI](?:[oO\u{00D3}]\u{0301}?|[\u{00F3}\u{00D3}]))?[nN]?",
+        "|",
+        "(?:[\u{FF45}\u{FF25}])?[\u{FF58}\u{FF38}][\u{FF54}\u{FF34}](?:[\u{FF4E}\u{FF2E}])?",
+        "|",
+        "[\u{0434}\u{0414}][\u{043E}\u{041E}][\u{0431}\u{0411}]",
+        "|",
+        "[aA][nN][eE][xX][oO]",
+        ")"
+    );
 
-    // Here the extension is called out in a more explicit way, i.e mentioning it
-    // obvious patterns like "ext.".
-    let explicit_ext_labels = "(?:e?xt(?:ensi(?:o\u{0301}?|\u{00F3}))?n?|(?:\u{FF45})?\u{FF58}\u{FF54}(?:\u{FF4E})?|\u{0434}\u{043E}\u{0431}|anexo)";
-    // One-character symbols that can be used to indicate an extension, and less
-    // commonly used or more ambiguous extension labels.
-    let ambiguous_ext_labels = "(?:[x\u{FF58}#\u{FF03}~\u{FF5E}]|int|\u{FF49}\u{FF4E}\u{FF54})";
-    // When extension is not separated clearly.
-    let ambiguous_separator = "[- ]+";
+    #[cfg(all(feature = "lite", not(feature = "regex")))]
+    const AMBIGUOUS_EXT_LABELS: &str = concat!(
+        "(?:",
+        "[xX\u{FF58}\u{FF38}#\u{FF03}~\u{FF5E}]",
+        "|",
+        "[iI][nN][tT]",
+        "|",
+        "[\u{FF49}\u{FF29}][\u{FF4E}\u{FF2E}][\u{FF54}\u{FF34}]",
+        ")"
+    );
+
+    #[cfg(feature = "regex")]
+    const EXPLICIT_EXT_LABELS: &str = concat!(
+        "(?:",
+        "e?xt(?:ensi(?:o\u{0301}?|\u{00F3}))?n?",
+        "|",
+        "(?:\u{FF45})?\u{FF58}\u{FF54}(?:\u{FF4E})?",
+        "|",
+        "\u{0434}\u{043E}\u{0431}",
+        "|",
+        "anexo",
+        ")"
+    );
+
+    #[cfg(feature = "regex")]
+    const AMBIGUOUS_EXT_LABELS: &str = concat!(
+        "(?:",
+        "[x\u{FF58}#\u{FF03}~\u{FF5E}]",
+        "|",
+        "int",
+        "|",
+        "\u{FF49}\u{FF4E}\u{FF54}",
+        ")"
+    );
+
+    const AMBIGUOUS_SEPARATOR: &str = "[- ]+";
 
     let rfc_extn = fast_cat::concat_str!(
         RFC3966_EXTN_PREFIX,
-        &extn_digits(ext_limit_after_explicit_label)
+        &extn_digits(EXT_LIMIT_AFTER_EXPLICIT_LABEL)
     );
     let explicit_extn = fast_cat::concat_str!(
         POSSIBLE_SEPARATORS_BETWEEN_NUMBER_AND_EXT_LABEL,
-        explicit_ext_labels,
+        EXPLICIT_EXT_LABELS,
         POSSIBLE_CHARS_AFTER_EXT_LABEL,
-        &extn_digits(ext_limit_after_explicit_label),
+        &extn_digits(EXT_LIMIT_AFTER_EXPLICIT_LABEL),
         OPTIONAL_EXT_SUFFIX
     );
     let ambiguous_extn = fast_cat::concat_str!(
         POSSIBLE_SEPARATORS_BETWEEN_NUMBER_AND_EXT_LABEL,
-        ambiguous_ext_labels,
+        AMBIGUOUS_EXT_LABELS,
         POSSIBLE_CHARS_AFTER_EXT_LABEL,
-        &extn_digits(ext_limit_after_ambiguous_char),
+        &extn_digits(EXT_LIMIT_AFTER_AMBIGUOUS_CHAR),
         OPTIONAL_EXT_SUFFIX
     );
 
     let american_style_extn_with_suffix = fast_cat::concat_str!(
-        ambiguous_separator,
-        &extn_digits(ext_limit_when_not_sure),
+        AMBIGUOUS_SEPARATOR,
+        &extn_digits(EXT_LIMIT_WHEN_NOT_SURE),
         "#"
     );
 
@@ -233,14 +270,14 @@ pub fn create_extn_pattern(for_parsing: bool) -> String {
             possible_separators_number_ext_label_no_comma,
             auto_dialling_and_ext_labels_found,
             POSSIBLE_CHARS_AFTER_EXT_LABEL,
-            &extn_digits(ext_limit_after_likely_label),
+            &extn_digits(EXT_LIMIT_AFTER_LIKELY_LABEL),
             OPTIONAL_EXT_SUFFIX
         );
         let only_commas_extn = fast_cat::concat_str!(
             possible_separators_number_ext_label_no_comma,
             "(?:,)+",
             POSSIBLE_CHARS_AFTER_EXT_LABEL,
-            &extn_digits(ext_limit_after_ambiguous_char),
+            &extn_digits(EXT_LIMIT_AFTER_AMBIGUOUS_CHAR),
             OPTIONAL_EXT_SUFFIX
         );
         // Here the first pattern is exclusive for extension autodialling formats

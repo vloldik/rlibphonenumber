@@ -98,7 +98,7 @@ fn main() {
                     .iter()
                     .map(|r| format!(r"\u{{{:x}}}-\u{{{:x}}}", r.code_point, r.code_point + 9))
                     .collect();
-                format!("pub const DIGITS_ND: &str = \"[{}]\";", decimals)
+                format!("pub const DIGITS_ND: &str = \"{}\";", decimals)
             })
             .out_file("uniprops_digits_pat.rs")
             .build();
