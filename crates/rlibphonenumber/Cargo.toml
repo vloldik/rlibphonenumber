@@ -25,7 +25,10 @@ categories = [
 build = "build/rust_build.rs"
 
 [features]
-default = ["global_static"]
+default = ["global_static", "regex"]
+regex = ["dep:regex"]
+lite = ["dep:regex-lite"]
+
 global_static = []
 serde = ["global_static", "dep:serde"]
 
@@ -42,7 +45,9 @@ protobuf = "3.7"
 # optimized concurrent map
 dashmap = "5.5"
 # just regex package
-regex = "1.10"
+regex = { version = "1.10", optional = true }
+regex-lite = { version = "0.1", optional = true }
+
 
 thiserror = { workspace = true }
 

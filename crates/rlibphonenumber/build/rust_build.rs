@@ -87,4 +87,20 @@ fn main() {
         .out_file("uniprops_without_nl.rs")
         .with_digits(false)
         .build();
+
+    if cfg!(all(feature = "lite", not(feature = "regex"))) {
+        UnipropsBuilder::new()
+            .with_digits(false)
+            .with_categories(false)
+            .filter(|r| r.general_category == "Nd" && r.decimal_digit_value == Some(0))
+            .with_custom(|recs| {
+                let decimals: String = recs
+                    .iter()
+                    .map(|r| format!(r"\u{{{:x}}}-\u{{{:x}}}", r.code_point, r.code_point + 9))
+                    .collect();
+                format!("pub const DIGITS_ND: &str = \"[{}]\";", decimals)
+            })
+            .out_file("uniprops_digits_pat.rs")
+            .build();
+    }
 }

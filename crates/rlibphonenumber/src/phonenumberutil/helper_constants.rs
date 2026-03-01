@@ -13,6 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(all(feature = "lite", not(feature = "regex")))]
+use crate::generated::uniprops_digits_pat;
+
 // The minimum and maximum length of the national significant number.
 pub const MIN_LENGTH_FOR_NSN: usize = 2;
 // The ITU says the maximum length should be 15, but we have found longer
@@ -52,7 +55,11 @@ pub const RFC3966_PHONE_CONTEXT: &str = ";phone-context=";
 pub const RFC3966_ISDN_SUBADDRESS: &str = ";isub=";
 pub const RFC3966_VISUAL_SEPARATOR: &str = r"[\-\.\(\)]?";
 
+#[cfg(feature = "regex")]
 pub const DIGITS: &str = r"\p{Nd}";
+
+#[cfg(all(feature = "lite", not(feature = "regex")))]
+pub const DIGITS: &str = uniprops_digits_pat::uniprops::DIGITS_ND;
 
 pub const VALID_ALPHA: &str = "a-z";
 pub const VALID_ALPHA_INCL_UPPERCASE: &str = "A-Za-z";

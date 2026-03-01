@@ -1,7 +1,7 @@
 use std::sync::OnceLock;
 
+use crate::regexp::Regex;
 use paste::paste;
-use regex::Regex;
 
 use crate::{
     InvalidRegexError,
@@ -12,9 +12,9 @@ use crate::{
 pub struct RegexTriplets {
     pub pattern_base: Option<String>,
 
-    pub original: OnceLock<Result<Option<Regex>, regex::Error>>,
-    pub anchor_start: OnceLock<Result<Option<Regex>, regex::Error>>,
-    pub anchor_full: OnceLock<Result<Option<Regex>, regex::Error>>,
+    pub original: OnceLock<Result<Option<Regex>, crate::regexp::Error>>,
+    pub anchor_start: OnceLock<Result<Option<Regex>, crate::regexp::Error>>,
+    pub anchor_full: OnceLock<Result<Option<Regex>, crate::regexp::Error>>,
 }
 
 const MIN_LENGTH_FOR_WRAPPED_PATTERN: usize = 6; // ^(?:)$

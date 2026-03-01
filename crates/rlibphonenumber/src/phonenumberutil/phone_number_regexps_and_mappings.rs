@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use regex::Regex;
+use crate::regexp::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::phonenumberutil::{

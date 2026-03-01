@@ -23,7 +23,7 @@ use thiserror::Error;
 
 #[derive(Debug, PartialEq, Error, Clone)]
 #[error("An error occurred while trying to create regex: {0}")]
-pub struct InvalidRegexError(#[from] regex::Error);
+pub struct InvalidRegexError(#[from] crate::regexp::Error);
 
 /// Represents the possible errors that can occur when parsing a phone number string.
 /// This is a public-facing error enum.

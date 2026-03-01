@@ -58,8 +58,8 @@ use crate::{
     string_util::strip_cow_prefix,
 };
 
+use crate::regexp::Regex;
 use log::{error, trace, warn};
-use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 // Helper type for Result
@@ -2721,7 +2721,7 @@ impl PhoneNumberUtilInternal {
         let first_capture = captures.as_ref().and_then(|c| c.get(1));
         let second_capture = captures.as_ref().and_then(|c| c.get(2));
 
-        let condition = |first_capture: &regex::Match<'_>| {
+        let condition = |first_capture: &crate::regexp::Match<'_>| {
             !transform_rule.is_empty()
                 && (second_capture.is_some_and(|c| !c.is_empty())
                     || !first_capture.is_empty() && second_capture.is_none())

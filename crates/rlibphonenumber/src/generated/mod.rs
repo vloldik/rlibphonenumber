@@ -24,3 +24,8 @@ pub mod uniprops_digits {
 pub mod uniprops_without_nl {
     include!(concat!(env!("OUT_DIR"), "/uniprops_without_nl.rs"));
 }
+
+#[cfg(all(feature = "lite", not(feature = "regex")))]
+pub mod uniprops_digits_pat {
+    include!(concat!(env!("OUT_DIR"), "/uniprops_digits_pat.rs"));
+}

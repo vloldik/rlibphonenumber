@@ -18,6 +18,7 @@ mod generated;
 mod interfaces;
 mod phonenumberutil;
 mod regex_based_matcher;
+pub(crate) mod regexp;
 pub(crate) mod string_util;
 
 pub use generated::proto::phonemetadata;
