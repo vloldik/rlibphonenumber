@@ -8,7 +8,7 @@
 A zero-allocation, high-performance Rust port of Google's `libphonenumber` library for parsing, formatting, and validating international phone numbers. 
 
 **Used metadata version: v9.0.25**  
-**Version:** `1.0.2`  
+**Version:** `1.0.3`  
 **Base libphonenumber:** `9.0.8`  
 **Min supported Rust version:** `1.88.0`
 
@@ -62,7 +62,7 @@ Uses the full `regex` crate. Provides maximum parsing performance.
 
 ```toml
 [dependencies]
-rlibphonenumber = "1.0.2"
+rlibphonenumber = "1.0.3"
 ```
 
 ### 2. Lite (Recommended for WASM/Embedded)
@@ -70,7 +70,7 @@ Uses `regex-lite` to significantly reduce binary size. Parsing is slower than th
 
 ```toml
 [dependencies]
-rlibphonenumber = { version = "1.0.2", default-features = false, features = ["lite", "global_static"] }
+rlibphonenumber = { version = "1.0.3", default-features = false, features = ["lite", "global_static"] }
 ```
 
 ### Available Features
@@ -190,7 +190,7 @@ If you need granular control over memory usage, wish to avoid global state, or a
 
 ```toml
 [dependencies]
-rlibphonenumber = { version = "1.0.2", default-features = false, features = ["regex"] }
+rlibphonenumber = { version = "1.0.3", default-features = false, features = ["regex"] }
 ```
 
 When `global_static` is disabled, helper methods on `PhoneNumber` (like `.format_as()`, `.is_valid()`) **will not be available**. You must instantiate the utility manually.
