@@ -53,7 +53,6 @@ fast-cat = "0.1"
 # lib for derive enum iteration
 strum = { version = "0.26", features = ["derive"] }
 # Simple lib to converts any unicode valid chars into decimals 
-dec_from_char = "0.2"
 rlibphonenumbers_macro = { path = "../rlibphonenumbers_macro", version = "0.1" }
 zeroes_itoa = { path = "../zeroes_itoa", version = "0.1" }
 
@@ -66,6 +65,7 @@ paste = "1.0"
 thiserror = "1.0"
 protobuf-codegen = "3.7"
 protobuf = "3.7"
+uniprops-gen = "0.3"
 
 [dev-dependencies]
 colog = "1.3"

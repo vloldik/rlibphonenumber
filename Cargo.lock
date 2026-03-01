@@ -385,26 +385,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dec_from_char"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a192e8f798f2bbd4095a4eb2f257106a1113a3b248374348809a9465419388b8"
-dependencies = [
- "dec_from_char_gen",
-]
-
-[[package]]
-name = "dec_from_char_gen"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ddfb9ab7ca300bfee970c933615884530ef3c97c301f17c35f09190e6729c46"
-dependencies = [
- "csv",
- "quote",
- "serde",
-]
-
-[[package]]
 name = "either"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1004,7 +984,6 @@ dependencies = [
  "colog",
  "criterion",
  "dashmap",
- "dec_from_char",
  "env_logger",
  "fast-cat",
  "itoa",
@@ -1021,6 +1000,7 @@ dependencies = [
  "serde_json",
  "strum",
  "thiserror",
+ "uniprops-gen",
  "zeroes_itoa",
 ]
 
@@ -1254,6 +1234,18 @@ name = "unicode-width"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4ac048d71ede7ee76d585517add45da530660ef4390e49b098733c6e897f254"
+
+[[package]]
+name = "uniprops-gen"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05d6db97ebbd56eefc1b33b5e98d4094da4df099edd8138c8c6354ce84d23e3f"
+dependencies = [
+ "csv",
+ "proc-macro2",
+ "quote",
+ "serde",
+]
 
 [[package]]
 name = "utf8parse"

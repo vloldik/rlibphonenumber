@@ -2,9 +2,12 @@ use protobuf::{Message, MessageField};
 
 use crate::{
     InternalError,
-    generated::proto::{
-        phonemetadata::{NumberFormat, PhoneMetadata, PhoneNumberDesc},
-        phonenumber::{PhoneNumber, phone_number::CountryCodeSource},
+    generated::{
+        proto::{
+            phonemetadata::{NumberFormat, PhoneMetadata, PhoneNumberDesc},
+            phonenumber::{PhoneNumber, phone_number::CountryCodeSource},
+        },
+        uniprops_digits,
     },
     phonenumberutil::{
         enums::{NumberLengthType, PhoneNumberFormat, PhoneNumberType},
@@ -31,7 +34,18 @@ fn interchange_invalid_codepoints() {
         "+44\u{2013}2087654321", // U+2013, EN DASH
     ];
     for input in valid_inputs {
-        assert_eq!(input, dec_from_char::normalize_decimals(input));
+        assert_eq!(
+            input,
+            input
+                .chars()
+                .map(|c| {
+                    uniprops_digits::uniprops::get_digit_value(c)
+                        .map(|c| (c + b'0') as char)
+                        .unwrap_or(c)
+                })
+                .collect::<String>()
+                .as_str()
+        );
         assert!(phone_util.is_viable_phone_number(input));
         phone_util.parse(input, Some(RegionCode::gb())).unwrap();
     }
@@ -40,6 +54,8 @@ fn interchange_invalid_codepoints() {
         "+44\u{96}2087654321",   // Invalid sequence
         "+44\u{0096}2087654321", // U+0096
         "+44\u{fffe}2087654321", // U+FFFE
+        // Unassigned end chars
+        "+44\u{2013}2087654321\u{0378}\u{0378}\u{0378}\u{0378}",
     ];
     for input in invalid_inputs {
         assert!(!phone_util.is_viable_phone_number(input));

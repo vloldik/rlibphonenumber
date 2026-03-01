@@ -15,6 +15,7 @@
 
 use protobuf::reflect::FieldDescriptor;
 use protobuf_codegen::{Customize, CustomizeCallback};
+use uniprops_gen::UnipropsBuilder;
 
 fn main() {
     struct GenWarnings {}
@@ -73,4 +74,17 @@ fn main() {
         .cargo_out_dir("proto_gen")
         .customize_callback(GenWarnings {})
         .run_from_script();
+
+    UnipropsBuilder::new()
+        .with_categories(false)
+        .out_file("uniprops_digits.rs")
+        .build();
+
+    // [^p{N}p{L}]
+    // For others, since char is valid unicode Category::from_char should be Some()
+    UnipropsBuilder::new()
+        .filter(|r| !r.general_category.starts_with(['N', 'L']))
+        .out_file("uniprops_without_nl.rs")
+        .with_digits(false)
+        .build();
 }

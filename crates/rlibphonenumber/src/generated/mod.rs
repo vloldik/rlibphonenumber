@@ -16,3 +16,11 @@
 pub mod metadata;
 #[allow(deprecated)]
 pub mod proto;
+
+pub mod uniprops_digits {
+    include!(concat!(env!("OUT_DIR"), "/uniprops_digits.rs"));
+}
+
+pub mod uniprops_without_nl {
+    include!(concat!(env!("OUT_DIR"), "/uniprops_without_nl.rs"));
+}

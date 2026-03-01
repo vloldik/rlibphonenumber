@@ -39,9 +39,12 @@ use super::{
 };
 use crate::{
     InternalError, InternalRegexError, InvalidNumberError,
-    generated::proto::{
-        phonemetadata::PhoneMetadataCollection,
-        phonenumber::{PhoneNumber, phone_number::CountryCodeSource},
+    generated::{
+        proto::{
+            phonemetadata::PhoneMetadataCollection,
+            phonenumber::{PhoneNumber, phone_number::CountryCodeSource},
+        },
+        uniprops_digits, uniprops_without_nl,
     },
     phonenumberutil::{
         helper_constants::PLUS_CHARS,
@@ -55,7 +58,6 @@ use crate::{
     string_util::strip_cow_prefix,
 };
 
-use dec_from_char::DecimalExtended;
 use log::{error, trace, warn};
 use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -241,17 +243,9 @@ impl PhoneNumberUtilInternal {
     }
 
     pub(crate) fn trim_unwanted_end_chars<'a>(&self, phone_number: &'a str) -> &'a str {
-        let Some(new_len) = self
-            .reg_exps
-            .unwanted_end_char_pattern_captures
-            .captures(phone_number)
-            .and_then(|c| c.get(1))
-            .map(|m| m.start())
-        else {
-            return phone_number;
-        };
-
-        &phone_number[..new_len]
+        phone_number.trim_end_matches(|c| {
+            c != '#' && uniprops_without_nl::uniprops::Category::from_char(c).is_some()
+        })
     }
 
     /// formatter is not implemented yet, but ..
@@ -1133,7 +1127,12 @@ impl PhoneNumberUtilInternal {
     ///
     /// * `phone_number` - The phone number string to normalize.
     pub(crate) fn normalize_digits_only(&self, phone_number: &str) -> String {
-        dec_from_char::normalize_decimals_filtering(phone_number)
+        phone_number
+            .chars()
+            .filter_map(|c| {
+                uniprops_digits::uniprops::get_digit_value(c).map(|d| (d + b'0') as char)
+            })
+            .collect()
     }
 
     /// Formats a phone number for calling from outside the number's region.
@@ -1742,8 +1741,9 @@ impl PhoneNumberUtilInternal {
         // Rust note: skip UTF-8 validation since in rust strings are already UTF-8 valid
 
         // inline regexp search
-        let Some(i) = phone_number.find(|c: char| c.is_decimal_utf8() || PLUS_CHARS.contains(c))
-        else {
+        let Some(i) = phone_number.find(|c: char| {
+            uniprops_digits::uniprops::get_digit_value(c).is_some() || PLUS_CHARS.contains(c)
+        }) else {
             // No valid start character was found. extracted_number should be set to
             // empty string.
             return Err(ExtractNumberError::NoValidStartCharacter);
@@ -2517,9 +2517,8 @@ impl PhoneNumberUtilInternal {
         // country calling codes cannot begin with 0.
         if phone_number[captured_range_end..]
             .chars()
-            .find(|c| c.is_decimal_utf8())
-            .and_then(|c| c.to_decimal_utf8())
-            == Some(0)
+            .find_map(uniprops_digits::uniprops::get_digit_value)
+            .is_some_and(|d| d == 0)
         {
             return None;
         }

@@ -28,40 +28,6 @@ use crate::phonenumberutil::{
 
 #[allow(unused)]
 pub(super) struct PhoneNumberRegExpsAndMappings {
-    /// Regular expression of viable phone numbers. This is location independent.
-    /// Checks we have at least three leading digits, and only valid punctuation,
-    /// alpha characters and digits in the phone number. Does not include extension
-    /// data. The symbol 'x' is allowed here as valid punctuation since it is often
-    /// used as a placeholder for carrier codes, for example in Brazilian phone
-    /// numbers. We also allow multiple plus-signs at the start.
-    ///
-    /// Corresponds to the following:
-    /// `[digits]{minLengthNsn}|
-    /// plus_sign*(([punctuation]|[star])*[digits]){3,}
-    /// ([punctuation]|[star]|[digits]|[alpha])*`
-    ///
-    /// The first reg-ex is to allow short numbers (two digits long) to be parsed
-    /// if they are entered as "15" etc, but only if there is no punctuation in
-    /// them. The second expression restricts the number of digits to three or
-    /// more, but then allows them to be in international form, and to have
-    /// alpha-characters and punctuation.
-    valid_phone_number: String,
-
-    /// Regexp of all possible ways to write extensions, for use when parsing. This
-    /// will be run as a case-insensitive regexp match. Wide character versions are
-    /// also provided after each ASCII version.
-    /// For parsing, we are slightly more lenient in our interpretation than for
-    /// matching. Here we allow "comma" and "semicolon" as possible extension
-    /// indicators. When matching, these are hardly ever used to indicate this.
-    extn_patterns_for_parsing: String,
-
-    /// Regular expressions of different parts of the phone-context parameter,
-    /// following the syntax defined in RFC3966.
-    rfc3966_phone_digit: String,
-    alphanum: String,
-    rfc3966_domainlabel: String,
-    rfc3966_toplabel: String,
-
     /// A map that contains characters that are essential when dialling. That means
     /// any of the characters in this map must not be removed from a number when
     /// dialing, otherwise the call will not reach the intended destination.
@@ -109,21 +75,11 @@ pub(super) struct PhoneNumberRegExpsAndMappings {
     /// or more characters that are not ASCII digits or a tilde.
     pub single_international_prefix_fullmatch: Regex,
 
-    pub digits_pattern: Regex,
-    pub capturing_digit_pattern: Regex,
     pub capturing_ascii_digits_pattern: Regex,
 
     /// Regular expression of valid characters before a marker that might indicate
     /// a second number.
     pub capture_up_to_second_number_start_pattern: Regex,
-
-    /// Regular expression of trailing characters that we want to remove. We remove
-    /// all characters that are not alpha or numerical characters. The hash
-    /// character is retained here, as it may signify the previous block was an
-    /// extension. Note the capturing block at the start to capture the rest of the
-    /// number if this was a match.
-    /// This corresponds to UNWANTED_END_CHAR_PATTERN in the java version.
-    pub unwanted_end_char_pattern_captures: Regex,
 
     /// Regular expression of groups of valid punctuation characters.
     pub separator_pattern_anchor_start: Regex,
@@ -305,12 +261,6 @@ impl PhoneNumberRegExpsAndMappings {
 
         let mut instance = Self {
             // it'll be initialized only once, so we can use slow format!
-            valid_phone_number: valid_phone_number.clone(),
-            extn_patterns_for_parsing: extn_patterns_for_parsing.clone(),
-            rfc3966_phone_digit: rfc3966_phone_digit.clone(),
-            alphanum,
-            rfc3966_domainlabel: rfc3966_domainlabel.clone(),
-            rfc3966_toplabel: rfc3966_toplabel.clone(),
             diallable_char_mappings: Default::default(),
             alpha_mappings: Default::default(),
             alpha_phone_mappings: Default::default(),
@@ -323,14 +273,11 @@ impl PhoneNumberRegExpsAndMappings {
                 "^(?:[\\d]+(?:[~\u{2053}\u{223C}\u{FF5E}][\\d]+)?)$",
             )
             .unwrap(),
-            digits_pattern: Regex::new(&format!("[{}]*", DIGITS)).unwrap(),
-            capturing_digit_pattern: Regex::new(&format!("([{}])", DIGITS)).unwrap(),
             capturing_ascii_digits_pattern: Regex::new("(\\d+)").unwrap(),
             capture_up_to_second_number_start_pattern: Regex::new(
                 CAPTURE_UP_TO_SECOND_NUMBER_START,
             )
             .unwrap(),
-            unwanted_end_char_pattern_captures: Regex::new("([^\\p{N}\\p{L}#]+)$").unwrap(),
             separator_pattern_anchor_start: Regex::new(&format!("^[{}]+", VALID_PUNCTUATION))
                 .unwrap(),
             separator_pattern: Regex::new(&format!("[{}]+", VALID_PUNCTUATION)).unwrap(),
