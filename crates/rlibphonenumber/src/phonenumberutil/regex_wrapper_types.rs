@@ -1,7 +1,6 @@
 use std::sync::OnceLock;
 
 use crate::regexp::Regex;
-use paste::paste;
 
 use crate::{
     InvalidRegexError,
@@ -108,7 +107,7 @@ impl RegexTriplets {
 macro_rules! wrapper {
     (struct $name:ident wraps $wraps:ty{
         $(Reg:
-        $($field:ident),+
+        $($field:ident <- $field_setter:ident),+
 
         $(Vec:
         $($vec_field:ident),+
@@ -142,14 +141,12 @@ macro_rules! wrapper {
                 &self.$field
             }
             )*
-            paste!{
-                $(
-                #[allow(dead_code)]
-                pub fn [<set_ $field>](&mut self, value: RegexTriplets) {
-                    self.$field = value;
-                }
-                )*
+            $(
+            #[allow(dead_code)]
+            pub fn $field_setter(&mut self, value: RegexTriplets) {
+                self.$field = value;
             }
+            )*
         }
         )?
 
@@ -177,21 +174,21 @@ macro_rules! wrapper {
 
 wrapper!(struct NumberFormatWrapper wraps NumberFormat {
 Reg:
-    pattern
+    pattern <- set_pattern
 Vec:
     leading_digits_pattern
 });
 
 wrapper!(struct PhoneNumberDescWrapper wraps PhoneNumberDesc {
 Reg:
-    national_number_pattern
+    national_number_pattern <- set_national_number_pattern
 });
 
 wrapper!(struct PhoneMetadataWrapper wraps PhoneMetadata {
 Reg:
-    leading_digits,
-    international_prefix,
-    national_prefix_for_parsing
+    leading_digits <- set_leading_digits,
+    international_prefix <- set_international_prefix,
+    national_prefix_for_parsing <- set_national_prefix_for_parsing
 Extra:
     number_format, intl_number_format: Vec<NumberFormatWrapper> | format | {
         format.into_iter().map(| v | v.into()).collect()
