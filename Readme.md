@@ -27,15 +27,15 @@ All benchmarks measure the average time required to process a **single phone num
 
 ### Initialization
 `rlibphonenumber` requires initializing `PhoneNumberUtil`, which loads the necessary metadata. This is typically done once at application startup:
-* **`PhoneNumberUtil::new()`**: ~6.41 ms
+* **`PhoneNumberUtil::new()`**: ~5.33 ms
 
 ### Parsing
 Time required to parse a string representation into a phone number object:
 
 | Library | `parse()` | Notes |
 |---|---|---|
-| **`rlibphonenumber`** | **~568 ns** | **Fastest & most reliable** |
-| `rust-phonenumber` | ~832 ns | Fails on certain valid numbers.* |
+| **`rlibphonenumber`** | **~500 ns** | **Fastest & most reliable** |
+| `rust-phonenumber` | ~1.66 µs | Fails on certain valid numbers.* |
 | `phonelib` | *Failed* | Fails on certain valid numbers. |
 
 *\* During testing, we found that `rust-phonenumber` (`rlp`) returns an error on valid phone numbers, such as the Brazilian number `"+55 11 98765-4321"`.*
@@ -45,10 +45,10 @@ Time required to format a parsed phone number object into various standards:
 
 | Format | `rlibphonenumber` | `rust-phonenumber` | `phonelib` |
 |---|---|---|---|
-| **E164** | **~33.7 ns** 🚀 | ~721 ns | ~710 ns |
-| **International** | **~423 ns** | ~1.01 µs | ~772 ns |
-| **National** | **~562 ns** | ~1.38 µs | ~752 ns |
-| **RFC3966** | **~587 ns** | ~1.18 µs | ~906 ns |
+| **E164** | **~33 ns** 🚀 | ~731 ns | ~814 ns |
+| **International** | **~432 ns** | ~1.03 µs | ~905 ns |
+| **National** | **~558 ns** | ~1.45 µs | ~896 ns |
+| **RFC3966** | **~606 ns** | ~1.17 µs | ~1.02 µs |
 
 ### Under the Hood: How is it so fast?
 * **Zero-Allocation Formatting:** Intermediate heap allocations are eliminated. By utilizing `Cow<str>`, stack-allocated buffers (via a custom zero-padding `itoa` implementation), and a specialized Builder pattern, formatting numbers rarely touches the system allocator.
@@ -222,34 +222,23 @@ fn main() {
 
 ## ⚖️ C++ Comparison & Methodology
 
-To verify performance against the industry standard, we benchmark directly against Google's upstream `libphonenumber` C++ library, linked via `cxx` FFI.
+To ensure absolute fairness and eliminate any Foreign Function Interface (FFI) overhead, we benchmarked `rlibphonenumber` against Google's upstream C++ library using completely native toolchains for both languages (`criterion` for Rust, `google/benchmark` for C++).
 
-### Build Environment
-To ensure a fair comparison, the reference C++ library is built from source within a controlled Docker environment using maximum optimization flags (`Release` mode):
+### Build Environment & Methodology
+The C++ library was built from source inside a controlled Docker environment with the **maximum possible performance configuration**:
+*   **Compiler:** C++17 with `-O3 -DNDEBUG` (optimizations enabled, debug assertions disabled).
+*   **Regex Engine:** Compiled directly against Google's ultra-fast **RE2** engine (`-DUSE_RE2=ON`, `-DUSE_ICU_REGEXP=OFF`), replacing the slower default ICU engine.
+*   **Memory Allocator fairness:** In the C++ formatting benchmark, the target `std::string` had `.reserve()` called before formatting to ensure the time measured represents the library's algorithm, not the underlying OS heap allocator.
 
-*   **Compiler:** C++17
-*   **Optimization:** `-O3 -DNDEBUG` (Assertions and debug symbols disabled)
-*   **Regex Backend:** ICU (`-DUSE_ICU_REGEXP=ON`) — matching the standard upstream configuration.
+Both benchmarks run over the exact same set of 12 diverse international phone numbers in a cyclic batch configuration to bypass CPU branch-predictor memorization.
 
-The full build configuration is available in `.devcontainer/Dockerfile`.
+### Pure Native Performance Results
+*(Average time to process a single phone number)*
 
-### Benchmark Logic
-The benchmark measures the pure execution time of a full lifecycle operation:
-1.  **Parse** a string into a phone number object.
-2.  **Validate** the number (`IsValidNumber`).
-3.  **Format** the number back to a string (E.164).
-
-**FFI Overhead Note:**
-The overhead introduced by the FFI boundary (`cxx`) and string passing is negligible.
-*   **Small String Optimization (SSO):** Modern C++ compilers store short strings (like phone numbers and region codes) directly on the stack. Passing these strings from Rust to C++ does not trigger `malloc`/heap allocations.
-*   **Result Validity:** The measured time is dominated by the library's internal logic, not the interface.
-
-### Results
-
-| Input Number | Region | Google C++ (v9.x) | rlibphonenumber (Rust) | Speedup |
-|---|---|---|---|---|
-| `+1 415 555 2671` | US | **~11.53 µs** | **~0.66 µs** | **~17x** |
-| `07400 123456` | GB | **~14.81 µs** | **~0.79 µs** | **~18x** |
-| `8 800 555 3535` | RU | **~6.92 µs** | **~0.58 µs** | **~12x** |
-| `12345` (Short) | US | **~10.02 µs** | **~1.18 µs** | **~8.5x** |
-| `invalid_alpha` | DE | **~1.84 µs** | **~0.04 µs** | **~46x** |
+| Operation | C++ (`libphonenumber` + RE2) | Rust (`rlibphonenumber`) | Speedup |
+| :--- | :--- | :--- | :--- |
+| **Parsing** | ~2.28 µs *(2279 ns)* | **~0.50 µs *(500 ns)*** | **~4.5x** |
+| **Format (E.164)** | ~63 ns | **~33 ns** | **~1.9x** |
+| **Format (International)** | ~2.03 µs *(2028 ns)* | **~0.43 µs *(432 ns)*** | **~4.7x** |
+| **Format (National)** | ~2.48 µs *(2484 ns)* | **~0.56 µs *(558 ns)*** | **~4.4x** |
+| **Format (RFC3966)** | ~2.42 µs *(2417 ns)* | **~0.61 µs *(606 ns)*** | **~4.0x** |
