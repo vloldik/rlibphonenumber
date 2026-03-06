@@ -44,7 +44,7 @@ fn setup_numbers() -> Vec<TestEntity> {
 fn convert_to_rlp_numbers(numbers: &[TestEntity]) -> Vec<rlp::PhoneNumber> {
     numbers
         .iter()
-        .map(|s| rlp::parse(Some(s.2), s.0).expect(s.0.as_str()))
+        .map(|s| rlp::parse(Some(s.2), s.0).expect(s.0))
         .collect()
 }
 
