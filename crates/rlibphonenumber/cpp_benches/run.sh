@@ -1,6 +1,10 @@
+#!/bin/bash
+
 dir="$(dirname $0)"
-mkdir -p $dir/build && cd $dir/build
-cmake ..
+cd $dir
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release
+
 make -j$(nproc)
 
-./bench_native
+./build/bench_native

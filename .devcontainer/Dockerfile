@@ -67,7 +67,6 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
        libicu-dev \
        libabsl-dev \
        maven \
-       libbenchmark-dev \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /opt/libphonenumber/include /usr/local/include
