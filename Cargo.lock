@@ -1128,6 +1128,7 @@ dependencies = [
 name = "rlibphonenumber-fuzz"
 version = "0.0.0"
 dependencies = [
+ "criterion",
  "cxx",
  "cxx-build",
  "libfuzzer-sys",

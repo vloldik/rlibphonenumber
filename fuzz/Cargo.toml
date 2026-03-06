@@ -4,17 +4,25 @@ version = "0.0.0"
 publish = false
 edition = "2024"
 
+[lib]
+name = "rlibphonenumber_fuzz"
+path = "src/lib.rs"
+
+
 [package.metadata]
 cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
 cxx = "1.0"
+criterion = "0.5"
 
 [build-dependencies]
 cxx-build = "1.0"
 
 [dependencies.rlibphonenumber]
+default-features = false
+features = ["global_static", "lite"]
 path = "../crates/rlibphonenumber"
 
 [[bin]]
@@ -30,3 +38,7 @@ path = "fuzz_targets/diff-test.rs"
 test = false
 doc = false
 bench = false
+
+[[bench]]
+name = "full-cycle-bench"
+harness = false

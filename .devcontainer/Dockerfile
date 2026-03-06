@@ -21,6 +21,8 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /tmp/libphonenumber/cpp
 
 RUN cmake \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_CXX_FLAGS="-O3 -DNDEBUG" \
     -DCMAKE_CXX_STANDARD=17 \
     -DUSE_BOOST=OFF \
     -DUSE_RE2=OFF \

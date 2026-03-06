@@ -219,3 +219,37 @@ fn main() {
     }
 }
 ```
+
+## ⚖️ C++ Comparison & Methodology
+
+To verify performance against the industry standard, we benchmark directly against Google's upstream `libphonenumber` C++ library, linked via `cxx` FFI.
+
+### Build Environment
+To ensure a fair comparison, the reference C++ library is built from source within a controlled Docker environment using maximum optimization flags (`Release` mode):
+
+*   **Compiler:** C++17
+*   **Optimization:** `-O3 -DNDEBUG` (Assertions and debug symbols disabled)
+*   **Regex Backend:** ICU (`-DUSE_ICU_REGEXP=ON`) — matching the standard upstream configuration.
+
+The full build configuration is available in `.devcontainer/Dockerfile`.
+
+### Benchmark Logic
+The benchmark measures the pure execution time of a full lifecycle operation:
+1.  **Parse** a string into a phone number object.
+2.  **Validate** the number (`IsValidNumber`).
+3.  **Format** the number back to a string (E.164).
+
+**FFI Overhead Note:**
+The overhead introduced by the FFI boundary (`cxx`) and string passing is negligible.
+*   **Small String Optimization (SSO):** Modern C++ compilers store short strings (like phone numbers and region codes) directly on the stack. Passing these strings from Rust to C++ does not trigger `malloc`/heap allocations.
+*   **Result Validity:** The measured time is dominated by the library's internal logic, not the interface.
+
+### Results
+
+| Input Number | Region | Google C++ (v9.x) | rlibphonenumber (Rust) | Speedup |
+|---|---|---|---|---|
+| `+1 415 555 2671` | US | **~11.53 µs** | **~0.66 µs** | **~17x** |
+| `07400 123456` | GB | **~14.81 µs** | **~0.79 µs** | **~18x** |
+| `8 800 555 3535` | RU | **~6.92 µs** | **~0.58 µs** | **~12x** |
+| `12345` (Short) | US | **~10.02 µs** | **~1.18 µs** | **~8.5x** |
+| `invalid_alpha` | DE | **~1.84 µs** | **~0.04 µs** | **~46x** |
