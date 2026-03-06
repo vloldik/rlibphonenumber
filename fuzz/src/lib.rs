@@ -19,6 +19,5 @@ pub mod ffi {
     unsafe extern "C++" {
         include!("cpp/wrapper.h");
         fn test_cpp_impl(number_str: &str, region_str: &str) -> CppResult;
-        fn bench_cpp_pure(number_str: &str, region_str: &str) -> bool;
     }
 }

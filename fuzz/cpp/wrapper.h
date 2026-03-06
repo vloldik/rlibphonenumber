@@ -6,4 +6,3 @@
 
 
 CppResult test_cpp_impl(rust::Str number_str, rust::Str region_str);
-bool bench_cpp_pure(rust::Str number_str, rust::Str region_str);

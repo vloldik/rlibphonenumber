@@ -77,23 +77,3 @@ CppResult test_cpp_impl(rust::Str number_str, rust::Str region_str) {
     return res;
 }
 
-bool bench_cpp_pure(rust::Str number_str, rust::Str region_str) {
-    static i18n::phonenumbers::PhoneNumberUtil* util = 
-        i18n::phonenumbers::PhoneNumberUtil::GetInstance();
-        
-    i18n::phonenumbers::PhoneNumber number;
-    std::string num_std(number_str.data(), number_str.size());
-    std::string reg_std(region_str.data(), region_str.size());
-
-    auto status = util->Parse(num_std, reg_std, &number);
-
-    if (status == i18n::phonenumbers::PhoneNumberUtil::NO_PARSING_ERROR) {
-        if (util->IsValidNumber(number)) {
-            std::string fmt_e164;
-            util->Format(number, i18n::phonenumbers::PhoneNumberUtil::E164, &fmt_e164);
-            return fmt_e164.length() > 0;
-        }
-    }
-    
-    return false;
-}

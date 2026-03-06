@@ -22,7 +22,7 @@ cxx-build = "1.0"
 
 [dependencies.rlibphonenumber]
 default-features = false
-features = ["global_static", "lite"]
+features = ["global_static"]
 path = "../crates/rlibphonenumber"
 
 [[bin]]
@@ -39,6 +39,7 @@ test = false
 doc = false
 bench = false
 
-[[bench]]
-name = "full-cycle-bench"
-harness = false
+[features]
+default = ["rlibphonenumber/lite"]
+
+regex = ["rlibphonenumber/regex"]
