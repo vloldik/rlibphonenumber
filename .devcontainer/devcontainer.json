@@ -4,9 +4,6 @@
     "dockerfile": "Dockerfile"
   },
   "features": {
-    "ghcr.io/devcontainers/features/java:1": {
-      "installMaven": "true"
-    }
   },
   "runArgs": [
     "--memory=10g"
