@@ -8,20 +8,32 @@ use rlibphonenumber_fuzz::ffi;
 
 const ALPHABET: &[u8] = b"+0123456789()-=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
+struct CustomChar(u8);
+
+impl<'a> Arbitrary<'a> for CustomChar {
+    fn arbitrary(u: &mut Unstructured<'a>) -> Result<Self, Error> {
+        Ok(Self(*u.choose(ALPHABET)?))
+    }
+
+    #[inline]
+    fn size_hint(_depth: usize) -> (usize, Option<usize>) {
+        (1, Some(1))
+    }
+}
+
 #[derive(Debug)]
 pub struct CustomString(pub String);
 
 impl<'a> Arbitrary<'a> for CustomString {
-    fn arbitrary(raw: &mut Unstructured<'a>) -> Result<Self, Error> {
-        let bytes = raw.bytes(raw.len())?;
-        let mut s = String::with_capacity(bytes.len());
-
-        for &b in bytes {
-            let char_idx = (b as usize) % ALPHABET.len();
-            s.push(ALPHABET[char_idx] as char);
-        }
-
-        Ok(CustomString(s))
+    fn arbitrary(u: &mut Unstructured<'a>) -> Result<Self, Error> {
+        let bytes = u
+            .arbitrary::<Vec<CustomChar>>()?
+            .into_iter()
+            .map(|c| c.0)
+            .collect::<Vec<u8>>();
+        String::from_utf8(bytes)
+            .map(Self)
+            .map_err(|_| Error::IncorrectFormat)
     }
 }
 
