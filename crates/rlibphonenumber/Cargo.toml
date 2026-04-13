@@ -38,10 +38,9 @@ path = "src/lib.rs"
 
 
 [dependencies]
+prost = "0.14"
 # logging standard in rust
 log = "0.4"
-# protobuf lib required to use .proto files from assets
-protobuf = "3.7"
 # optimized concurrent map
 dashmap = "5.5"
 # just regex package
@@ -67,8 +66,7 @@ rustc-hash = { version = "2.1" }
 
 [build-dependencies]
 thiserror = "1.0"
-protobuf-codegen = "3.7"
-protobuf = "3.7"
+prost-build = "0.14"
 uniprops-gen = "0.3"
 
 [dev-dependencies]

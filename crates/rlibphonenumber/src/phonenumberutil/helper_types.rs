@@ -144,7 +144,7 @@ impl<'a, 'b, F: FnOnce(&str) -> RegexResult<Cow<'_, str>>, FP: FnOnce(&str) -> P
 
     pub fn early_exit(self) -> String {
         let mut nsn_buf = zeroes_itoa::LeadingZeroBuffer::new();
-        let nsn = nsn_buf.format(self.number.national_number(), self.leading_zeroes);
+        let nsn = nsn_buf.format(self.number.national_number, self.leading_zeroes);
         nsn.to_string()
     }
 
@@ -152,10 +152,10 @@ impl<'a, 'b, F: FnOnce(&str) -> RegexResult<Cow<'_, str>>, FP: FnOnce(&str) -> P
         let mut nsn_buf = zeroes_itoa::LeadingZeroBuffer::new();
         let mut country_code_buf = itoa::Buffer::new();
 
-        let nsn = nsn_buf.format(self.number.national_number(), self.leading_zeroes);
+        let nsn = nsn_buf.format(self.number.national_number, self.leading_zeroes);
         let significant_national_number = (self.format_number_fn)(&nsn)?;
 
-        let country_code = country_code_buf.format(self.number.country_code());
+        let country_code = country_code_buf.format(self.number.country_code);
         let prefix = (self.get_prefix_fn)(country_code);
 
         let prefix_len = prefix

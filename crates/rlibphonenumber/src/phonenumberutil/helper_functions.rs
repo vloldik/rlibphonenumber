@@ -15,14 +15,14 @@
 
 use std::{borrow::Cow, collections::HashSet};
 
-use protobuf::Message;
+use prost::{DecodeError, Message, bytes::Bytes};
 use rustc_hash::FxHashMap;
 use strum::IntoEnumIterator;
 
 use crate::{
     generated::{
         metadata::METADATA,
-        proto::{phonemetadata::PhoneMetadataCollection, phonenumber::PhoneNumber},
+        proto::{PhoneMetadataCollection, PhoneNumber},
     },
     interfaces::MatcherApi,
     phonenumberutil::{
@@ -41,8 +41,8 @@ use super::{
 };
 
 /// Loads metadata from helper constants METADATA array
-pub fn load_compiled_metadata() -> Result<PhoneMetadataCollection, protobuf::Error> {
-    PhoneMetadataCollection::parse_from_bytes(&METADATA)
+pub fn load_compiled_metadata() -> Result<PhoneMetadataCollection, DecodeError> {
+    PhoneMetadataCollection::decode(Bytes::from_static(&METADATA))
 }
 
 /// Returns a pointer to the description inside the metadata of the appropriate
@@ -97,9 +97,9 @@ pub fn is_national_number_suffix_of_the_other(
     second_number: &PhoneNumber,
 ) -> bool {
     let mut buf = itoa::Buffer::new();
-    let first_number_national_number = buf.format(first_number.national_number());
+    let first_number_national_number = buf.format(first_number.national_number);
     let mut buf = itoa::Buffer::new();
-    let second_number_national_number = buf.format(second_number.national_number());
+    let second_number_national_number = buf.format(second_number.national_number);
     // Note that HasSuffixString returns true if the numbers are equal.
     first_number_national_number.ends_with(second_number_national_number)
         || second_number_national_number.ends_with(first_number_national_number)
@@ -131,7 +131,7 @@ pub fn get_national_significant_number<'b>(
     buf: &'b mut zeroes_itoa::LeadingZeroBuffer,
 ) -> Cow<'b, str> {
     buf.format(
-        phone_number.national_number(),
+        phone_number.national_number,
         if phone_number.italian_leading_zero() {
             phone_number
                 .number_of_leading_zeros()
@@ -359,9 +359,9 @@ pub fn desc_has_data(desc: &PhoneNumberDescWrapper) -> bool {
     // exampleNumber). We don't bother checking the PossibleLengthsLocalOnly,
     // since if this is the only thing that's present we don't really support the
     // type at all: no type-specific methods will work with only this data.
-    desc.original.has_example_number()
+    desc.original.example_number.is_some()
         || desc_has_possible_number_data(desc)
-        || desc.original.has_national_number_pattern()
+        || desc.national_number_pattern().pattern_base.is_some()
 }
 
 /// Returns the types we have metadata for based on the PhoneMetadata object
@@ -498,18 +498,14 @@ pub fn test_number_length_with_unknown_type(
 /// These fields correspond to those set in `parse()` rather than
 /// `parse_and_keep_raw_input()`.
 pub(crate) fn copy_core_fields_only(from_number: &PhoneNumber) -> PhoneNumber {
-    let mut to_number = PhoneNumber::new();
-    to_number.set_country_code(from_number.country_code());
-    to_number.set_national_number(from_number.national_number());
-    if let Some(extension) = &from_number.extension {
-        to_number.set_extension(extension.clone());
+    PhoneNumber {
+        country_code: from_number.country_code,
+        national_number: from_number.national_number,
+        extension: from_number.extension.clone(),
+        italian_leading_zero: from_number.italian_leading_zero,
+        number_of_leading_zeros: from_number.number_of_leading_zeros,
+        ..Default::default()
     }
-    if from_number.italian_leading_zero() {
-        to_number.set_italian_leading_zero(true);
-        // This field is only relevant if there are leading zeros at all.
-        to_number.set_number_of_leading_zeros(from_number.number_of_leading_zeros());
-    }
-    to_number
 }
 
 /// Determines whether the given number is a national number match for the given

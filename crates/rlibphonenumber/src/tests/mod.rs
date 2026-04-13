@@ -10,7 +10,7 @@ mod region_code;
 #[cfg(test)]
 mod common {
     use crate::{
-        generated::metadata::TEST_METADATA, phonemetadata::PhoneMetadataCollection,
+        PhoneMetadataCollection, generated::metadata::TEST_METADATA,
         phonenumberutil::phonenumberutil_internal::PhoneNumberUtilInternal,
     };
 
@@ -20,7 +20,7 @@ mod common {
 
     #[cfg(test)]
     pub fn get_phone_util() -> PhoneNumberUtilInternal {
-        use protobuf::Message;
+        use prost::{Message, bytes::Bytes};
 
         ONCE.call_once(|| {
             colog::default_builder()
@@ -28,7 +28,7 @@ mod common {
                 .init()
         });
 
-        let metadata = PhoneMetadataCollection::parse_from_bytes(&TEST_METADATA)
+        let metadata = PhoneMetadataCollection::decode(Bytes::from_static(&TEST_METADATA))
             .expect("Metadata should be valid");
         PhoneNumberUtilInternal::new_for_metadata(metadata)
     }

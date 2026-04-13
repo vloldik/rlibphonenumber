@@ -21,9 +21,10 @@ mod regex_based_matcher;
 pub(crate) mod regexp;
 pub(crate) mod string_util;
 
-pub use generated::proto::phonemetadata;
-pub use generated::proto::phonenumber::PhoneNumber;
-pub use generated::proto::phonenumber::phone_number::CountryCodeSource;
+pub use generated::proto::phone_number::CountryCodeSource;
+pub use generated::proto::{
+    NumberFormat, PhoneMetadata, PhoneMetadataCollection, PhoneNumber, PhoneNumberDesc,
+};
 
 #[cfg(feature = "global_static")]
 mod phone_ext;

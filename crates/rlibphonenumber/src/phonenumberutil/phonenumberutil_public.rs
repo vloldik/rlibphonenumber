@@ -23,7 +23,7 @@
 use std::{borrow::Cow, collections::HashSet};
 
 use crate::{
-    generated::proto::phonenumber::PhoneNumber, phonemetadata::PhoneMetadataCollection,
+    PhoneMetadataCollection, generated::proto::PhoneNumber,
     phonenumberutil::helper_functions::get_national_significant_number, unwrap_internal,
 };
 

@@ -11,8 +11,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // let number = PHONE_NUMBER_UTIL.parse(number_string)?;
 
     println!("✅ Successfully parsed number.");
-    println!("   - Country Code: {}", number.country_code());
-    println!("   - National Number: {}", number.national_number());
+    println!("   - Country Code: {}", number.country_code);
+    println!("   - National Number: {}", number.national_number);
 
     // 2. Validate the number
     // `is_valid()` performs a full validation (length, prefix, region rules)

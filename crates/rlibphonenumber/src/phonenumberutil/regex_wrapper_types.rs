@@ -2,10 +2,7 @@ use std::sync::OnceLock;
 
 use crate::regexp::Regex;
 
-use crate::{
-    InvalidRegexError,
-    phonemetadata::{NumberFormat, PhoneMetadata, PhoneNumberDesc},
-};
+use crate::{InvalidRegexError, NumberFormat, PhoneMetadata, PhoneNumberDesc};
 
 #[derive(Debug, Clone)]
 pub struct RegexTriplets {
@@ -155,7 +152,7 @@ macro_rules! wrapper {
             fn from(mut value: $wraps) -> Self {
                 Self {
                     $(
-                    $($field: RegexTriplets::new(::std::mem::take(&mut value.$field)),)*
+                    $($field: RegexTriplets::new(::std::mem::take(&mut value.$field).into()),)*
                     $($($vec_field: RegexTriplets::new_vec(::std::mem::take(&mut value.$vec_field)),)*)?
                     )?
                     $($($(
@@ -199,6 +196,6 @@ Extra:
     voicemail, short_code, standard_rate,
     carrier_specific, sms_services,
     no_international_dialling: PhoneNumberDescWrapper | desc | {
-        desc.into_option().unwrap_or_default().into()
+        desc.unwrap_or_default().into()
     }
 });
