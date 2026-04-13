@@ -8,6 +8,8 @@ fn main() {
         .compile("phonenumber_cpp_bridge");
 
     println!("cargo:rustc-link-search=native=/usr/local/lib");
+    println!("cargo:rustc-link-search=native=/opt/re2/lib");
+    println!("cargo:rustc-link-search=native=/opt/libphonenumber/lib");
     println!("cargo:rustc-link-search=native=/usr/local/lib64");
 
     println!("cargo:rustc-link-lib=phonenumber");
