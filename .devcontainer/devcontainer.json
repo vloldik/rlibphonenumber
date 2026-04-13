@@ -1,30 +1,40 @@
 {
-  "name": "Rust Dev Environment",
-  "build": {
-    "dockerfile": "Dockerfile"
-  },
-  "features": {
-  },
-  "runArgs": [
-    "--memory=10g"
-  ],
-  "customizations": {
-    "vscode": {
-      "settings": {
-        "lldb.executable": "/usr/bin/lldb",
-        "rust-analyzer.check.command": "clippy",
-        "remote.downloadExtensionsLocally": true,
-        "editor.formatOnSave": true
-      },
-      "extensions": [
-        "rust-lang.rust-analyzer",
-        "mads-hartmann.bash-ide-vscode",
-        "streetsidesoftware.code-spell-checker",
-        "tamasfe.even-better-toml",
-        "waderyan.gitblame",
-        "github.vscode-github-actions"
-      ]
-    }
-  },
-  "remoteUser": "vscode"
+    "name": "Rust Dev (DinD)",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "features": {
+        "ghcr.io/devcontainers/features/docker-in-docker:2": {
+            "version": "latest",
+            "enableNonRootDocker": true,
+            "moby": false
+        }
+    },
+    "runArgs": [
+        "--privileged",
+        "--init"
+    ],
+    "mounts": [
+        "type=volume,source=dind-var-lib-docker,target=/var/lib/docker"
+    ],
+    "postCreateCommand": "sudo /usr/local/share/docker-init.sh",
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "lldb.executable": "/usr/bin/lldb",
+                "rust-analyzer.check.command": "clippy",
+                "remote.downloadExtensionsLocally": true,
+                "editor.formatOnSave": true
+            },
+            "extensions": [
+                "rust-lang.rust-analyzer",
+                "mads-hartmann.bash-ide-vscode",
+                "streetsidesoftware.code-spell-checker",
+                "tamasfe.even-better-toml",
+                "waderyan.gitblame",
+                "github.vscode-github-actions"
+            ]
+        }
+    },
+    "remoteUser": "vscode"
 }
