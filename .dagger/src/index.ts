@@ -15,7 +15,7 @@ export class Rlibphonenumber {
     version: string,
     re2Version: string = RE2_DEFAULT,
   ): Container {
-    return this.cppBase()
+    return this.buildBase()
       .withWorkdir("/tmp")
       .withExec(["git", "clone", "--depth", "1", "--branch", version,
         "https://github.com/google/libphonenumber.git",
@@ -75,7 +75,7 @@ export class Rlibphonenumber {
     const resolvedTag = tag ? await this.resolveTag(tag) : await this.readLock(source)
     const src = tag ? await this.withFreshResources(source, resolvedTag) : source
 
-    const generated = this.metadataRunner(src, skipInstall)
+    const generated = this.metadataRunner(src)
 
     return source
       .withDirectory(
@@ -109,16 +109,7 @@ export class Rlibphonenumber {
       ? ["cargo", "+nightly", "fuzz", "run", "diff-test", "--", `-max_total_time=${maxTotalTime}`]
       : ["cargo", "+nightly", "fuzz", "run", "diff-test"]
 
-    const base = dag.container()
-      .from(RUST_IMAGE)
-      .withEnvVariable("DEBIAN_FRONTEND", "noninteractive")
-      .withExec(["apt-get", "update", "-qq",])
-      .withExec(["apt-get", "install", "-y", "--no-install-recommends",
-        "build-essential", "cmake", "pkg-config",
-        "libssl-dev", "libprotobuf-dev", "protobuf-compiler",
-        "libicu-dev", "libabsl-dev",
-        "llvm", "clang",
-      ])
+    const base = this.buildBase()
 
 
     return this.withPhoneLibs(base, built)
@@ -177,15 +168,17 @@ export class Rlibphonenumber {
       .directory("/project")
   }
 
-  private cppBase(): Container {
+  private buildBase(): Container {
     return dag.container()
       .from(RUST_IMAGE)
       .withEnvVariable("DEBIAN_FRONTEND", "noninteractive")
       .withExec(["apt-get", "update", "-qq"])
       .withExec(["apt-get", "install", "-y", "--no-install-recommends",
         "build-essential", "cmake", "git", "curl", "ca-certificates",
+        "pkg-config", "libssl-dev",
         "libprotobuf-dev", "protobuf-compiler",
-        "libicu-dev", "libabsl-dev", "libgtest-dev", "default-jre-headless"
+        "libicu-dev", "libabsl-dev", "libgtest-dev", "default-jre-headless",
+        "llvm", "clang"
       ])
   }
 
@@ -232,7 +225,7 @@ export class Rlibphonenumber {
     return source.withDirectory("resources", resources)
   }
 
-  private metadataRunner(source: Directory, skipInstall: boolean): Container {
+  private metadataRunner(source: Directory): Container {
     const mavenCache = dag.cacheVolume("maven-local-repo")
 
     const base = dag.container()
@@ -248,11 +241,7 @@ export class Rlibphonenumber {
         "crates/rlibphonenumbers_macro/resources",
       ])
 
-    const withJar = skipInstall
-      ? base
-      : base.withExec(["mvn", "-f", "tools/java/pom.xml", "install"])
-
-    return withJar
+    return base
       .withExec(this.javaCmd(
         "resources/PhoneNumberMetadata.xml",
         "crates/rlibphonenumber/src/generated/metadata/metadata.rs",
