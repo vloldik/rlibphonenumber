@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/rlibphonenumber",
+    "crates/rlibphonenumber_bin",
     "crates/rlibphonenumbers_macro",
     "fuzz",
     "crates/zeroes_itoa",
