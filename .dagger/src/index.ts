@@ -6,7 +6,7 @@ import {
   func,
   argument,
 } from "@dagger.io/dagger"
-import { COPYRIGHT_HEADER, JAR, JDK_IMAGE, LOCK_FILE, RE2_DEFAULT, RUST_IMAGE, RUST_MODULE_CONTENT } from "./constants"
+import { JAR, JDK_IMAGE, LOCK_FILE, RE2_DEFAULT, RUST_IMAGE, RUST_MODULE_CONTENT } from "./constants"
 
 @object()
 export class Rlibphonenumber {
