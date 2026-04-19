@@ -70,7 +70,6 @@ export class Rlibphonenumber {
   async generate(
     source: Directory,
     tag: string = "",
-    skipInstall: boolean = false,
   ): Promise<Directory> {
     const resolvedTag = tag ? await this.resolveTag(tag) : await this.readLock(source)
     const src = tag ? await this.withFreshResources(source, resolvedTag) : source
@@ -85,6 +84,14 @@ export class Rlibphonenumber {
       .withDirectory(
         "crates/rlibphonenumber/resources",
         generated.directory("/project/crates/rlibphonenumber/resources"),
+      )
+      .withDirectory(
+        "resources",
+        generated.directory("/project/resources")
+      )
+      .withDirectory(
+        "crates/rlibphonenumber_bin/resources",
+        generated.directory("/project/crates/rlibphonenumber_bin/resources")
       )
       .withDirectory(
         "crates/rlibphonenumbers_macro/resources",
@@ -235,9 +242,11 @@ export class Rlibphonenumber {
       .withMountedCache("/root/.m2", mavenCache)
       .withMountedDirectory("/project", source)
       .withWorkdir("/project")
+      .withExec(["mvn", "-f", "tools/java/pom.xml", "install"])
       .withExec(["mkdir", "-p",
         "crates/rlibphonenumber/src/generated/metadata",
         "crates/rlibphonenumber/resources",
+        "crates/rlibphonenumber_bin/resources",
         "crates/rlibphonenumbers_macro/resources",
       ])
 
@@ -257,6 +266,7 @@ export class Rlibphonenumber {
         RUST_MODULE_CONTENT,
       )
       .withExec(["bash", "-c", "cp resources/*.proto crates/rlibphonenumber/resources/"])
+      .withExec(["bash", "-c", "cp resources/*.proto crates/rlibphonenumber_bin/resources/"])
       .withExec(["bash", "-c",
         "cp resources/ShortNumberMetadata.xml crates/rlibphonenumbers_macro/resources/",
       ])
