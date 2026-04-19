@@ -61,7 +61,7 @@ impl MetadataFilter {
         add_variable!("is_main_country", metadata_ctx.is_main_country);
 
         match prog.execute(&ctx) {
-            Ok(Value::Bool(drop_it)) => Ok(drop_it),
+            Ok(Value::Bool(drop_it)) => Ok(!drop_it),
             Ok(_) => Ok(false),
             Err(e) => Err(MetadataError::Cel(e.to_string())),
         }

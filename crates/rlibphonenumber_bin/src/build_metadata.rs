@@ -30,7 +30,7 @@ pub struct Options {
     pub const_name: String,
 
     /// custom CEL (Common Expression Language) expression to filter out metadata fields.
-    /// The expression should evaluate to `true` for fields that MUST BE DROPPED.
+    /// The expression should evaluate to `false` for fields that MUST BE DROPPED.
     ///
     /// Available CEL context variables:
     /// - `field` (string): The current field name (e.g., "example_number", "national_prefix").
@@ -40,8 +40,8 @@ pub struct Options {
     /// - `is_main_country` (bool): True if this region is the main one for its calling code.
     ///
     /// Example usage:
-    /// --filter "region == 'US' && field == 'example_number'"
-    /// --filter "parent != '' && parent != 'mobile'"
+    /// --filter "region != 'US' && field != 'example_number'"
+    /// --filter "parent == '' && parent == 'mobile'"
     #[argh(option)]
     pub filter: Option<String>,
 }
