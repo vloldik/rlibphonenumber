@@ -15,7 +15,7 @@
 
 use std::{borrow::Cow, collections::HashSet};
 
-use rkyv::rancor;
+use prost::{DecodeError, Message};
 use rustc_hash::FxHashMap;
 use strum::IntoEnumIterator;
 
@@ -41,8 +41,8 @@ use super::{
 };
 
 /// Loads metadata from helper constants METADATA array
-pub fn load_compiled_metadata() -> Result<PhoneMetadataCollection, rancor::Error> {
-    rkyv::from_bytes::<PhoneMetadataCollection, rancor::Error>(METADATA)
+pub fn load_compiled_metadata() -> Result<PhoneMetadataCollection, DecodeError> {
+    PhoneMetadataCollection::decode(METADATA)
 }
 
 /// Returns a pointer to the description inside the metadata of the appropriate

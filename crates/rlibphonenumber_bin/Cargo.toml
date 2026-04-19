@@ -11,4 +11,4 @@ cel = "0.13.0"
 thiserror = { workspace = true }
 rlibphonenumber = { path = "../rlibphonenumber" }
 argh = "0.1"
-rkyv = { workspace = true }
+prost = { workspace = true }

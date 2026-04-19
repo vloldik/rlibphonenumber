@@ -38,7 +38,8 @@ path = "src/lib.rs"
 
 
 [dependencies]
-prost = "0.14"
+prost = { workspace = true }
+
 # logging standard in rust
 log = "0.4"
 # optimized concurrent map
@@ -46,7 +47,7 @@ dashmap = "5.5"
 # just regex package
 regex = { version = "1.10", optional = true }
 regex-lite = { version = "0.1", optional = true }
-rkyv = { workspace = true }
+
 thiserror = { workspace = true }
 
 # for fast 0-alloc int to string conversion

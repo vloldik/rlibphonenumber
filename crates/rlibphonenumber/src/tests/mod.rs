@@ -9,7 +9,7 @@ mod region_code;
 
 #[cfg(test)]
 mod common {
-    use rkyv::rancor;
+    use prost::Message;
 
     use crate::{
         PhoneMetadataCollection, generated::metadata::TEST_METADATA,
@@ -32,7 +32,6 @@ mod common {
     }
 
     pub fn load_metadata() -> PhoneMetadataCollection {
-        rkyv::from_bytes::<PhoneMetadataCollection, rancor::Error>(TEST_METADATA)
-            .expect("Metadata should be valid")
+        PhoneMetadataCollection::decode(TEST_METADATA).expect("Metadata should be valid")
     }
 }
