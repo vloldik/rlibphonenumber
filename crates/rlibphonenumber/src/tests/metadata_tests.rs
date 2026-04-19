@@ -1,16 +1,5 @@
-use prost::{Message, bytes::Bytes};
-
-use crate::{
-    PhoneMetadataCollection,
-    phonenumberutil::regex_wrapper_types::{PhoneMetadataWrapper, RegexTriplets},
-};
-
-fn load_metadata() -> PhoneMetadataCollection {
-    use crate::generated::metadata::METADATA;
-
-    PhoneMetadataCollection::decode(Bytes::from_static(&METADATA))
-        .expect("Metadata should be valid")
-}
+use super::common::load_metadata;
+use crate::phonenumberutil::regex_wrapper_types::{PhoneMetadataWrapper, RegexTriplets};
 
 fn test_triplets(triplets: &RegexTriplets) {
     triplets.anchor_full().unwrap();

@@ -57,7 +57,7 @@ use crate::{
 
 use crate::regexp::Regex;
 use log::{error, trace, warn};
-use prost::DecodeError;
+use rkyv::rancor;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 // Helper type for Result
@@ -167,7 +167,7 @@ impl PhoneNumberUtilInternal {
     /// This method loads the compiled metadata for parsing, formatting, and validating phone numbers.
     ///
     /// You probably want use `PHONE_NUMBER_UTIL` singleton instead
-    pub(crate) fn new() -> Result<Self, DecodeError> {
+    pub(crate) fn new() -> Result<Self, rancor::Error> {
         let metadata_collection = load_compiled_metadata()?;
         Ok(Self::new_for_metadata(metadata_collection))
     }

@@ -36,14 +36,6 @@ impl MetadataFilter {
         Self { program: None }
     }
 
-    pub fn for_lite_build() -> Result<Self> {
-        Self::new("field == 'example_number'")
-    }
-
-    pub fn for_special_build() -> Result<Self> {
-        Self::new("parent != '' && parent != 'mobile'")
-    }
-
     fn should_drop(
         &self,
         metadata_ctx: MetadataContext,
@@ -145,17 +137,9 @@ impl MetadataFilter {
     }
 }
 
-pub fn get_metadata_filter(lite_build: bool, special_build: bool) -> Result<MetadataFilter> {
-    if special_build {
-        if lite_build {
-            return Err(MetadataError::Validation(
-                "liteBuild and specialBuild may not both be set".into(),
-            ));
-        }
-        MetadataFilter::for_special_build()
-    } else if lite_build {
-        MetadataFilter::for_lite_build()
-    } else {
-        Ok(MetadataFilter::empty_filter())
+pub fn get_metadata_filter(custom_filter: Option<&str>) -> Result<MetadataFilter> {
+    if let Some(expr) = custom_filter {
+        return MetadataFilter::new(expr);
     }
+    Ok(MetadataFilter::empty_filter())
 }

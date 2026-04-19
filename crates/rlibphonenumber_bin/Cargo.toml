@@ -10,3 +10,5 @@ roxmltree = "0.21.1"
 cel = "0.13.0"
 thiserror = { workspace = true }
 rlibphonenumber = { path = "../rlibphonenumber" }
+argh = "0.1"
+rkyv = { workspace = true }

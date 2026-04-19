@@ -11,6 +11,7 @@ members = [
 [workspace.dependencies]
 # helpful error package
 thiserror = "1.0"
+rkyv = "0.8"
 
 [workspace.package]
 

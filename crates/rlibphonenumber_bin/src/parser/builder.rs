@@ -7,20 +7,16 @@ use super::{
     utils::validate_re,
 };
 use rlibphonenumber::{NumberFormat, PhoneMetadata, PhoneMetadataCollection, PhoneNumberDesc};
-use roxmltree::{Document, Node};
+use roxmltree::{Document, Node, ParsingOptions};
 use std::collections::BTreeSet;
 
 pub struct MetadataBuilder {
-    lite_build: bool,
-    special_build: bool,
+    custom_filter: Option<String>,
 }
 
 impl MetadataBuilder {
-    pub fn new(lite_build: bool, special_build: bool) -> Self {
-        Self {
-            lite_build,
-            special_build,
-        }
+    pub fn new(custom_filter: Option<String>) -> Self {
+        Self { custom_filter }
     }
 
     pub fn build_from_file(&self, file_path: &str) -> Result<PhoneMetadataCollection> {
@@ -37,12 +33,19 @@ impl MetadataBuilder {
         is_short_number: bool,
         is_alternate_formats: bool,
     ) -> Result<PhoneMetadataCollection> {
-        let doc = Document::parse(xml_content)?;
+        let doc = Document::parse_with_options(
+            xml_content,
+            ParsingOptions {
+                allow_dtd: true,
+                ..Default::default()
+            },
+        )?;
         let mut collection = PhoneMetadataCollection::default();
-        let filter = get_metadata_filter(self.lite_build, self.special_build)?;
+        let filter = get_metadata_filter(self.custom_filter.as_deref())?;
 
         let root = doc.root_element();
-        for territory in root.children().filter(|n| n.has_tag_name("territory")) {
+
+        for territory in root.descendants().filter(|n| n.has_tag_name("territory")) {
             let region_code = territory.attribute("id").unwrap_or("");
             let mut metadata = self.load_country_metadata(
                 region_code,
@@ -153,7 +156,7 @@ impl MetadataBuilder {
         }
 
         let format_nodes: Vec<_> = element
-            .children()
+            .descendants()
             .filter(|n| n.has_tag_name(NUMBER_FORMAT))
             .collect();
         let mut has_explicit_intl = false;
@@ -247,25 +250,33 @@ impl MetadataBuilder {
                 "Invalid number of intlFormat patterns for country: {}",
                 id
             )));
-        } else if intl_nodes.is_empty() {
-            return Ok(false);
         }
 
-        intl_format.pattern = node.attribute(PATTERN).unwrap_or("").to_string();
-        intl_format.leading_digits_pattern.clear();
-        self.set_leading_digits_patterns(node, &mut intl_format)?;
+        let mut has_explicit_intl = false;
 
-        let val = intl_nodes[0].text().unwrap_or("");
-        if val != "NA" {
-            intl_format.format = val.to_string();
+        // ОШИБКА БЫЛА ЗДЕСЬ: Раньше мы возвращали Ok(false), если узлов нет.
+        // Но даже если узлов нет, формат должен добавиться в массив как копия национального!
+        if intl_nodes.is_empty() {
+            // Оставляем intl_format точной копией national_format
         } else {
-            intl_format.format.clear();
+            intl_format.pattern = node.attribute(PATTERN).unwrap_or("").to_string();
+            intl_format.leading_digits_pattern.clear();
+            self.set_leading_digits_patterns(node, &mut intl_format)?;
+
+            let val = intl_nodes[0].text().unwrap_or("");
+            if val != "NA" {
+                intl_format.format = val.to_string();
+            } else {
+                intl_format.format.clear();
+            }
+            has_explicit_intl = true;
         }
 
         if !intl_format.format.is_empty() {
             metadata.intl_number_format.push(intl_format);
         }
-        Ok(true)
+
+        Ok(has_explicit_intl)
     }
 
     fn set_relevant_desc_patterns(
@@ -359,6 +370,7 @@ impl MetadataBuilder {
         {
             desc.national_number_pattern = Some(validate_re(text, true)?);
         }
+
         if let Some(ex) = node.children().find(|n| n.has_tag_name(EXAMPLE_NUMBER)) {
             desc.example_number = ex.text().map(|s| s.to_string());
         }

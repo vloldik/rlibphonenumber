@@ -9,6 +9,8 @@ mod region_code;
 
 #[cfg(test)]
 mod common {
+    use rkyv::rancor;
+
     use crate::{
         PhoneMetadataCollection, generated::metadata::TEST_METADATA,
         phonenumberutil::phonenumberutil_internal::PhoneNumberUtilInternal,
@@ -18,18 +20,19 @@ mod common {
 
     pub const UNKNOWN_REGION_CODE: Option<&str> = Some("ZZ");
 
-    #[cfg(test)]
     pub fn get_phone_util() -> PhoneNumberUtilInternal {
-        use prost::{Message, bytes::Bytes};
-
         ONCE.call_once(|| {
             colog::default_builder()
                 .filter_level(log::LevelFilter::Trace)
                 .init()
         });
 
-        let metadata = PhoneMetadataCollection::decode(Bytes::from_static(&TEST_METADATA))
-            .expect("Metadata should be valid");
+        let metadata = load_metadata();
         PhoneNumberUtilInternal::new_for_metadata(metadata)
+    }
+
+    pub fn load_metadata() -> PhoneMetadataCollection {
+        rkyv::from_bytes::<PhoneMetadataCollection, rancor::Error>(TEST_METADATA)
+            .expect("Metadata should be valid")
     }
 }
