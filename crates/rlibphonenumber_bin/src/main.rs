@@ -1,8 +1,30 @@
 use std::error::Error;
 
-mod build_metadata;
+use argh::FromArgs;
+
+use crate::commands::CommandEnum;
+
+mod commands;
 mod parser;
 
+#[derive(FromArgs, Debug)]
+/// rlibphonenumber CLI utility
+struct Cli {
+    #[argh(subcommand)]
+    command: CommandEnum,
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
-    build_metadata::build_metadata()
+    let cli: Cli = argh::from_env();
+
+    match cli.command {
+        CommandEnum::BuildMetadata(cmd) => {
+            commands::build_metadata::execute(cmd)?;
+        }
+        CommandEnum::PhoneInfo(cmd) => {
+            commands::phone_info::execute(cmd)?;
+        }
+    }
+
+    Ok(())
 }

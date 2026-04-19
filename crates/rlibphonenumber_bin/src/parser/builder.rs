@@ -47,15 +47,16 @@ impl MetadataBuilder {
 
         for territory in root.descendants().filter(|n| n.has_tag_name("territory")) {
             let region_code = territory.attribute("id").unwrap_or("");
-            let mut metadata = self.load_country_metadata(
+            let metadata = self.load_country_metadata(
                 region_code,
                 territory,
                 is_short_number,
                 is_alternate_formats,
             )?;
 
-            filter.filter_metadata(&mut metadata)?;
-            collection.metadata.push(metadata);
+            if let Some(metadata) = filter.filter_metadata(metadata)? {
+                collection.metadata.push(metadata);
+            }
         }
 
         Ok(collection)

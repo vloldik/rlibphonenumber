@@ -39,8 +39,8 @@ impl MetadataFilter {
     fn should_drop(
         &self,
         metadata_ctx: MetadataContext,
-        parent: &str,
-        field: &str,
+        parent: Option<&str>,
+        field: Option<&str>,
     ) -> Result<bool> {
         let Some(prog) = &self.program else {
             return Ok(false);
@@ -67,29 +67,37 @@ impl MetadataFilter {
         }
     }
 
-    pub fn filter_metadata(&self, metadata: &mut PhoneMetadata) -> Result<()> {
+    pub fn filter_metadata(&self, mut metadata: PhoneMetadata) -> Result<Option<PhoneMetadata>> {
         let ctx = build_metadata_context!(metadata);
+        if self.should_drop(ctx, None, None)? {
+            return Ok(None);
+        }
 
-        if self.should_drop(ctx, "", "preferred_international_prefix")? {
-            metadata.preferred_international_prefix = None;
+        macro_rules! filter_field {
+            ($($field:ident),+) => {
+                $(if self.should_drop(ctx, None, stringify!($field).into())? {
+                    metadata.$field = None;
+                })+
+            };
         }
-        if self.should_drop(ctx, "", "national_prefix")? {
-            metadata.national_prefix = None;
+
+        filter_field!(
+            preferred_international_prefix,
+            national_prefix,
+            preferred_extn_prefix,
+            national_prefix_transform_rule,
+            same_mobile_and_fixed_line_pattern,
+            main_country_for_code,
+            mobile_number_portable_region
+        );
+
+        #[allow(deprecated)]
+        if self.should_drop(ctx, None, "number_format".into())? {
+            metadata.number_format.clear();
         }
-        if self.should_drop(ctx, "", "preferred_extn_prefix")? {
-            metadata.preferred_extn_prefix = None;
-        }
-        if self.should_drop(ctx, "", "national_prefix_transform_rule")? {
-            metadata.national_prefix_transform_rule = None;
-        }
-        if self.should_drop(ctx, "", "same_mobile_and_fixed_line_pattern")? {
-            metadata.same_mobile_and_fixed_line_pattern = None;
-        }
-        if self.should_drop(ctx, "", "main_country_for_code")? {
-            metadata.main_country_for_code = None;
-        }
-        if self.should_drop(ctx, "", "mobile_number_portable_region")? {
-            metadata.mobile_number_portable_region = None;
+        #[allow(deprecated)]
+        if self.should_drop(ctx, None, "intl_number_format".into())? {
+            metadata.intl_number_format.clear();
         }
 
         macro_rules! filter_desc {
@@ -97,16 +105,16 @@ impl MetadataFilter {
                 $(
                     #[allow(deprecated)]
                     if let Some(desc) = metadata.$variant.as_mut() {
-                        if self.should_drop(ctx, stringify!($variant), "national_number_pattern")? {
+                        if self.should_drop(ctx, stringify!($variant).into(), "national_number_pattern".into())? {
                             desc.national_number_pattern = None;
                         }
-                        if self.should_drop(ctx, stringify!($variant), "possible_length")? {
+                        if self.should_drop(ctx, stringify!($variant).into(), "possible_length".into())? {
                             desc.possible_length.clear();
                         }
-                        if self.should_drop(ctx, stringify!($variant), "possible_length_local_only")? {
+                        if self.should_drop(ctx, stringify!($variant).into(), "possible_length_local_only".into())? {
                             desc.possible_length_local_only.clear();
                         }
-                        if self.should_drop(ctx, stringify!($variant), "example_number")? {
+                        if self.should_drop(ctx, stringify!($variant).into(), "example_number".into())? {
                             desc.example_number = None;
                         }
                     }
@@ -115,6 +123,7 @@ impl MetadataFilter {
         }
 
         filter_desc!(
+            general_desc,
             fixed_line,
             mobile,
             toll_free,
@@ -133,7 +142,7 @@ impl MetadataFilter {
             no_international_dialling
         );
 
-        Ok(())
+        Ok(Some(metadata))
     }
 }
 
