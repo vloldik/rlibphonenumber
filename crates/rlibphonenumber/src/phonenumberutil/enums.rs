@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use rlibphonenumbers_macro::countries_enum;
-use strum::EnumIter;
+use strum::{EnumIter, EnumString};
 
 /// Defines the various standardized formats for representing phone numbers.
 ///
@@ -26,7 +26,8 @@ use strum::EnumIter;
 /// - **NATIONAL**: `044 668 1800`
 /// - **E164**: `+41446681800` (international format without formatting)
 /// - **RFC3966**: `tel:+41-44-668-1800` (hyphen-separated with a "tel:" prefix)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumString)]
+#[strum(serialize_all = "lowercase")]
 pub enum PhoneNumberFormat {
     /// **E.164 format.**
     /// This is a standardized international format with no spaces or symbols,
