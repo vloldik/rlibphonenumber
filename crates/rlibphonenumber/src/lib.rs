@@ -31,6 +31,8 @@ mod phone_ext;
 #[cfg(feature = "global_static")]
 pub use crate::phonenumberutil::PHONE_NUMBER_UTIL;
 
+pub mod phonenumber_matcher;
+
 #[cfg(feature = "serde")]
 pub mod serde;
 
