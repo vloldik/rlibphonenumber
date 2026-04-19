@@ -60,7 +60,7 @@ strum = { version = "0.26", features = ["derive"] }
 rlibphonenumbers_macro = { path = "../rlibphonenumbers_macro", version = "0.1" }
 zeroes_itoa = { path = "../zeroes_itoa", version = "0.1" }
 
-serde = { version = "1", optional = true }
+serde = { workspace = true, optional = true }
 
 rustc-hash = { version = "2.1" }
 

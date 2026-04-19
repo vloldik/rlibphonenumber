@@ -12,6 +12,7 @@ members = [
 # helpful error package
 thiserror = "1.0"
 prost = "0.14"
+serde = "1.0"
 
 [workspace.package]
 
