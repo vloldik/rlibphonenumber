@@ -1,4 +1,5 @@
 use argh::FromArgs;
+use prost::Message;
 use std::fs;
 use std::path::PathBuf;
 
@@ -52,7 +53,7 @@ pub fn build_metadata() -> Result<(), Box<dyn std::error::Error>> {
     let collection = builder.build_from_file(&options.input_xml)?;
     let transformed = transform_for_rust(collection);
 
-    let bytes = rkyv::to_bytes::<rkyv::rancor::Error>(&transformed)?;
+    let bytes = transformed.encode_to_vec();
 
     let bin_filename = format!("{}.bin", options.basename);
     let bin_path = PathBuf::from(&options.output_dir).join(&bin_filename);
