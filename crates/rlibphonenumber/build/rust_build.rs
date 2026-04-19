@@ -50,6 +50,10 @@ fn main() {
     }
 
     config
+        .type_attribute(
+            ".",
+            "#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]",
+        )
         .compile_protos(
             &[
                 "resources/phonemetadata.proto",

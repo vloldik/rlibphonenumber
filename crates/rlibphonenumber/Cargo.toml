@@ -47,6 +47,7 @@ dashmap = "5.5"
 regex = { version = "1.10", optional = true }
 regex-lite = { version = "0.1", optional = true }
 
+rkyv = "0.8"
 
 thiserror = { workspace = true }
 
