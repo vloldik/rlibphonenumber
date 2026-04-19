@@ -55,7 +55,7 @@ export class Rlibphonenumber {
 
   @func()
   async devSetup(
-    source: Directory,
+    @argument({ defaultPath: '/' }) source: Directory,
     re2Version: string = RE2_DEFAULT,
   ): Promise<Directory> {
     const version = await this.readLock(source)
@@ -68,7 +68,7 @@ export class Rlibphonenumber {
 
   @func()
   async generate(
-    source: Directory,
+    @argument({ defaultPath: '/' }) source: Directory,
     tag: string = "",
   ): Promise<Directory> {
     const resolvedTag = tag ? await this.resolveTag(tag) : await this.readLock(source)
@@ -100,9 +100,9 @@ export class Rlibphonenumber {
       .withNewFile(LOCK_FILE, resolvedTag + "\n")
   }
 
-  @func()
-  async fuzzTest(
-    source: Directory,
+  @func({ cache: 'never' })
+  async diffTest(
+    @argument({ defaultPath: '/' }) source: Directory,
     maxTotalTime: number = 60,
     re2Version: string = RE2_DEFAULT,
   ): Promise<string> {
