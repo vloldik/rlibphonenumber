@@ -23,6 +23,7 @@ use crate::{
     generated::{
         metadata::METADATA,
         proto::{PhoneMetadataCollection, PhoneNumber},
+        uniprops_digits::uniprops::get_digit_value,
     },
     interfaces::MatcherApi,
     phonenumberutil::{
@@ -141,6 +142,17 @@ pub fn get_national_significant_number<'b>(
             0
         },
     )
+}
+
+pub fn normalize_digits(string: &str) -> String {
+    string
+        .chars()
+        .map(|char| {
+            get_digit_value(char)
+                .map(|digit| (digit + b'0') as char)
+                .unwrap_or(char)
+        })
+        .collect()
 }
 
 // Helper initialiser method to create the regular-expression pattern to match

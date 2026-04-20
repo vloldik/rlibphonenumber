@@ -86,5 +86,18 @@ fn main() {
             })
             .out_file("uniprops_digits_pat.rs")
             .build();
+        UnipropsBuilder::new()
+            .with_digits(false)
+            .with_categories(false)
+            .filter(|r| r.general_category.starts_with('Z'))
+            .with_custom(|recs| {
+                let decimals: String = recs
+                    .iter()
+                    .map(|r| format!(r"\u{{{:x}}}", r.code_point))
+                    .collect();
+                format!("pub const SEPARATORS: &str = \"{decimals}\";")
+            })
+            .out_file("uniprops_separators_pat.rs")
+            .build();
     }
 }

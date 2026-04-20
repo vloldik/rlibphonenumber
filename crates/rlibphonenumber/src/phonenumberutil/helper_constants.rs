@@ -61,6 +61,12 @@ pub const DIGITS: &str = r"\p{Nd}";
 #[cfg(all(feature = "lite", not(feature = "regex")))]
 pub const DIGITS: &str = uniprops_digits_pat::uniprops::DIGITS_ND;
 
+#[cfg(feature = "regex")]
+pub const SEPARATORS: &str = r"\p{Z}";
+
+#[cfg(all(feature = "lite", not(feature = "regex")))]
+pub const SEPARATORS: &str = uniprops_separators_pat::uniprops::SEPARATORS;
+
 pub const VALID_ALPHA: &str = "a-z";
 pub const VALID_ALPHA_INCL_UPPERCASE: &str = "A-Za-z";
 

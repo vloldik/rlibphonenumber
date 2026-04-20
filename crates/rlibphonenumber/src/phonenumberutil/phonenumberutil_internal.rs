@@ -74,7 +74,7 @@ pub type ExtractNumberResult<T> = std::result::Result<T, ExtractNumberError>;
 
 pub struct PhoneNumberUtilInternal {
     /// Helper class holding useful regular expressions and character mappings.
-    reg_exps: PhoneNumberRegExpsAndMappings,
+    pub reg_exps: PhoneNumberRegExpsAndMappings,
 
     /// A mapping from a country calling code to a RegionCode object which denotes
     /// NANPA share the country calling code 1 and Russia and Kazakhstan share the

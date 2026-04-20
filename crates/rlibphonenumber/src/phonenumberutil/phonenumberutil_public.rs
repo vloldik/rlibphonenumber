@@ -59,6 +59,10 @@ impl PhoneNumberUtil {
         }
     }
 
+    pub(crate) fn util_internal(&self) -> &PhoneNumberUtilInternal {
+        &self.util_internal
+    }
+
     /// Checks if a `PhoneNumber` can be dialed internationally.
     ///
     /// # Parameters
