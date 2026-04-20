@@ -24,6 +24,7 @@ use crate::{
         metadata::METADATA,
         proto::{PhoneMetadataCollection, PhoneNumber},
         uniprops_digits::uniprops::get_digit_value,
+        uniprops_without_nl,
     },
     interfaces::MatcherApi,
     phonenumberutil::{
@@ -528,4 +529,8 @@ pub fn is_match(
     number_desc: &PhoneNumberDescWrapper,
 ) -> Result<bool, crate::InvalidRegexError> {
     matcher_api.match_national_number(number, number_desc, false)
+}
+
+pub fn is_unwanted_end_char(c: char) -> bool {
+    c != '#' && uniprops_without_nl::uniprops::Category::from_char(c).is_some()
 }

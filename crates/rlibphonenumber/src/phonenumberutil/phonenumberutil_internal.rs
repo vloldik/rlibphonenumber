@@ -41,11 +41,11 @@ use crate::{
     InternalError, InternalRegexError, InvalidNumberError,
     generated::{
         proto::{PhoneMetadataCollection, PhoneNumber, phone_number::CountryCodeSource},
-        uniprops_digits, uniprops_without_nl,
+        uniprops_digits,
     },
     phonenumberutil::{
         helper_constants::PLUS_CHARS,
-        helper_functions::get_national_significant_number,
+        helper_functions::{get_national_significant_number, is_unwanted_end_char},
         helper_types::{PrefixParts, new_formatted_number_builder},
         regex_wrapper_types::{
             NumberFormatWrapper, PhoneMetadataWrapper, PhoneNumberDescWrapper, RegexTriplets,
@@ -243,9 +243,7 @@ impl PhoneNumberUtilInternal {
     }
 
     pub(crate) fn trim_unwanted_end_chars<'a>(&self, phone_number: &'a str) -> &'a str {
-        phone_number.trim_end_matches(|c| {
-            c != '#' && uniprops_without_nl::uniprops::Category::from_char(c).is_some()
-        })
+        phone_number.trim_end_matches(is_unwanted_end_char)
     }
 
     /// formatter is not implemented yet, but ..
