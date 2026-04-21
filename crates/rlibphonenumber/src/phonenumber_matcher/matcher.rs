@@ -17,14 +17,14 @@
 // Generated Unicode lookup tables (produced by build.rs via UnipropsBuilder).
 // Each included file exposes a single `pub fn is_<name>(c: char) -> bool`.
 
-use core::str;
+use core::{num, str};
 use std::{
     cell::Cell,
     ops::{Deref, Index},
 };
 
 use crate::{
-    CountryCodeSource, PhoneNumber, PhoneNumberFormat, PhoneNumberUtil,
+    CountryCodeSource, MatchType, PhoneNumber, PhoneNumberFormat, PhoneNumberUtil,
     generated::uniprops_without_nl,
     phonenumber_matcher::{leniency::Leniency, phonenumber_match::PhoneNumberMatch},
     phonenumberutil::{
@@ -35,6 +35,7 @@ use crate::{
         helper_functions::{create_extn_pattern, is_unwanted_end_char, normalize_digits},
     },
     regexp::Regex,
+    unwrap_internal, unwrap_regex_error,
 };
 
 // ── Error type ────────────────────────────────────────────────────────────────
@@ -583,51 +584,51 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
     }
 
     pub fn all_number_groups_are_exactly_present<'b>(
-        util: &PhoneNumberUtil,
+        &self,
         number: &PhoneNumber,
         normalized_candidate: &mut String,
-        formatted_number_groups: impl Iterator<Item = &'b str>,
+        mut formatted_number_groups: impl DoubleEndedIterator<Item = &'b str> + Clone,
     ) -> bool {
         let mut candidate_groups = normalized_candidate
             .split(|c: char| !c.is_ascii_digit())
-            .rev();
+            .rev()
+            .peekable();
 
         // Set this to the last group, skipping it if the number has an
         // extension.
-        if number.extension.is_some() {
-            candidate_groups.next();
-        }
+        let (mut candidate, is_single_group) = if number.extension.is_some() {
+            let candidate = candidate_groups.nth(1);
+            (candidate, candidate.is_none())
+        } else {
+            (candidate_groups.next(), candidate_groups.peek().is_none())
+        };
 
-        let first = candidate_groups.next();
         // First check if the national significant number is formatted as a
         // block.  We use `contains` and not `==`, since the national
         // significant number may be present with a prefix such as a national
         // number prefix, or the country code itself.
-        if candidate_groups.next().is_none()
-            || candidate_groups
-                .nth(candidate_number_group_index)
-                .is_some_and(|g| g.contains(&*util.get_national_significant_number(number)))
+        if is_single_group
+            || candidate.is_some_and(|g| {
+                g.contains(&self.phone_util.get_national_significant_number(number))
+            })
         {
             return true;
         }
-        // Starting from the end, go through in reverse, excluding the first
-        // group, and check the candidate and number groups are the same.
-        let mut candidate_idx = candidate_number_group_index;
-        let mut formatted_idx = formatted_number_groups.len().saturating_sub(1);
-        while formatted_idx > 0 && candidate_idx >= 0 {
-            if candidate_groups[candidate_idx as usize]
-                != formatted_number_groups[formatted_idx as usize]
-            {
+
+        let first_formatted = formatted_number_groups.next();
+        let formatted_rev = formatted_number_groups.rev();
+
+        for next_formatted in formatted_rev {
+            if Some(next_formatted) != candidate {
                 return false;
             }
-            formatted_idx.saturating_sub(1);
-            candidate_idx.saturating_sub(1);
+            candidate = candidate_groups.next();
         }
-        // Now check the first group.  There may be a national prefix at the
-        // start, so we only check that the candidate group ends with the
-        // formatted number group.
-        candidate_idx >= 0
-            && candidate_groups[candidate_idx as usize].ends_with(&*formatted_number_groups[0])
+
+        match (candidate, first_formatted) {
+            (Some(c), Some(f)) => c.ends_with(f),
+            _ => false,
+        }
     }
 
     /// Helper method to get the national-number part of a number, formatted
@@ -663,13 +664,14 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
     ) -> bool {
         let mut normalized_candidate = normalize_digits(candidate);
         let formatted_rfc_number = self.phone_util.format(number, PhoneNumberFormat::RFC3966);
-        let formatted_number_groups = Self::get_national_number_groups(&formatted_rfc_number);
+        let formatted_number_groups = self.get_national_number_groups(&formatted_rfc_number);
         if checker(number, normalized_candidate, &formatted_number_groups) {
             return true;
         }
         // If this didn't pass, see if there are any alternate formats that
         // match, and try them instead.
         let alternate_formats = util
+            .util_internal()
             .get_alternate_formats_metadata_source()
             .get_formatting_metadata_for_country_calling_code(number.get_country_code());
         let nsn = util.get_national_significant_number(number);
@@ -702,6 +704,7 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
     }
 
     pub fn contains_more_than_one_slash_in_national_number(
+        &self,
         number: &PhoneNumber,
         candidate: &str,
     ) -> bool {
@@ -718,14 +721,18 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
         // If the first slash is after the country calling code, this is
         // permitted.
         let candidate_has_country_code = matches!(
-            number.get_country_code_source(),
+            number.country_code_source(),
             CountryCodeSource::FromNumberWithPlusSign
                 | CountryCodeSource::FromNumberWithoutPlusSign
         );
         if candidate_has_country_code {
-            let digits_before_slash =
-                PhoneNumberUtil::normalize_digits_only(&candidate[..first_slash]);
-            if digits_before_slash == number.get_country_code().to_string() {
+            let digits_before_slash = self
+                .phone_util
+                .normalize_digits_only(&candidate[..first_slash]);
+            let mut buf = itoa::Buffer::new();
+            let source = number.country_code_source();
+            let source_str = buf.format(source as i32);
+            if digits_before_slash == source_str {
                 // Any more slashes and this is illegal.
                 return candidate[second_slash + 1..].contains('/');
             }
@@ -733,11 +740,7 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
         true
     }
 
-    pub fn contains_only_valid_x_chars(
-        number: &PhoneNumber,
-        candidate: &str,
-        util: &PhoneNumberUtil,
-    ) -> bool {
+    pub fn contains_only_valid_x_chars(&self, number: &PhoneNumber, candidate: &str) -> bool {
         // The characters 'x' and 'X' can be (1) a carrier code, in which case
         // they always precede the national significant number or (2) an
         // extension sign, in which case they always precede the extension
@@ -745,81 +748,97 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
         // first case has to have more than 1 consecutive 'x' or 'X', whereas
         // the second case can only have exactly 1 'x' or 'X'.  We ignore the
         // character if it appears as the last character of the string.
-        let chars: Vec<char> = candidate.chars().collect();
-        let mut index = 0;
-        while index + 1 < chars.len() {
-            let c = chars[index];
-            if c == 'x' || c == 'X' {
-                let next = chars[index + 1];
-                if next == 'x' || next == 'X' {
-                    // This is the carrier code case, in which the 'X's always
-                    // precede the national significant number.
-                    index += 1;
-                    let rest: String = chars[index..].iter().collect();
-                    if util.is_number_match(number, &rest) != MatchType::NsnMatch {
-                        return false;
-                    }
-                } else {
-                    // This is the extension sign case, in which the 'x' or
-                    // 'X' should always precede the extension number.
-                    let rest: String = chars[index..].iter().collect();
-                    if PhoneNumberUtil::normalize_digits_only(&rest) != number.get_extension() {
-                        return false;
-                    }
+        let mut iter = candidate.char_indices().peekable();
+        while let Some((index, c)) = iter.next() {
+            let Some((_, next)) = iter.peek().cloned() else {
+                break;
+            };
+            if c != 'x' && c != 'X' {
+                continue;
+            }
+            if next == 'x' || next == 'X' {
+                // This is the carrier code case, in which the 'X's always
+                // precede the national significant number.
+                iter.next();
+                let rest = &candidate[index + 1..];
+                if self
+                    .phone_util
+                    .is_number_match_with_one_string(number, rest)
+                    != Ok(MatchType::NsnMatch)
+                {
+                    return false;
+                }
+            } else {
+                // This is the extension sign case, in which the 'x' or
+                // 'X' should always precede the extension number.
+                let rest = &candidate[index..];
+                if self.phone_util.normalize_digits_only(rest) != number.extension() {
+                    return false;
                 }
             }
-            index += 1;
         }
         true
     }
 
     pub fn is_national_prefix_present_if_required(
+        &self,
         number: &PhoneNumber,
         util: &PhoneNumberUtil,
     ) -> bool {
         // First, check how we deduced the country code.  If it was written in
         // international format, then the national prefix is not required.
-        if number.get_country_code_source() != CountryCodeSource::FromDefaultCountry {
+        if number.country_code_source() != CountryCodeSource::FromDefaultCountry {
             return true;
         }
-        let phone_number_region = util.get_region_code_for_country_code(number.get_country_code());
-        let metadata = match util.get_metadata_for_region(&phone_number_region) {
-            Some(m) => m,
-            None => return true,
+        let Some(phone_number_region) = util.get_region_code_for_country_code(number.country_code)
+        else {
+            return true;
+        };
+        let Some(metadata) = util
+            .util_internal()
+            .get_metadata_for_region(phone_number_region)
+        else {
+            return true;
         };
         // Check if a national prefix should be present when formatting this
         // number.
         let national_number = util.get_national_significant_number(number);
-        let format_rule = util.choose_formatting_pattern_for_number(
-            metadata.get_number_format_list(),
-            &national_number,
-        );
+        let format_rule = util
+            .util_internal()
+            .choose_formatting_pattern_for_number(&metadata.number_format, &national_number)
+            .map_err(unwrap_regex_error)
+            .unwrap_or_else(|err| match err {});
         // To do this, we check that a national prefix formatting rule was
         // present and that it wasn't just the first-group symbol ($1) with
         // punctuation.
         if let Some(rule) = format_rule {
-            if !rule.get_national_prefix_formatting_rule().is_empty() {
-                if rule.get_national_prefix_optional_when_formatting() {
+            if !rule.original.national_prefix_formatting_rule().is_empty() {
+                if rule.original.national_prefix_optional_when_formatting() {
                     // The national-prefix is optional in these cases, so we
                     // don't need to check if it was present.
                     return true;
                 }
-                if PhoneNumberUtil::formatting_rule_has_first_group_only(
-                    rule.get_national_prefix_formatting_rule(),
-                ) {
+                if self
+                    .phone_util
+                    .util_internal()
+                    .formatting_rule_has_first_group_only(
+                        rule.original.national_prefix_formatting_rule(),
+                    )
+                {
                     // National prefix not needed for this number.
                     return true;
                 }
                 // Normalize the remainder.
-                let raw_input_copy = PhoneNumberUtil::normalize_digits_only(number.get_raw_input());
-                let mut raw_input = raw_input_copy;
+                let raw_input_copy = self.phone_util.normalize_digits_only(number.raw_input());
                 // Check if we found a national prefix and/or carrier code at
                 // the start of the raw input, and return the result.
-                return util.maybe_strip_national_prefix_and_carrier_code(
-                    &mut raw_input,
-                    &metadata,
-                    None,
-                );
+                return util
+                    .util_internal()
+                    .maybe_strip_national_prefix_and_carrier_code(metadata, &raw_input_copy)
+                    .map_err(unwrap_internal)
+                    .unwrap_or_else(|err| match err {})
+                    .1
+                    .is_some();
             }
         }
         true

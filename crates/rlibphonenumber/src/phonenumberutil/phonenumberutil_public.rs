@@ -23,7 +23,7 @@
 use std::{borrow::Cow, collections::HashSet};
 
 use crate::{
-    PhoneMetadataCollection, generated::proto::PhoneNumber,
+    InvalidNumberError, PhoneMetadataCollection, generated::proto::PhoneNumber,
     phonenumberutil::helper_functions::get_national_significant_number, unwrap_internal,
 };
 
@@ -657,6 +657,25 @@ impl PhoneNumberUtil {
             .is_number_match(first_number, second_number)
     }
 
+    /// Compares phone number with string and returns their `MatchType`.
+    ///
+    /// # Parameters
+    ///
+    /// * `first_number`: The first `PhoneNumber` to compare.
+    /// * `second_number`: The second `PhoneNumber` to compare.
+    ///
+    /// # Returns
+    ///
+    /// The `MatchType` indicating the level of similarity (e.g., EXACT_MATCH, NSN_MATCH).
+    pub fn is_number_match_with_one_string(
+        &self,
+        first_number: &PhoneNumber,
+        second_number: &str,
+    ) -> Result<MatchType, InvalidNumberError> {
+        self.util_internal
+            .is_number_match_with_one_string(first_number, second_number)
+            .map_err(|err| unwrap_internal(err))
+    }
     /// Performs a fast check to determine if a `PhoneNumber` is possibly valid.
     ///
     /// This method is less strict than `is_valid_number`.

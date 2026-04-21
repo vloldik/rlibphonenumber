@@ -213,3 +213,10 @@ pub(crate) fn unwrap_internal<T: Debug + Display>(err: InternalError<T>) -> T {
         ),
     }
 }
+
+pub(crate) fn unwrap_regex_error(invalid_regex_error: InternalRegexError) -> Infallible {
+    panic!(
+        "A valid regex is expected in metadata; this indicates a library bug: {}",
+        invalid_regex_error
+    )
+}
