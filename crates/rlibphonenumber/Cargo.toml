@@ -67,7 +67,7 @@ rustc-hash = { version = "2.1" }
 [build-dependencies]
 thiserror = "1.0"
 prost-build = "0.14"
-uniprops-gen = "0.3"
+uniprops-gen = "0.3.5"
 
 [dev-dependencies]
 colog = "1.3"

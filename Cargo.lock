@@ -1644,9 +1644,9 @@ checksum = "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853"
 
 [[package]]
 name = "uniprops-gen"
-version = "0.3.3"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d197e267c5f803c1fa9b69c12dc2f9719a46a6a31a4c6d6ced8222596f28b3c1"
+checksum = "7d61405b0691969f166c022859edf8757f1ae895dea6973234a7fef7ee368363"
 dependencies = [
  "csv",
  "proc-macro2",

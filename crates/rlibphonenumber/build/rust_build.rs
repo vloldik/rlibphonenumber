@@ -1,5 +1,5 @@
 use prost_build::Config;
-use uniprops_gen::UnipropsBuilder;
+use uniprops_gen::{LookupStrategy, UnipropsBuilder};
 
 fn main() {
     let deprecated = concat!(
@@ -68,9 +68,37 @@ fn main() {
     // For others, since char is valid unicode Category::from_char should be Some()
     UnipropsBuilder::new()
         .filter(|r| !r.general_category.starts_with(['N', 'L']))
+        .with_lookup_strategy(if cfg!(all(feature = "lite")) {
+            LookupStrategy::BSearch
+        } else {
+            LookupStrategy::Trie { shift: 8 }
+        })
         .out_file("uniprops_without_nl.rs")
         .with_digits(false)
         .build();
+
+    UnipropsBuilder::new()
+        .with_lookup_strategy(LookupStrategy::BSearch)
+        .filter(|record| {
+            let cp = record.code_point;
+            let is_in_latin_block = (cp <= 0x007F) || // Basic Latin
+        (0x0080..=0x00FF).contains(&cp) || // Latin-1 Supplement
+        (0x0100..=0x017F).contains(&cp) || // Latin Extended-A
+        (0x0180..=0x024F).contains(&cp) || // Latin Extended-B
+        (0x1E00..=0x1EFF).contains(&cp) || // Latin Extended Additional
+        (0x0300..=0x036F).contains(&cp); // Combining Diacritical Marks
+
+            if !is_in_latin_block {
+                return false;
+            }
+
+            let cat = &record.general_category;
+            let is_alpha = cat.starts_with('L');
+            let is_non_spacing_mark = cat == "Mn";
+
+            is_alpha || is_non_spacing_mark
+        })
+        .out_file("is_latin_letter.rs");
 
     if cfg!(all(feature = "lite", not(feature = "regex"))) {
         UnipropsBuilder::new()

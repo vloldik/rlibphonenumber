@@ -21,18 +21,25 @@ use core::{num, str};
 use std::{
     cell::Cell,
     ops::{Deref, Index},
+    sync::Arc,
 };
 
 use crate::{
     CountryCodeSource, MatchType, PhoneNumber, PhoneNumberFormat, PhoneNumberUtil,
     generated::uniprops_without_nl,
-    phonenumber_matcher::{leniency::Leniency, phonenumber_match::PhoneNumberMatch},
+    phonenumber_matcher::{
+        alternate_formats::AlternateFormats, leniency::Leniency,
+        phonenumber_match::PhoneNumberMatch,
+    },
     phonenumberutil::{
         helper_constants::{
             CAPTURE_UP_TO_SECOND_NUMBER_START, DIGITS, MAX_LENGTH_COUNTRY_CODE, MAX_LENGTH_FOR_NSN,
             PLUS_CHARS, SEPARATORS, VALID_PUNCTUATION,
         },
-        helper_functions::{create_extn_pattern, is_unwanted_end_char, normalize_digits},
+        helper_functions::{
+            create_extn_pattern, get_national_significant_number, is_unwanted_end_char,
+            normalize_digits,
+        },
     },
     regexp::Regex,
     unwrap_internal, unwrap_regex_error,
@@ -154,6 +161,8 @@ pub struct PhoneNumberMatcher<'a, T: Deref<Target = PhoneNumberUtil>> {
     last_match: Option<PhoneNumberMatch<'a>>,
     /// The next index to start searching at.  Undefined in [`State::Done`].
     search_index: usize,
+
+    alternate_formats: Option<Arc<AlternateFormats>>,
 }
 
 impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
@@ -176,6 +185,7 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
         country: Option<String>,
         leniency: Leniency,
         max_tries: i64,
+        alternate_formats: Option<Arc<AlternateFormats>>,
     ) -> Result<Self, PhoneNumberMatcherError> {
         if max_tries < 0 {
             return Err(PhoneNumberMatcherError::NegativeMaxTries(max_tries));
@@ -284,6 +294,7 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
             state: State::NotReady,
             last_match: None,
             search_index: 0,
+            alternate_formats,
         })
     }
 
@@ -655,6 +666,13 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
         None
     }
 
+    fn get_national_number_groups_for_pattern<'b>(
+        &self,
+        formatted_rfc_number: &'b str,
+    ) -> str::Split<'b, char> {
+        formatted_rfc_number.split('-')
+    }
+
     pub fn check_number_grouping_is_valid(
         &self,
         number: &PhoneNumber,
@@ -662,39 +680,59 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
         util: &PhoneNumberUtil,
         checker_variant: CheckerVariant,
     ) -> bool {
-        let mut normalized_candidate = normalize_digits(candidate);
+        let normalized_candidate = normalize_digits(candidate);
         let formatted_rfc_number = self.phone_util.format(number, PhoneNumberFormat::RFC3966);
-        let formatted_number_groups = self.get_national_number_groups(&formatted_rfc_number);
-        if checker(number, normalized_candidate, &formatted_number_groups) {
+        let Some(formatted_number_groups) = self.get_national_number_groups(&formatted_rfc_number)
+        else {
+            return false;
+        };
+        if self.checker(
+            checker_variant,
+            number,
+            &normalized_candidate,
+            formatted_number_groups,
+        ) {
             return true;
         }
         // If this didn't pass, see if there are any alternate formats that
         // match, and try them instead.
-        let alternate_formats = util
-            .util_internal()
-            .get_alternate_formats_metadata_source()
-            .get_formatting_metadata_for_country_calling_code(number.get_country_code());
+        let alternate_formats = self
+            .alternate_formats
+            .as_deref()
+            .and_then(|formats| formats.get_alternate_formats_for_country(number.country_code));
+
         let nsn = util.get_national_significant_number(number);
         if let Some(alternate_formats) = alternate_formats {
-            for alternate_format in alternate_formats.get_number_format_list() {
-                if alternate_format.get_leading_digits_pattern_count() > 0 {
+            for alternate_format in &alternate_formats.number_format {
+                if let Some(pattern) = alternate_format.leading_digits_pattern().get(0) {
                     // There is only one leading digits pattern for alternate
                     // formats.
-                    let pattern = self
-                        .regex_cache
-                        .get_pattern_for_regex(alternate_format.get_leading_digits_pattern(0));
-                    if !pattern.is_match_at(&nsn, 0) {
+                    if !pattern
+                        .anchor_start()
+                        .map_err(unwrap_regex_error)
+                        .unwrap_or_else(|err| match err {})
+                        .is_some_and(|pat| pat.is_match(&nsn))
+                    {
                         // Leading digits don't match; try another one.
                         continue;
                     }
                 }
+                let mut buf = zeroes_itoa::LeadingZeroBuffer::new();
+                let nsn = get_national_significant_number(number, &mut buf);
+                let nsn_formatted = self
+                    .phone_util
+                    .util_internal()
+                    .format_nsn_using_pattern(&nsn, alternate_format, PhoneNumberFormat::RFC3966)
+                    .map_err(unwrap_internal)
+                    .unwrap_or_else(|err| match err {});
+
                 let formatted_number_groups =
-                    Self::get_national_number_groups(util, number, Some(alternate_format));
-                if checker.check_groups(
-                    util,
+                    self.get_national_number_groups_for_pattern(&nsn_formatted);
+                if self.checker(
+                    checker_variant,
                     number,
-                    &mut normalized_candidate,
-                    &formatted_number_groups,
+                    &normalized_candidate,
+                    formatted_number_groups,
                 ) {
                     return true;
                 }
@@ -806,7 +844,7 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
         let format_rule = util
             .util_internal()
             .choose_formatting_pattern_for_number(&metadata.number_format, &national_number)
-            .map_err(unwrap_regex_error)
+            .map_err(unwrap_internal)
             .unwrap_or_else(|err| match err {});
         // To do this, we check that a national prefix formatting rule was
         // present and that it wasn't just the first-group symbol ($1) with
@@ -866,7 +904,7 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> Iterator for PhoneNumberMatcher<'a,
     fn next(&mut self) -> Option<Self::Item> {
         if self.state == State::NotReady {
             let index = self.search_index;
-            self.last_match = self.find(index);
+            self.last_match = PhoneNumberMatcher::find(&self, index);
             if self.last_match.is_none() {
                 self.state = State::Done;
             } else {
