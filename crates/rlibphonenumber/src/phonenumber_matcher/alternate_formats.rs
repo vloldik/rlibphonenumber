@@ -2,6 +2,7 @@ use rustc_hash::FxHashMap;
 
 use crate::{PhoneMetadataCollection, phonenumberutil::regex_wrapper_types::PhoneMetadataWrapper};
 
+#[derive(Debug)]
 pub struct AlternateFormats {
     calling_code_to_alternate_formats_map: FxHashMap<i32, PhoneMetadataWrapper>,
 }

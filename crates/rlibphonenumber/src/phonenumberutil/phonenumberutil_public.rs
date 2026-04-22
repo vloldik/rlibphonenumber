@@ -674,7 +674,7 @@ impl PhoneNumberUtil {
     ) -> Result<MatchType, InvalidNumberError> {
         self.util_internal
             .is_number_match_with_one_string(first_number, second_number)
-            .map_err(|err| unwrap_internal(err))
+            .map_err(unwrap_internal)
     }
     /// Performs a fast check to determine if a `PhoneNumber` is possibly valid.
     ///

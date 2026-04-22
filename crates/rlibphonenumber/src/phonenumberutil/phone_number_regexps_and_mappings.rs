@@ -27,7 +27,7 @@ use crate::phonenumberutil::{
 };
 
 #[allow(unused)]
-pub(super) struct PhoneNumberRegExpsAndMappings {
+pub(crate) struct PhoneNumberRegExpsAndMappings {
     /// A map that contains characters that are essential when dialling. That means
     /// any of the characters in this map must not be removed from a number when
     /// dialing, otherwise the call will not reach the intended destination.
@@ -84,11 +84,6 @@ pub(super) struct PhoneNumberRegExpsAndMappings {
     /// Regular expression of groups of valid punctuation characters.
     pub separator_pattern_anchor_start: Regex,
     pub separator_pattern: Regex,
-
-    /// Regexp of all possible ways to write extensions, for use when finding phone
-    /// numbers in text. This will be run as a case-insensitive regexp match. Wide
-    /// character versions are also provided after each ASCII version.
-    pub extn_patterns_for_matching: String,
 
     /// Regexp of all known extension prefixes used by different regions followed
     /// by 1 or more valid digits, for use when parsing.
@@ -281,7 +276,6 @@ impl PhoneNumberRegExpsAndMappings {
             separator_pattern_anchor_start: Regex::new(&format!("^[{}]+", VALID_PUNCTUATION))
                 .unwrap(),
             separator_pattern: Regex::new(&format!("[{}]+", VALID_PUNCTUATION)).unwrap(),
-            extn_patterns_for_matching: create_extn_pattern(false),
             extn_pattern: Regex::new(&format!("(?i)(?:{})$", &extn_patterns_for_parsing)).unwrap(),
             valid_phone_number_pattern_fullmatch: Regex::new(&format!(
                 "(?i)^(?:{})(?:{})?$",

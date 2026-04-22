@@ -81,6 +81,7 @@ export class Rlibphonenumber {
         "crates/rlibphonenumber/src/generated",
         generated.directory("/project/crates/rlibphonenumber/src/generated"),
       )
+
       .withDirectory(
         "crates/rlibphonenumber/resources",
         generated.directory("/project/crates/rlibphonenumber/resources"),
@@ -268,7 +269,7 @@ export class Rlibphonenumber {
       .withExec(["bash", "-c", "cp resources/*.proto crates/rlibphonenumber/resources/"])
       .withExec(["bash", "-c", "cp resources/*.proto crates/rlibphonenumber_bin/resources/"])
       .withExec(["bash", "-c",
-        "cp resources/ShortNumberMetadata.xml crates/rlibphonenumbers_macro/resources/",
+        "cp resources/PhoneNumberMetadata.xml crates/rlibphonenumbers_macro/resources/",
       ])
   }
 

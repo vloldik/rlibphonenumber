@@ -14,46 +14,29 @@
  * limitations under the License.
  */
 
-// Generated Unicode lookup tables (produced by build.rs via UnipropsBuilder).
-// Each included file exposes a single `pub fn is_<name>(c: char) -> bool`.
-
-use core::{num, str};
-use std::{
-    cell::Cell,
-    ops::{Deref, Index},
-    sync::Arc,
-};
+use core::str;
+use std::{cell::Cell, convert::Infallible, ops::Deref, sync::Arc};
 
 use crate::{
-    CountryCodeSource, MatchType, PhoneNumber, PhoneNumberFormat, PhoneNumberUtil,
-    generated::uniprops_without_nl,
+    CountryCodeSource, InternalError, MatchType, PhoneNumber, PhoneNumberFormat, PhoneNumberUtil,
+    generated::{uniprops_currencies, uniprops_latin_letters},
     phonenumber_matcher::{
         alternate_formats::AlternateFormats, leniency::Leniency,
         phonenumber_match::PhoneNumberMatch,
     },
     phonenumberutil::{
         helper_constants::{
-            CAPTURE_UP_TO_SECOND_NUMBER_START, DIGITS, MAX_LENGTH_COUNTRY_CODE, MAX_LENGTH_FOR_NSN,
-            PLUS_CHARS, SEPARATORS, VALID_PUNCTUATION,
+            DIGITS, MAX_LENGTH_COUNTRY_CODE, MAX_LENGTH_FOR_NSN, PLUS_CHARS, SEPARATORS,
+            VALID_PUNCTUATION,
         },
         helper_functions::{
             create_extn_pattern, get_national_significant_number, is_unwanted_end_char,
             normalize_digits,
         },
+        phonenumberutil_internal::PhoneNumberUtilInternal,
     },
     regexp::Regex,
-    unwrap_internal, unwrap_regex_error,
 };
-
-// ── Error type ────────────────────────────────────────────────────────────────
-
-#[derive(Debug, thiserror::Error)]
-pub enum PhoneNumberMatcherError {
-    #[error("max_tries must be >= 0, got {0}")]
-    NegativeMaxTries(i64),
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 /// Returns a regular expression quantifier with an upper and lower limit.
 fn limit(lower: usize, upper: usize) -> String {
@@ -64,11 +47,9 @@ fn limit(lower: usize, upper: usize) -> String {
     format!("{{{lower},{upper}}}")
 }
 
-// ── State ─────────────────────────────────────────────────────────────────────
-
 /// The potential states of a [`PhoneNumberMatcher`].
-#[derive(PartialEq)]
-enum State {
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum State {
     NotReady,
     Ready,
     Done,
@@ -80,8 +61,6 @@ enum CheckerVariant {
     AllNumberGroupsAreExactlyPresent,
 }
 
-// ── Main struct ───────────────────────────────────────────────────────────────
-
 /// A stateful struct that finds and extracts telephone numbers from text.
 /// Instances are created via the factory methods in [`PhoneNumberUtil`].
 ///
@@ -89,7 +68,8 @@ enum CheckerVariant {
 /// `1-800-SIX-FLAGS`) are not found.
 ///
 /// This struct is not thread-safe.
-pub struct PhoneNumberMatcher<'a, T: Deref<Target = PhoneNumberUtil>> {
+#[derive(Debug, Clone)]
+pub struct PhoneNumberMatcher<'a, 'r, T: Deref<Target = PhoneNumberUtil>> {
     /// The phone number pattern used by [`find`], similar to
     /// `PhoneNumberUtil::VALID_PHONE_NUMBER`, but with the following
     /// differences:
@@ -143,17 +123,17 @@ pub struct PhoneNumberMatcher<'a, T: Deref<Target = PhoneNumberUtil>> {
 
     // ── instance state ────────────────────────────────────────────────────────
     /// The phone number utility.
-    phone_util: T,
+    _phone_util: T,
     /// The text searched for phone numbers.
-    text: String,
+    text: &'a str,
     /// The region (country) to assume for phone numbers without an
     /// international prefix, or `None` if only numbers with a leading plus
     /// should be considered.
-    preferred_region: Option<String>,
+    preferred_region: Option<&'r str>,
     /// The degree of validation requested.
     leniency: Leniency,
     /// The maximum number of retries after matching an invalid number.
-    max_tries: Cell<i64>,
+    max_tries: Cell<u64>,
 
     /// The iteration tristate.
     state: State,
@@ -165,7 +145,7 @@ pub struct PhoneNumberMatcher<'a, T: Deref<Target = PhoneNumberUtil>> {
     alternate_formats: Option<Arc<AlternateFormats>>,
 }
 
-impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
+impl<'a, 'r, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, 'r, T> {
     /// Creates a new instance.  See the factory methods in [`PhoneNumberUtil`]
     /// on how to obtain a new instance.
     ///
@@ -181,16 +161,12 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
     ///   has many false positives.  Must be `>= 0`.
     pub fn new(
         util: T,
-        text: Option<String>,
-        country: Option<String>,
+        text: &'a str,
+        preferred_region: Option<&'r str>,
         leniency: Leniency,
-        max_tries: i64,
+        max_tries: u64,
         alternate_formats: Option<Arc<AlternateFormats>>,
-    ) -> Result<Self, PhoneNumberMatcherError> {
-        if max_tries < 0 {
-            return Err(PhoneNumberMatcherError::NegativeMaxTries(max_tries));
-        }
-
+    ) -> Self {
         /* Build the `matching_brackets` and `pattern` regular expressions.
          * The building blocks below exist to make the pattern more easily
          * understood. */
@@ -274,7 +250,7 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
             Regex::new(format!("[{}]+([{}]+)", SEPARATORS, SEPARATORS).as_str()).unwrap(),
         ];
 
-        Ok(PhoneNumberMatcher {
+        Self {
             pattern,
             pub_pages: Regex::new("\\d{1,5}-+\\d{1,5}\\s{0,4}\\(\\d{1,4}").unwrap(),
             slash_separated_dates: Regex::new(
@@ -286,16 +262,20 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
             matching_brackets_full_match,
             inner_matches,
             lead_class,
-            phone_util: util,
-            text: text.unwrap_or_default(),
-            preferred_region: country,
+            _phone_util: util,
+            text,
+            preferred_region,
             leniency,
             max_tries: Cell::new(max_tries),
             state: State::NotReady,
             last_match: None,
             search_index: 0,
             alternate_formats,
-        })
+        }
+    }
+
+    fn phone_util(&self) -> &PhoneNumberUtilInternal {
+        self._phone_util.util_internal()
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
@@ -303,12 +283,17 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
     /// Attempts to find the next subsequence in the searched text on or after
     /// `index` that represents a phone number.  Returns the next match, or
     /// `None` if none was found.
-    fn find(&self, index: usize) -> Option<PhoneNumberMatch<'a>> {
+    fn find(
+        &self,
+        index: usize,
+    ) -> Result<Option<PhoneNumberMatch<'a>>, InternalError<Infallible>> {
         let mut pos = index;
 
         while self.max_tries.get() > 0 {
-            let text = self.text.as_str();
-            let m = self.pattern.find_at(text, pos)?;
+            let text = self.text;
+            let Some(m) = self.pattern.find_at(text, pos) else {
+                return Ok(None);
+            };
             let start = m.start();
             let mut candidate = &text[start..m.end()];
 
@@ -318,34 +303,30 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
             // (+41 79 123 45 67 / 68).
             candidate = Self::trim_after_first_match(
                 |s| {
-                    self.phone_util
-                        .util_internal()
+                    self.phone_util()
                         .reg_exps
                         .capture_up_to_second_number_start_pattern
                         .find(s)
                         .map(|s| s.start())
                 },
-                &candidate,
+                candidate,
             );
 
-            let extract_match = self.extract_match(&candidate, start);
+            let extract_match = self.extract_match(candidate, start)?;
             if let Some(result) = extract_match {
-                return Some(result);
+                return Ok(Some(result));
             } else {
                 pos = start + candidate.len();
                 self.decrement_tries();
             }
         }
 
-        None
+        Ok(None)
     }
 
     /// Trims away any characters after the first match of `pattern` in
     /// `candidate`, returning the trimmed version.
-    fn trim_after_first_match<'b, P: Fn(&str) -> Option<usize>>(
-        pattern: P,
-        candidate: &'b str,
-    ) -> &'b str {
+    fn trim_after_first_match<P: Fn(&str) -> Option<usize>>(pattern: P, candidate: &str) -> &str {
         match pattern(candidate) {
             Some(m) => &candidate[..m],
             None => candidate,
@@ -357,45 +338,40 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
     /// we assume they have been added to a preceding Latin character.
     // #[cfg(test)]
     pub fn is_latin_letter(letter: char) -> bool {
-        // Combining marks are a subset of non-spacing-mark.
-        // `is_non_spacing_mark` is generated by UnipropsBuilder for Unicode
-        // general category Mn.
-        if !letter.is_alphabetic() && !is_non_spacing_mark(letter) {
-            return false;
-        }
-        // `is_latin_script` is generated by UnipropsBuilder filtering on:
-        //   Basic Latin, Latin-1 Supplement, Latin Extended-A, Latin Extended-B,
-        //   Latin Extended Additional, Combining Diacritical Marks.
-        is_latin_script(letter)
+        uniprops_latin_letters::uniprops::Category::from_char(letter).is_some()
     }
 
     fn is_invalid_punctuation_symbol(character: char) -> bool {
-        // `is_currency_symbol` is generated by UnipropsBuilder for Unicode
-        // general category Sc.
-        character == '%' || is_currency_symbol(character)
+        character == '%'
+            || uniprops_currencies::uniprops::Category::from_char(character)
+                == Some(uniprops_currencies::uniprops::Category::Sc)
     }
 
     /// Attempts to extract a match from a `candidate` character sequence.
     ///
     /// * `candidate` – the candidate text that might contain a phone number
     /// * `offset`    – the offset of `candidate` within [`Self::text`]
-    fn extract_match(&self, candidate: &str, offset: usize) -> Option<PhoneNumberMatch<'a>> {
+    fn extract_match(
+        &self,
+        candidate: &'a str,
+        offset: usize,
+    ) -> Result<Option<PhoneNumberMatch<'a>>, InternalError<Infallible>> {
         // Skip a match that is more likely to be a date.
         if self.slash_separated_dates.find(candidate).is_some() {
-            return None;
+            return Ok(None);
         }
 
         // Skip potential time-stamps.
         if self.time_stamps.find(candidate).is_some() {
             let following_text = &self.text[offset + candidate.len()..];
             if self.time_stamps_suffix.is_match_at(following_text, 0) {
-                return None;
+                return Ok(None);
             }
         }
 
         // Try to come up with a valid match given the entire candidate.
-        if let Some(result) = self.parse_and_verify(candidate, offset) {
-            return Some(result);
+        if let Some(result) = self.parse_and_verify(candidate, offset)? {
+            return Ok(Some(result));
         }
 
         // If that failed, try to find an "inner match" — there might be a
@@ -408,13 +384,16 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
     ///
     /// * `candidate` – the candidate text that might contain a phone number
     /// * `offset`    – the current offset of `candidate` within [`Self::text`]
-    fn extract_inner_match(&self, candidate: &str, offset: usize) -> Option<PhoneNumberMatch<'a>> {
+    fn extract_inner_match(
+        &self,
+        candidate: &'a str,
+        offset: usize,
+    ) -> Result<Option<PhoneNumberMatch<'a>>, InternalError<Infallible>> {
         // Clone to satisfy the borrow checker — `inner_matches` is borrowed
         // immutably by the loop while `self` must also be borrowed mutably for
         // the parse calls.
-        let patterns: Vec<Regex> = self.inner_matches.iter().cloned().collect();
 
-        for possible_inner_match in &patterns {
+        for possible_inner_match in &self.inner_matches {
             let mut is_first_match = true;
             let mut search_pos = 0;
 
@@ -430,8 +409,8 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
                         |s| s.find(is_unwanted_end_char),
                         &candidate[..group_m.start()],
                     );
-                    if let Some(result) = self.parse_and_verify(&before, offset) {
-                        return Some(result);
+                    if let Some(result) = self.parse_and_verify(before, offset)? {
+                        return Ok(Some(result));
                     }
                     self.decrement_tries();
                     is_first_match = false;
@@ -447,28 +426,32 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
                 let group_offset =
                     offset + (group1.as_ptr() as usize - candidate.as_ptr() as usize);
 
-                if let Some(result) = self.parse_and_verify(&group, group_offset) {
-                    return Some(result);
+                if let Some(result) = self.parse_and_verify(group, group_offset)? {
+                    return Ok(Some(result));
                 }
                 self.decrement_tries();
 
                 search_pos = group_m.end();
             }
         }
-        None
+        Ok(None)
     }
 
     /// Parses a phone number from `candidate` using
     /// [`PhoneNumberUtil::parse_and_keep_raw_input`] and verifies it matches
     /// the requested [`leniency`].  Returns a [`PhoneNumberMatch`] on success,
     /// or `None` otherwise.
-    fn parse_and_verify(&self, candidate: &str, offset: usize) -> Option<PhoneNumberMatch<'a>> {
+    fn parse_and_verify(
+        &self,
+        candidate: &'a str,
+        offset: usize,
+    ) -> Result<Option<PhoneNumberMatch<'a>>, InternalError<Infallible>> {
         // Check the candidate doesn't contain any formatting which would
         // indicate that it really isn't a phone number.
         if !self.matching_brackets_full_match.is_match(candidate)
             || self.pub_pages.find(candidate).is_some()
         {
-            return None;
+            return Ok(None);
         }
 
         // If leniency is set to VALID or stricter, we also want to skip
@@ -479,38 +462,39 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
             // start with phone-number punctuation, check the previous
             // character.
             if offset > 0 && !self.lead_class.is_match_at(candidate, 0) {
-                let previous_char = self.text[..offset].chars().last()?;
+                let Some(previous_char) = self.text[..offset].chars().last() else {
+                    return Ok(None);
+                };
                 // We return None if it is a latin letter or an invalid
                 // punctuation symbol.
                 if Self::is_invalid_punctuation_symbol(previous_char)
                     || Self::is_latin_letter(previous_char)
                 {
-                    return None;
+                    return Ok(None);
                 }
             }
             let last_char_index = offset + candidate.len();
             if last_char_index < self.text.len() {
-                let next_char = self.text[last_char_index..].chars().next()?;
+                let Some(next_char) = self.text[last_char_index..].chars().next() else {
+                    return Ok(None);
+                };
                 if Self::is_invalid_punctuation_symbol(next_char)
                     || Self::is_latin_letter(next_char)
                 {
-                    return None;
+                    return Ok(None);
                 }
             }
         }
 
-        let number = match self.preferred_region {
-            Some(region) => self
-                .phone_util
-                .parse_and_keep_raw_input_with_default_region(candidate, region),
-            None => self.phone_util.parse(candidate),
-        }
-        .ok()?;
-
-        if self
-            .leniency
-            .verify(&number, candidate, &self.phone_util, self)
+        let number = match self
+            .phone_util()
+            .parse_and_keep_raw_input(candidate, self.preferred_region)
         {
+            Ok(number) => number,
+            Err(InternalError::RegexError(e)) => return Err(InternalError::RegexError(e)),
+            Err(InternalError::Wrapped(_)) => return Ok(None),
+        };
+        if self.verify_according_to_leniency(&number, candidate)? {
             // We used `parse_and_keep_raw_input` to create this number, but
             // for now we don't return the extra values parsed.
             // TODO: stop clearing all values here and switch all users over to
@@ -520,20 +504,20 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
             number.country_code_source = None;
             number.raw_input = None;
             number.preferred_domestic_carrier_code = None;
-            return Some(PhoneNumberMatch::new(offset, candidate, number));
+            return Ok(Some(PhoneNumberMatch::new(offset, candidate, number)));
         }
 
-        None
+        Ok(None)
     }
 
     // ── Public static helpers ─────────────────────────────────────────────────
 
-    pub fn all_number_groups_remain_grouped(
-        util: &PhoneNumberUtil,
+    pub fn all_number_groups_remain_grouped<'b>(
+        &self,
         number: &PhoneNumber,
-        normalized_candidate: &mut String,
-        formatted_number_groups: &[String],
-    ) -> bool {
+        normalized_candidate: &str,
+        formatted_number_groups: impl DoubleEndedIterator<Item = &'b str>,
+    ) -> Result<bool, InternalError<Infallible>> {
         let mut from_index = 0usize;
         if number.country_code_source() != CountryCodeSource::FromDefaultCountry {
             // First skip the country code if the normalised candidate
@@ -545,13 +529,13 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
         }
         // Check each group of consecutive digits is not broken into separate
         // groupings in `normalized_candidate`.
-        for (i, group) in formatted_number_groups.iter().enumerate() {
+        for (i, group) in formatted_number_groups.enumerate() {
             // Fails if the substring of `normalized_candidate` starting from
             // `from_index` doesn't contain the consecutive digits in
             // `formatted_number_groups[i]`.
-            from_index = match normalized_candidate[from_index..].find(group.as_str()) {
+            from_index = match normalized_candidate[from_index..].find(group) {
                 Some(pos) => from_index + pos,
-                None => return false,
+                None => return Ok(false),
             };
             // Move `from_index` forward.
             from_index += group.len();
@@ -561,13 +545,15 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
                 // code in the phone number, rather than the number itself, as
                 // we do not need to distinguish between different countries
                 // with the same country calling code and this is faster.
-                let Some(region) = util.get_region_code_for_country_code(number.country_code)
+                let Some(region) = self
+                    .phone_util()
+                    .get_region_code_for_country_code(number.country_code)
                 else {
                     continue;
                 };
-                if util
-                    .util_internal()
-                    .get_ndd_prefix_for_region(&region, true)
+                if self
+                    .phone_util()
+                    .get_ndd_prefix_for_region(region, true)
                     .is_some()
                 {
                     let next_is_digit = normalized_candidate[from_index..]
@@ -581,9 +567,10 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
                         // there is no formatting symbol at all in the number,
                         // except for extensions.  This is only important for
                         // countries with national prefixes.
-                        let nsn = util.get_national_significant_number(number);
+                        let mut buf = zeroes_itoa::LeadingZeroBuffer::new();
+                        let nsn = get_national_significant_number(number, &mut buf);
                         let start = from_index - group.len();
-                        return normalized_candidate[start..].starts_with(&*nsn);
+                        return Ok(normalized_candidate[start..].starts_with(&*nsn));
                     }
                 }
             }
@@ -591,13 +578,13 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
         // The check here makes sure that we haven't mistakenly already used
         // the extension to match the last group of the subscriber number.
         // Note the extension cannot have formatting in-between digits.
-        normalized_candidate[from_index..].contains(number.extension())
+        Ok(normalized_candidate[from_index..].contains(number.extension()))
     }
 
     pub fn all_number_groups_are_exactly_present<'b>(
         &self,
         number: &PhoneNumber,
-        normalized_candidate: &mut String,
+        normalized_candidate: &str,
         mut formatted_number_groups: impl DoubleEndedIterator<Item = &'b str> + Clone,
     ) -> bool {
         let mut candidate_groups = normalized_candidate
@@ -620,7 +607,10 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
         // number prefix, or the country code itself.
         if is_single_group
             || candidate.is_some_and(|g| {
-                g.contains(&self.phone_util.get_national_significant_number(number))
+                let mut buf = zeroes_itoa::LeadingZeroBuffer::new();
+                let nsn = get_national_significant_number(number, &mut buf);
+
+                g.contains(nsn.deref())
             })
         {
             return true;
@@ -656,7 +646,7 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
         // We remove the extension part from the formatted string before splitting
         // it into different groups.
         if let Some(index) = formatted_rfc_number.find(';') {
-            formatted_rfc_number = (&formatted_rfc_number)[..index].into();
+            formatted_rfc_number = formatted_rfc_number[..index].into();
         }
 
         if let Some(start_index) = formatted_rfc_number.find('-') {
@@ -673,26 +663,27 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
         formatted_rfc_number.split('-')
     }
 
-    pub fn check_number_grouping_is_valid(
+    fn check_number_grouping_is_valid(
         &self,
         number: &PhoneNumber,
         candidate: &str,
-        util: &PhoneNumberUtil,
         checker_variant: CheckerVariant,
-    ) -> bool {
+    ) -> Result<bool, InternalError<Infallible>> {
         let normalized_candidate = normalize_digits(candidate);
-        let formatted_rfc_number = self.phone_util.format(number, PhoneNumberFormat::RFC3966);
+        let formatted_rfc_number = self
+            .phone_util()
+            .format(number, PhoneNumberFormat::RFC3966)?;
         let Some(formatted_number_groups) = self.get_national_number_groups(&formatted_rfc_number)
         else {
-            return false;
+            return Ok(false);
         };
         if self.checker(
             checker_variant,
             number,
             &normalized_candidate,
             formatted_number_groups,
-        ) {
-            return true;
+        )? {
+            return Ok(true);
         }
         // If this didn't pass, see if there are any alternate formats that
         // match, and try them instead.
@@ -701,16 +692,15 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
             .as_deref()
             .and_then(|formats| formats.get_alternate_formats_for_country(number.country_code));
 
-        let nsn = util.get_national_significant_number(number);
+        let mut buf = zeroes_itoa::LeadingZeroBuffer::new();
+        let nsn = get_national_significant_number(number, &mut buf);
         if let Some(alternate_formats) = alternate_formats {
             for alternate_format in &alternate_formats.number_format {
-                if let Some(pattern) = alternate_format.leading_digits_pattern().get(0) {
+                if let Some(pattern) = alternate_format.leading_digits_pattern().first() {
                     // There is only one leading digits pattern for alternate
                     // formats.
                     if !pattern
-                        .anchor_start()
-                        .map_err(unwrap_regex_error)
-                        .unwrap_or_else(|err| match err {})
+                        .anchor_start()?
                         .is_some_and(|pat| pat.is_match(&nsn))
                     {
                         // Leading digits don't match; try another one.
@@ -719,12 +709,11 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
                 }
                 let mut buf = zeroes_itoa::LeadingZeroBuffer::new();
                 let nsn = get_national_significant_number(number, &mut buf);
-                let nsn_formatted = self
-                    .phone_util
-                    .util_internal()
-                    .format_nsn_using_pattern(&nsn, alternate_format, PhoneNumberFormat::RFC3966)
-                    .map_err(unwrap_internal)
-                    .unwrap_or_else(|err| match err {});
+                let nsn_formatted = self.phone_util().format_nsn_using_pattern(
+                    &nsn,
+                    alternate_format,
+                    PhoneNumberFormat::RFC3966,
+                )?;
 
                 let formatted_number_groups =
                     self.get_national_number_groups_for_pattern(&nsn_formatted);
@@ -733,12 +722,12 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
                     number,
                     &normalized_candidate,
                     formatted_number_groups,
-                ) {
-                    return true;
+                )? {
+                    return Ok(true);
                 }
             }
         }
-        false
+        Ok(false)
     }
 
     pub fn contains_more_than_one_slash_in_national_number(
@@ -765,7 +754,7 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
         );
         if candidate_has_country_code {
             let digits_before_slash = self
-                .phone_util
+                .phone_util()
                 .normalize_digits_only(&candidate[..first_slash]);
             let mut buf = itoa::Buffer::new();
             let source = number.country_code_source();
@@ -800,7 +789,7 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
                 iter.next();
                 let rest = &candidate[index + 1..];
                 if self
-                    .phone_util
+                    .phone_util()
                     .is_number_match_with_one_string(number, rest)
                     != Ok(MatchType::NsnMatch)
                 {
@@ -810,7 +799,7 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
                 // This is the extension sign case, in which the 'x' or
                 // 'X' should always precede the extension number.
                 let rest = &candidate[index..];
-                if self.phone_util.normalize_digits_only(rest) != number.extension() {
+                if self.phone_util().normalize_digits_only(rest) != number.extension() {
                     return false;
                 }
             }
@@ -821,65 +810,60 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
     pub fn is_national_prefix_present_if_required(
         &self,
         number: &PhoneNumber,
-        util: &PhoneNumberUtil,
-    ) -> bool {
+    ) -> Result<bool, InternalError<Infallible>> {
         // First, check how we deduced the country code.  If it was written in
         // international format, then the national prefix is not required.
         if number.country_code_source() != CountryCodeSource::FromDefaultCountry {
-            return true;
+            return Ok(true);
         }
-        let Some(phone_number_region) = util.get_region_code_for_country_code(number.country_code)
+        let Some(phone_number_region) = self
+            .phone_util()
+            .get_region_code_for_country_code(number.country_code)
         else {
-            return true;
+            return Ok(true);
         };
-        let Some(metadata) = util
-            .util_internal()
+        let Some(metadata) = self
+            .phone_util()
             .get_metadata_for_region(phone_number_region)
         else {
-            return true;
+            return Ok(true);
         };
         // Check if a national prefix should be present when formatting this
         // number.
-        let national_number = util.get_national_significant_number(number);
-        let format_rule = util
-            .util_internal()
-            .choose_formatting_pattern_for_number(&metadata.number_format, &national_number)
-            .map_err(unwrap_internal)
-            .unwrap_or_else(|err| match err {});
+        let mut buf = zeroes_itoa::LeadingZeroBuffer::new();
+        let nsn = get_national_significant_number(number, &mut buf);
+
+        let format_rule = self
+            .phone_util()
+            .choose_formatting_pattern_for_number(&metadata.number_format, &nsn)?;
         // To do this, we check that a national prefix formatting rule was
         // present and that it wasn't just the first-group symbol ($1) with
         // punctuation.
-        if let Some(rule) = format_rule {
-            if !rule.original.national_prefix_formatting_rule().is_empty() {
-                if rule.original.national_prefix_optional_when_formatting() {
-                    // The national-prefix is optional in these cases, so we
-                    // don't need to check if it was present.
-                    return true;
-                }
-                if self
-                    .phone_util
-                    .util_internal()
-                    .formatting_rule_has_first_group_only(
-                        rule.original.national_prefix_formatting_rule(),
-                    )
-                {
-                    // National prefix not needed for this number.
-                    return true;
-                }
-                // Normalize the remainder.
-                let raw_input_copy = self.phone_util.normalize_digits_only(number.raw_input());
-                // Check if we found a national prefix and/or carrier code at
-                // the start of the raw input, and return the result.
-                return util
-                    .util_internal()
-                    .maybe_strip_national_prefix_and_carrier_code(metadata, &raw_input_copy)
-                    .map_err(unwrap_internal)
-                    .unwrap_or_else(|err| match err {})
-                    .1
-                    .is_some();
+        if let Some(rule) = format_rule
+            && !rule.original.national_prefix_formatting_rule().is_empty()
+        {
+            if rule.original.national_prefix_optional_when_formatting() {
+                // The national-prefix is optional in these cases, so we
+                // don't need to check if it was present.
+                return Ok(true);
             }
+            if self.phone_util().formatting_rule_has_first_group_only(
+                rule.original.national_prefix_formatting_rule(),
+            ) {
+                // National prefix not needed for this number.
+                return Ok(true);
+            }
+            // Normalize the remainder.
+            let raw_input_copy = self.phone_util().normalize_digits_only(number.raw_input());
+            // Check if we found a national prefix and/or carrier code at
+            // the start of the raw input, and return the result.
+            return Ok(self
+                .phone_util()
+                .maybe_strip_national_prefix_and_carrier_code(metadata, &raw_input_copy)?
+                .1
+                .is_some());
         }
-        true
+        Ok(true)
     }
 
     fn decrement_tries(&self) {
@@ -891,25 +875,80 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
         variant: CheckerVariant,
         number: &PhoneNumber,
         normalized_candidate: &str,
-        formatted_number_groups: impl Iterator<Item = &'b str>,
-    ) -> bool {
+        formatted_number_groups: impl DoubleEndedIterator<Item = &'b str> + Clone,
+    ) -> Result<bool, InternalError<Infallible>> {
+        match variant {
+            CheckerVariant::AllNumberGroupsAreExactlyPresent => Ok(self
+                .all_number_groups_are_exactly_present(
+                    number,
+                    normalized_candidate,
+                    formatted_number_groups,
+                )),
+            CheckerVariant::AllNumberGroupsRemainGrouped => self.all_number_groups_remain_grouped(
+                number,
+                normalized_candidate,
+                formatted_number_groups,
+            ),
+        }
+    }
+
+    fn verify_according_to_leniency(
+        &self,
+        phone_number: &PhoneNumber,
+        candidate: &str,
+    ) -> Result<bool, InternalError<Infallible>> {
+        let is_valid = || {
+            Ok::<_, InternalError<Infallible>>(
+                self.phone_util().is_valid_number(phone_number)?
+                    && self.contains_only_valid_x_chars(phone_number, candidate)
+                    && self.is_national_prefix_present_if_required(phone_number)?,
+            )
+        };
+        let result = match self.leniency {
+            Leniency::Possible => self.phone_util().is_possible_number(phone_number),
+            Leniency::Valid => is_valid()?,
+            Leniency::StrictGrouping => {
+                is_valid()?
+                    && !self
+                        .contains_more_than_one_slash_in_national_number(phone_number, candidate)
+                    && self.check_number_grouping_is_valid(
+                        phone_number,
+                        candidate,
+                        CheckerVariant::AllNumberGroupsRemainGrouped,
+                    )?
+            }
+            Leniency::ExactGrouping => {
+                is_valid()?
+                    && !self
+                        .contains_more_than_one_slash_in_national_number(phone_number, candidate)
+                    && self.check_number_grouping_is_valid(
+                        phone_number,
+                        candidate,
+                        CheckerVariant::AllNumberGroupsAreExactlyPresent,
+                    )?
+            }
+        };
+
+        Ok(result)
     }
 }
 
-// ── Iterator ──────────────────────────────────────────────────────────────────
-
-impl<'a, T: Deref<Target = PhoneNumberUtil>> Iterator for PhoneNumberMatcher<'a, T> {
-    type Item = PhoneNumberMatch<'a>;
+impl<'a, 'b, T: Deref<Target = PhoneNumberUtil>> Iterator for PhoneNumberMatcher<'a, 'b, T> {
+    type Item = Result<PhoneNumberMatch<'a>, InternalError<Infallible>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.state == State::NotReady {
             let index = self.search_index;
-            self.last_match = PhoneNumberMatcher::find(&self, index);
-            if self.last_match.is_none() {
-                self.state = State::Done;
-            } else {
-                self.search_index = self.last_match.as_ref().unwrap().end();
+            let new_match = PhoneNumberMatcher::<'a, 'b>::find(self, index);
+            self.last_match = match new_match {
+                Ok(last_match) => last_match,
+                Err(err) => return Some(Err(err)),
+            };
+            if let Some(item) = &self.last_match {
+                self.search_index = item.end();
                 self.state = State::Ready;
+            } else {
+                self.state = State::Done;
             }
         }
 
@@ -920,6 +959,6 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> Iterator for PhoneNumberMatcher<'a,
         // Don't retain that memory any longer than necessary.
         let result = self.last_match.take();
         self.state = State::NotReady;
-        result
+        Ok(result).transpose()
     }
 }

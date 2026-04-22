@@ -1,4 +1,4 @@
 mod alternate_formats;
 mod leniency;
-mod matcher;
+mod matcher_internal;
 mod phonenumber_match;

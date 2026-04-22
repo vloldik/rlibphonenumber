@@ -47,7 +47,7 @@ use crate::PhoneNumber;
 * util.parse(m.rawString(), country).equals(m.number());
 * </pre>
 */
-#[derive(Debug, Hash, PartialEq, Eq)]
+#[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct PhoneNumberMatch<'a> {
     /** The start index into the text. */
     start: usize,
