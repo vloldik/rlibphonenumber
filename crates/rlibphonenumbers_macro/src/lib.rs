@@ -3,7 +3,7 @@ use quote::{format_ident, quote};
 use xml::{EventReader, reader::XmlEvent};
 
 fn get_country_list() -> Vec<String> {
-    let file = include_str!(concat!(env!("OUT_DIR"), "/ShortNumberMetadata.xml"));
+    let file = include_str!(concat!(env!("OUT_DIR"), "/PhoneNumberMetadata.xml"));
     let mut countries = Vec::new();
 
     let parser = EventReader::from_str(file);
@@ -14,7 +14,11 @@ fn get_country_list() -> Vec<String> {
             && name.borrow().local_name == "territory"
             && let Some(id_attr) = attributes.iter().find(|attr| attr.name.local_name == "id")
         {
-            countries.push(id_attr.value.clone());
+            let value = match id_attr.value.as_str() {
+                "001" => continue,
+                other => other,
+            };
+            countries.push(value.to_string());
         }
     }
 
