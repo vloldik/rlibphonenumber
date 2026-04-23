@@ -26,28 +26,19 @@ pub fn wrap_util(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
                 let sig = &method.sig;
                 let method_name = &sig.ident;
-                let (new_sig, args_call) = transform_sig_for_as_ref(sig);
-                let self_call = if new_sig.receiver().is_some() {
+                let (sig, args_call) = transform_sig_for_as_ref(sig);
+                let self_call = if sig.receiver().is_some() {
                     quote! { self.inner.#method_name(#(#args_call),*) }
                 } else {
-                    quote! { #orig_name::#method_name(#(#args_call),*) }
+                    quote! { #original_struct::#method_name(#(#args_call),*) }
                 };
                 let (self_call_fallible, self_call_infallible) = (
                     transform_call(self_call.clone(), sig.clone(), false),
                     transform_call(self_call.clone(), sig.clone(), true),
                 );
 
-                methods_a.push(quote! {
-                    pub #self_call_infallible {
-                        #self_call
-                    }
-                });
-
-                methods_b.push(quote! {
-                    pub #self_call_fallible {
-                        #self_call
-                    }
-                });
+                methods_a.push(self_call_infallible);
+                methods_b.push(self_call_fallible);
             }
         }
     }
@@ -85,7 +76,7 @@ fn transform_sig_for_as_ref(sig: &Signature) -> (Signature, Vec<proc_macro2::Tok
             FnArg::Receiver(_) => {}
             FnArg::Typed(pat_type) => {
                 let is_str = if let Type::Reference(r) = &*pat_type.ty {
-                    if let Type::Path(p) = &*r.elem {
+                    if let Type::Path(p) = r.elem.as_ref() {
                         p.path.is_ident("str")
                     } else {
                         false
@@ -94,7 +85,7 @@ fn transform_sig_for_as_ref(sig: &Signature) -> (Signature, Vec<proc_macro2::Tok
                     false
                 };
 
-                let arg_name = if let Pat::Ident(id) = &*pat_type.pat {
+                let arg_name = if let Pat::Ident(id) = pat_type.pat.as_ref() {
                     &id.ident
                 } else {
                     panic!("Unsupported pattern");
@@ -141,10 +132,20 @@ fn transform_call(self_call: proc_macro2::TokenStream, mut sig: Signature, for_p
         ReturnType::Type(_arr, type_) => {
             match type_.as_ref() {
                 Type::Path(type_path) if !for_public => {
-                    transform_return_value_path(type_path, self_call)
+                    let call = transform_return_value_path(type_path, self_call);
+                    quote! {
+                        pub #sig {
+                            #call
+                        }
+                    }
                 },
                 Type::Path(type_path) if for_public => {
-                    transform_for_public(type_path, &mut sig, transform_return_value_path(type_path, self_call))
+                    let call = transform_for_public(type_path, &mut sig, transform_return_value_path(type_path, self_call));
+                    quote! {
+                        pub #sig {
+                            #call
+                        }
+                    }
                 },
                 _ => self_call,
             }
@@ -154,7 +155,7 @@ fn transform_call(self_call: proc_macro2::TokenStream, mut sig: Signature, for_p
 
 fn transform_for_public(path: &TypePath, sig: &mut Signature, self_call: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     let Some(last_segment) = path.path.segments.last()
-       .filter(| last | ["ParseResult", "RegexResult"].contains(&last.ident.to_string().as_str())) else {
+       .filter(| last | last.ident == "ParseResult" || last.ident == "RegexResult") else {
         return self_call;
     };
 
@@ -167,16 +168,16 @@ fn transform_for_public(path: &TypePath, sig: &mut Signature, self_call: proc_ma
     };
 
     if last_segment.ident == "ParseResult" {
-        sig.output = parse_quote!(core::result::Result<#return_type>, crate::phonenumberutil::errors::ParseError);
+        sig.output = parse_quote!(-> ::core::result::Result<#return_type, ::crate::phonenumberutil::errors::ParseError>);
         quote! {
             #self_call
                 .map_err(crate::phonenumberutil::errors::unwrap_internal)
         }
     } else {
-        sig.output = parse_quote!( #return_type );
+        sig.output = parse_quote!( -> #return_type );
         quote! {
             #self_call
-                .map_err(crate::phonenumberutil::errors::unwrap_internal)
+                .map_err(::crate::phonenumberutil::errors::unwrap_internal)
                 .unwrap_or_else(| err | match err { })
         }
     }
