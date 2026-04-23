@@ -1,13 +1,13 @@
 use proc_macro::TokenStream;
-use quote::{ToTokens, format_ident, quote};
-use syn::{FnArg, ImplItem, ItemImpl, Pat, Signature, Type, parse_macro_input};
+use quote::{format_ident, quote};
+use syn::{FnArg, ImplItem, ItemImpl, Pat, PathArguments, ReturnType, Signature, Type, TypePath, parse_macro_input, parse_quote, };
 
 pub fn wrap_util(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut input_impl = parse_macro_input!(item as ItemImpl);
     let original_struct = &input_impl.self_ty;
-    let orig_name = format_ident!("{}", quote!(#original_struct).to_string());
+    let orig_name = format_ident!("{}", quote!(#original_struct).to_string().replace("Internal", ""));
 
-    let wrapper_a = format_ident!("{}Public", orig_name);
+    let wrapper_a = format_ident!("{}", orig_name);
     let wrapper_b = format_ident!("{}Fallible", orig_name);
 
     let mut methods_a = Vec::new();
@@ -28,20 +28,24 @@ pub fn wrap_util(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 let method_name = &sig.ident;
                 let (new_sig, args_call) = transform_sig_for_as_ref(sig);
                 let self_call = if new_sig.receiver().is_some() {
-                    quote! { self.inner.#method_name }
+                    quote! { self.inner.#method_name(#(#args_call),*) }
                 } else {
-                    quote! { #orig_name::#method_name }
+                    quote! { #orig_name::#method_name(#(#args_call),*) }
                 };
+                let (self_call_fallible, self_call_infallible) = (
+                    transform_call(self_call.clone(), sig.clone(), false),
+                    transform_call(self_call.clone(), sig.clone(), true),
+                );
 
                 methods_a.push(quote! {
-                    pub #new_sig {
-                        #self_call(#(#args_call),*)
+                    pub #self_call_infallible {
+                        #self_call
                     }
                 });
 
                 methods_b.push(quote! {
-                    pub #new_sig {
-                        #self_call(#(#args_call),*)
+                    pub #self_call_fallible {
+                        #self_call
                     }
                 });
             }
@@ -114,4 +118,66 @@ fn transform_sig_for_as_ref(sig: &Signature) -> (Signature, Vec<proc_macro2::Tok
     }
 
     (new_sig, args_call)
+}
+
+fn transform_return_value_path(path: &TypePath, self_call: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+    if path.path.is_ident("Self") {
+        return quote! { Self { inner: #self_call } };
+    }
+    let Some(last_segment) = path.path.segments.last().filter(| last | last.ident == "Result") else {
+        return self_call;
+    };
+
+    if let PathArguments::AngleBracketed(_) = &last_segment.arguments {
+        quote! { Ok( Self { inner: #self_call? } ) }
+    } else {
+        self_call
+    }
+}
+
+fn transform_call(self_call: proc_macro2::TokenStream, mut sig: Signature, for_public: bool) -> proc_macro2::TokenStream {
+    match sig.output.clone() {
+        ReturnType::Default => self_call,
+        ReturnType::Type(_arr, type_) => {
+            match type_.as_ref() {
+                Type::Path(type_path) if !for_public => {
+                    transform_return_value_path(type_path, self_call)
+                },
+                Type::Path(type_path) if for_public => {
+                    transform_for_public(type_path, &mut sig, transform_return_value_path(type_path, self_call))
+                },
+                _ => self_call,
+            }
+        }
+    }
+}
+
+fn transform_for_public(path: &TypePath, sig: &mut Signature, self_call: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+    let Some(last_segment) = path.path.segments.last()
+       .filter(| last | ["ParseResult", "RegexResult"].contains(&last.ident.to_string().as_str())) else {
+        return self_call;
+    };
+
+    let PathArguments::AngleBracketed(args) = &last_segment.arguments else {
+        return self_call
+    };
+
+    let Some(return_type) = args.args.first() else {
+        return self_call;
+    };
+
+    if last_segment.ident == "ParseResult" {
+        sig.output = parse_quote!(core::result::Result<#return_type>, crate::phonenumberutil::errors::ParseError);
+        quote! {
+            #self_call
+                .map_err(crate::phonenumberutil::errors::unwrap_internal)
+        }
+    } else {
+        sig.output = parse_quote!( #return_type );
+        quote! {
+            #self_call
+                .map_err(crate::phonenumberutil::errors::unwrap_internal)
+                .unwrap_or_else(| err | match err { })
+        }
+    }
 }
