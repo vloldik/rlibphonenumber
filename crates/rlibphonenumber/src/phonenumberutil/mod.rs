@@ -20,13 +20,12 @@ pub(super) mod helper_functions;
 mod helper_types;
 mod phone_number_regexps_and_mappings;
 pub(super) mod phonenumberutil_internal;
-pub mod phonenumberutil_public;
 pub(super) mod regex_wrapper_types;
 
 use std::sync::LazyLock;
 
-use crate::phonenumberutil::phonenumberutil_public::PhoneNumberUtil;
+// use crate::phonenumberutil::phonenumberutil_public::PhoneNumberUtil;
 
-/// Singleton instance of phone number util for general use
-#[cfg(feature = "global_static")]
-pub static PHONE_NUMBER_UTIL: LazyLock<PhoneNumberUtil> = LazyLock::new(PhoneNumberUtil::new);
+// /// Singleton instance of phone number util for general use
+// #[cfg(feature = "global_static")]
+// pub static PHONE_NUMBER_UTIL: LazyLock<PhoneNumberUtil> = LazyLock::new(PhoneNumberUtil::new);

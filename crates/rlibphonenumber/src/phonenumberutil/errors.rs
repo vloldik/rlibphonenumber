@@ -19,6 +19,7 @@ use std::{
     num::ParseIntError,
 };
 
+use prost::DecodeError;
 use thiserror::Error;
 
 #[derive(Debug, PartialEq, Error, Clone)]
@@ -211,5 +212,20 @@ pub(crate) fn unwrap_internal<T: Debug + Display>(err: InternalError<T>) -> T {
             "A valid regex is expected in metadata; this indicates a library bug: {}",
             invalid_regex_error
         ),
+    }
+}
+
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum CreateUtilError {
+    #[error("Failed to create region: region should be valid 2-digit ascii string, got: {0}")]
+    InvalidRegionError(String),
+
+    #[error("Failed to decode metadata from static file, this indicates library bug: {0}")]
+    Decode(#[from] DecodeError),
+}
+
+impl From<String> for CreateUtilError {
+    fn from(value: String) -> Self {
+        CreateUtilError::InvalidRegionError(value)
     }
 }

@@ -19,6 +19,7 @@ use std::{cell::Cell, convert::Infallible, ops::Deref, sync::Arc};
 
 use crate::{
     CountryCodeSource, InternalError, MatchType, PhoneNumber, PhoneNumberFormat, PhoneNumberUtil,
+    Region,
     generated::{uniprops_currencies, uniprops_latin_letters},
     phonenumber_matcher::{
         alternate_formats::AlternateFormats, leniency::Leniency,
@@ -69,7 +70,7 @@ enum CheckerVariant {
 ///
 /// This struct is not thread-safe.
 #[derive(Debug, Clone)]
-pub struct PhoneNumberMatcher<'a, 'r, T: Deref<Target = PhoneNumberUtil>> {
+pub struct PhoneNumberMatcher<'a, T: Deref<Target = PhoneNumberUtil>> {
     /// The phone number pattern used by [`find`], similar to
     /// `PhoneNumberUtil::VALID_PHONE_NUMBER`, but with the following
     /// differences:
@@ -129,7 +130,7 @@ pub struct PhoneNumberMatcher<'a, 'r, T: Deref<Target = PhoneNumberUtil>> {
     /// The region (country) to assume for phone numbers without an
     /// international prefix, or `None` if only numbers with a leading plus
     /// should be considered.
-    preferred_region: Option<&'r str>,
+    preferred_region: Option<Region>,
     /// The degree of validation requested.
     leniency: Leniency,
     /// The maximum number of retries after matching an invalid number.
@@ -145,7 +146,7 @@ pub struct PhoneNumberMatcher<'a, 'r, T: Deref<Target = PhoneNumberUtil>> {
     alternate_formats: Option<Arc<AlternateFormats>>,
 }
 
-impl<'a, 'r, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, 'r, T> {
+impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
     /// Creates a new instance.  See the factory methods in [`PhoneNumberUtil`]
     /// on how to obtain a new instance.
     ///
@@ -162,7 +163,7 @@ impl<'a, 'r, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, 'r, T> {
     pub fn new(
         util: T,
         text: &'a str,
-        preferred_region: Option<&'r str>,
+        preferred_region: Option<Region>,
         leniency: Leniency,
         max_tries: u64,
         alternate_formats: Option<Arc<AlternateFormats>>,
@@ -547,7 +548,7 @@ impl<'a, 'r, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, 'r, T> {
                 // with the same country calling code and this is faster.
                 let Some(region) = self
                     .phone_util()
-                    .get_region_code_for_country_code(number.country_code)
+                    .get_region_for_country_code(number.country_code)
                 else {
                     continue;
                 };
@@ -818,7 +819,7 @@ impl<'a, 'r, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, 'r, T> {
         }
         let Some(phone_number_region) = self
             .phone_util()
-            .get_region_code_for_country_code(number.country_code)
+            .get_region_for_country_code(number.country_code)
         else {
             return Ok(true);
         };
@@ -933,13 +934,13 @@ impl<'a, 'r, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, 'r, T> {
     }
 }
 
-impl<'a, 'b, T: Deref<Target = PhoneNumberUtil>> Iterator for PhoneNumberMatcher<'a, 'b, T> {
+impl<'a, T: Deref<Target = PhoneNumberUtil>> Iterator for PhoneNumberMatcher<'a, T> {
     type Item = Result<PhoneNumberMatch<'a>, InternalError<Infallible>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.state == State::NotReady {
             let index = self.search_index;
-            let new_match = PhoneNumberMatcher::<'a, 'b>::find(self, index);
+            let new_match = PhoneNumberMatcher::<'a>::find(self, index);
             self.last_match = match new_match {
                 Ok(last_match) => last_match,
                 Err(err) => return Some(Err(err)),

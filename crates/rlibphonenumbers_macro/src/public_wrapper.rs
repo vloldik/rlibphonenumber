@@ -1,11 +1,17 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
-use syn::{FnArg, ImplItem, ItemImpl, Pat, PathArguments, ReturnType, Signature, Type, TypePath, parse_macro_input, parse_quote, };
+use syn::{
+    FnArg, ImplItem, ItemImpl, Pat, PathArguments, ReturnType, Signature, Type, TypePath,
+    parse_macro_input, parse_quote,
+};
 
 pub fn wrap_util(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut input_impl = parse_macro_input!(item as ItemImpl);
     let original_struct = &input_impl.self_ty;
-    let orig_name = format_ident!("{}", quote!(#original_struct).to_string().replace("Internal", ""));
+    let orig_name = format_ident!(
+        "{}",
+        quote!(#original_struct).to_string().replace("Internal", "")
+    );
 
     let wrapper_a = format_ident!("{}", orig_name);
     let wrapper_b = format_ident!("{}Fallible", orig_name);
@@ -75,35 +81,35 @@ fn transform_sig_for_as_ref(sig: &Signature) -> (Signature, Vec<proc_macro2::Tok
         match input {
             FnArg::Receiver(_) => {}
             FnArg::Typed(pat_type) => {
-                let is_str = if let Type::Reference(r) = &*pat_type.ty {
-                    if let Type::Path(p) = r.elem.as_ref() {
-                        p.path.is_ident("str")
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                };
-
                 let arg_name = if let Pat::Ident(id) = pat_type.pat.as_ref() {
                     &id.ident
                 } else {
                     panic!("Unsupported pattern");
                 };
 
-                if is_str {
-                    generic_counter += 1;
-                    let gen_ident = format_ident!("S{}", generic_counter);
-                    *pat_type.ty = syn::parse_quote!(#gen_ident);
-                    new_sig
-                        .generics
-                        .params
-                        .push(syn::parse_quote!(#gen_ident: AsRef<str>));
-
-                    args_call.push(quote! { #arg_name.as_ref() });
+                let refer = if let Type::Reference(r) = &*pat_type.ty
+                    && let Type::Path(p) = r.elem.as_ref()
+                    && p.path.is_ident("str")
+                {
+                    if let Some(lt) = r.lifetime.as_ref() {
+                        quote! { & #lt }
+                    } else {
+                        quote! { & }
+                    }
                 } else {
                     args_call.push(quote! { #arg_name });
-                }
+                    continue;
+                };
+
+                generic_counter += 1;
+                let gen_ident = format_ident!("S{}", generic_counter);
+                *pat_type.ty = syn::parse_quote!(#refer #gen_ident);
+                new_sig
+                    .generics
+                    .params
+                    .push(syn::parse_quote!(#gen_ident: AsRef<str> ));
+
+                args_call.push(quote! { #arg_name.as_ref() });
             }
         }
     }
@@ -111,11 +117,19 @@ fn transform_sig_for_as_ref(sig: &Signature) -> (Signature, Vec<proc_macro2::Tok
     (new_sig, args_call)
 }
 
-fn transform_return_value_path(path: &TypePath, self_call: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+fn transform_return_value_path(
+    path: &TypePath,
+    self_call: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
     if path.path.is_ident("Self") {
         return quote! { Self { inner: #self_call } };
     }
-    let Some(last_segment) = path.path.segments.last().filter(| last | last.ident == "Result") else {
+    let Some(last_segment) = path
+        .path
+        .segments
+        .last()
+        .filter(|last| last.ident == "Result")
+    else {
         return self_call;
     };
 
@@ -126,41 +140,51 @@ fn transform_return_value_path(path: &TypePath, self_call: proc_macro2::TokenStr
     }
 }
 
-fn transform_call(self_call: proc_macro2::TokenStream, mut sig: Signature, for_public: bool) -> proc_macro2::TokenStream {
-    match sig.output.clone() {
+fn transform_call(
+    self_call: proc_macro2::TokenStream,
+    mut sig: Signature,
+    for_public: bool,
+) -> proc_macro2::TokenStream {
+    let self_call = match sig.output.clone() {
         ReturnType::Default => self_call,
-        ReturnType::Type(_arr, type_) => {
-            match type_.as_ref() {
-                Type::Path(type_path) if !for_public => {
-                    let call = transform_return_value_path(type_path, self_call);
-                    quote! {
-                        pub #sig {
-                            #call
-                        }
-                    }
-                },
-                Type::Path(type_path) if for_public => {
-                    let call = transform_for_public(type_path, &mut sig, transform_return_value_path(type_path, self_call));
-                    quote! {
-                        pub #sig {
-                            #call
-                        }
-                    }
-                },
-                _ => self_call,
+        ReturnType::Type(_arr, type_) => match type_.as_ref() {
+            Type::Path(type_path) => {
+                if for_public {
+                    transform_return_value_path(type_path, self_call)
+                } else {
+                    transform_for_public(
+                        type_path,
+                        &mut sig,
+                        transform_return_value_path(type_path, self_call),
+                    )
+                }
             }
+            _ => self_call,
+        },
+    };
+    quote! {
+        pub #sig {
+            #self_call
         }
     }
 }
 
-fn transform_for_public(path: &TypePath, sig: &mut Signature, self_call: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
-    let Some(last_segment) = path.path.segments.last()
-       .filter(| last | last.ident == "ParseResult" || last.ident == "RegexResult") else {
+fn transform_for_public(
+    path: &TypePath,
+    sig: &mut Signature,
+    self_call: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+    let Some(last_segment) = path
+        .path
+        .segments
+        .last()
+        .filter(|last| last.ident == "ParseResult" || last.ident == "RegexResult")
+    else {
         return self_call;
     };
 
     let PathArguments::AngleBracketed(args) = &last_segment.arguments else {
-        return self_call
+        return self_call;
     };
 
     let Some(return_type) = args.args.first() else {
@@ -168,7 +192,7 @@ fn transform_for_public(path: &TypePath, sig: &mut Signature, self_call: proc_ma
     };
 
     if last_segment.ident == "ParseResult" {
-        sig.output = parse_quote!(-> ::core::result::Result<#return_type, ::crate::phonenumberutil::errors::ParseError>);
+        sig.output = parse_quote!(-> ::core::result::Result<#return_type, crate::phonenumberutil::errors::ParseError>);
         quote! {
             #self_call
                 .map_err(crate::phonenumberutil::errors::unwrap_internal)
@@ -177,7 +201,7 @@ fn transform_for_public(path: &TypePath, sig: &mut Signature, self_call: proc_ma
         sig.output = parse_quote!( -> #return_type );
         quote! {
             #self_call
-                .map_err(::crate::phonenumberutil::errors::unwrap_internal)
+                .map_err(crate::phonenumberutil::errors::unwrap_internal)
                 .unwrap_or_else(| err | match err { })
         }
     }
