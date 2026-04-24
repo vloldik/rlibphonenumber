@@ -30,7 +30,7 @@ jobs:
 
       - name: Set up Rust
         # Required for cargo-edit
-        uses: dtolnay/rust-toolchain@1.89.0
+        uses: dtolnay/rust-toolchain@1.91.0
 
       - name: Generate Metadata
         id: generate_metadata
