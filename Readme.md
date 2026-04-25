@@ -10,7 +10,7 @@ A zero-allocation, high-performance Rust port of Google's `libphonenumber` libra
 
 🌐 **Live WASM Preview:** [Try the library directly in browser!](https://vloldik.github.io/rlibphonenumber-wasm/)
 
-**Used metadata version: v9.0.28**  
+**Used metadata version: v9.0.29**  
 **Version:** `1.1.1`  
 **Base libphonenumber:** `9.0.8`  
 **Min supported Rust version:** `1.88.0`
@@ -65,7 +65,7 @@ Uses the full `regex` crate. Provides maximum parsing performance.
 
 ```toml
 [dependencies]
-rlibphonenumber = "1.1.4"
+rlibphonenumber = "1.1.5"
 ```
 
 ### 2. Lite (Recommended for WASM/Embedded)

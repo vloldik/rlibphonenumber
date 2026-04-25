@@ -1099,7 +1099,7 @@ checksum = "dc897dd8d9e8bd1ed8cdad82b5966c3e0ecae09fb1907d58efaa013543185d0a"
 
 [[package]]
 name = "rlibphonenumber"
-version = "1.1.4"
+version = "1.1.5"
 dependencies = [
  "colog",
  "criterion",
@@ -1137,7 +1137,7 @@ dependencies = [
 
 [[package]]
 name = "rlibphonenumbers_macro"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "proc-macro2",
  "quote",
