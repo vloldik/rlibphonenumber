@@ -18,8 +18,11 @@ use std::{borrow::Cow, collections::HashSet};
 use prost::{DecodeError, Message};
 use rustc_hash::FxHashMap;
 use strum::IntoEnumIterator;
+use zeroes_itoa::LeadingZeroBuffer;
 
 use crate::{
+    enums::{NumberLengthType, PhoneNumberFormat, PhoneNumberType},
+    errors::{InvalidRegexError, ValidationError},
     generated::{
         metadata::METADATA,
         proto::{PhoneMetadataCollection, PhoneNumber},
@@ -33,13 +36,9 @@ use crate::{
     },
 };
 
-use super::{
-    enums::{NumberLengthType, PhoneNumberFormat, PhoneNumberType},
-    errors::ValidationError,
-    helper_constants::{
-        OPTIONAL_EXT_SUFFIX, PLUS_SIGN, POSSIBLE_CHARS_AFTER_EXT_LABEL,
-        POSSIBLE_SEPARATORS_BETWEEN_NUMBER_AND_EXT_LABEL, RFC3966_EXTN_PREFIX, RFC3966_PREFIX,
-    },
+use super::helper_constants::{
+    OPTIONAL_EXT_SUFFIX, PLUS_SIGN, POSSIBLE_CHARS_AFTER_EXT_LABEL,
+    POSSIBLE_SEPARATORS_BETWEEN_NUMBER_AND_EXT_LABEL, RFC3966_EXTN_PREFIX, RFC3966_PREFIX,
 };
 
 /// Loads metadata from helper constants METADATA array
@@ -143,6 +142,11 @@ pub fn get_national_significant_number<'b>(
             0
         },
     )
+}
+
+pub fn get_national_significant_number_owned(phone_number: &PhoneNumber) -> String {
+    let mut buf = LeadingZeroBuffer::new();
+    get_national_significant_number(phone_number, &mut buf).to_string()
 }
 
 pub fn normalize_digits(string: &str) -> String {
@@ -527,7 +531,7 @@ pub fn is_match(
     matcher_api: &dyn MatcherApi,
     number: &str,
     number_desc: &PhoneNumberDescWrapper,
-) -> Result<bool, crate::InvalidRegexError> {
+) -> Result<bool, InvalidRegexError> {
     matcher_api.match_national_number(number, number_desc, false)
 }
 

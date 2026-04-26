@@ -13,5 +13,5 @@ proc-macro = true
 quote = "1"
 xml = "1.0"
 proc-macro2 = "1.0"
-syn = { version = "2.0", features = ["full"] }
+syn = { version = "2.0", features = ["full", "parsing", "visit-mut"] }
 csv = "1.4.0"

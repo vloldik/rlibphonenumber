@@ -13,8 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod enums;
-pub mod errors;
 pub(super) mod helper_constants;
 pub(super) mod helper_functions;
 mod helper_types;
@@ -22,10 +20,10 @@ mod phone_number_regexps_and_mappings;
 pub(super) mod phonenumberutil_internal;
 pub(super) mod regex_wrapper_types;
 
+use crate::phonenumberutil::phonenumberutil_internal::PhoneNumberUtil;
 use std::sync::LazyLock;
 
-// use crate::phonenumberutil::phonenumberutil_public::PhoneNumberUtil;
-
-// /// Singleton instance of phone number util for general use
-// #[cfg(feature = "global_static")]
-// pub static PHONE_NUMBER_UTIL: LazyLock<PhoneNumberUtil> = LazyLock::new(PhoneNumberUtil::new);
+/// Singleton instance of phone number util for general use
+#[cfg(feature = "global_static")]
+pub static PHONE_NUMBER_UTIL: LazyLock<PhoneNumberUtil> =
+    LazyLock::new(|| PhoneNumberUtil::new().unwrap());

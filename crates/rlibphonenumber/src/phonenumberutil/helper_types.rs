@@ -16,7 +16,8 @@
 use std::borrow::Cow;
 
 use crate::{
-    CountryCodeSource, PhoneNumber, PhoneNumberFormat,
+    CountryCodeSource, PhoneNumber,
+    enums::PhoneNumberFormat,
     phonenumberutil::{
         helper_functions::get_number_prefix_by_format_and_calling_code,
         phonenumberutil_internal::RegexResult,

@@ -1,8 +1,8 @@
 use std::sync::OnceLock;
 
-use crate::regexp::Regex;
-
-use crate::{InvalidRegexError, NumberFormat, PhoneMetadata, PhoneNumberDesc};
+use crate::{
+    NumberFormat, PhoneMetadata, PhoneNumberDesc, errors::InvalidRegexError, regexp::Regex,
+};
 
 #[derive(Debug, Clone)]
 pub struct RegexTriplets {

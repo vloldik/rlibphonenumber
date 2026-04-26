@@ -43,11 +43,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 4. Get additional information
     let number_type = number.get_type(); // e.g., Mobile, FixedLine
-    let region_code = number.get_region_code(); // e.g., "CA"
+    let region_code = number.get_region_code();
 
     println!("\nInfo:");
     println!("   - Type:   {:?}", number_type);
-    println!("   - Region: {:?}", region_code.unwrap_or("Unknown"));
+    println!(
+        "   - Region: {:?}",
+        region_code
+            .map(|reg| reg.as_region_str())
+            .as_deref()
+            .unwrap_or("Unknown")
+    );
 
     Ok(())
 }

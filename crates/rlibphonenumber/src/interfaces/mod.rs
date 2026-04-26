@@ -13,7 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{InvalidRegexError, phonenumberutil::regex_wrapper_types::PhoneNumberDescWrapper};
+use crate::{
+    errors::InvalidRegexError, phonenumberutil::regex_wrapper_types::PhoneNumberDescWrapper,
+};
 
 /// Internal phonenumber matching API used to isolate the underlying
 /// implementation of the matcher and allow different implementations to be
@@ -28,4 +30,9 @@ pub(crate) trait MatcherApi: Send + Sync {
         number_desc: &PhoneNumberDescWrapper,
         allow_prefix_match: bool,
     ) -> Result<bool, InvalidRegexError>;
+}
+
+// Used for wrappers to get common behavior on different wrappers
+pub trait AsOriginal<T> {
+    fn as_original(&self) -> &T;
 }

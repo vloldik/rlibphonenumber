@@ -12,3 +12,8 @@ pub fn countries_enum(name: TokenStream) -> TokenStream {
 pub fn public_wrapper(attr: TokenStream, item: TokenStream) -> TokenStream {
     public_wrapper::wrap_util(attr, item)
 }
+
+#[proc_macro_attribute]
+pub fn export(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}

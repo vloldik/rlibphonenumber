@@ -17,36 +17,26 @@
 use core::str;
 use std::{cell::Cell, convert::Infallible, ops::Deref, sync::Arc};
 
+use rlibphonenumbers_macro::{export, public_wrapper};
+
 use crate::{
-    CountryCodeSource, InternalError, MatchType, PhoneNumber, PhoneNumberFormat, PhoneNumberUtil,
-    Region,
+    CountryCodeSource, PhoneNumber,
+    enums::{MatchType, PhoneNumberFormat, Region},
+    errors::InternalError,
     generated::{uniprops_currencies, uniprops_latin_letters},
+    interfaces::AsOriginal,
     phonenumber_matcher::{
-        alternate_formats::AlternateFormats, leniency::Leniency,
+        alternate_formats::AlternateFormats, leniency::Leniency, matcher_regex::MatcherRegex,
         phonenumber_match::PhoneNumberMatch,
     },
     phonenumberutil::{
-        helper_constants::{
-            DIGITS, MAX_LENGTH_COUNTRY_CODE, MAX_LENGTH_FOR_NSN, PLUS_CHARS, SEPARATORS,
-            VALID_PUNCTUATION,
-        },
         helper_functions::{
-            create_extn_pattern, get_national_significant_number, is_unwanted_end_char,
-            normalize_digits,
+            get_national_significant_number, is_unwanted_end_char, normalize_digits,
         },
         phonenumberutil_internal::PhoneNumberUtilInternal,
     },
-    regexp::Regex,
+    unwrap_internal_infallible,
 };
-
-/// Returns a regular expression quantifier with an upper and lower limit.
-fn limit(lower: usize, upper: usize) -> String {
-    debug_assert!(
-        upper > 0 && upper >= lower,
-        "invalid limit bounds: lower={lower}, upper={upper}"
-    );
-    format!("{{{lower},{upper}}}")
-}
 
 /// The potential states of a [`PhoneNumberMatcher`].
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -70,58 +60,12 @@ enum CheckerVariant {
 ///
 /// This struct is not thread-safe.
 #[derive(Debug, Clone)]
-pub struct PhoneNumberMatcher<'a, T: Deref<Target = PhoneNumberUtil>> {
-    /// The phone number pattern used by [`find`], similar to
-    /// `PhoneNumberUtil::VALID_PHONE_NUMBER`, but with the following
-    /// differences:
-    /// * All captures are limited to place an upper bound on the matched text:
-    ///   * Leading punctuation / plus signs are limited.
-    ///   * Consecutive occurrences of punctuation are limited.
-    ///   * Number of digits is limited.
-    /// * No whitespace is allowed at the start or end.
-    /// * No alpha digits (vanity numbers such as `1-800-SIX-FLAGS`) are
-    ///   currently supported.
-    pattern: Regex,
-
-    /// Matches strings that look like publication pages.  Example:
-    ///
-    /// * Computing Complete Answers to Queries in the Presence of Limited
-    /// * Access Patterns.  Chen Li. VLDB J. 12(3): 211-227 (2003).
-    ///
-    /// The string `"211-227 (2003)"` is not a telephone number.
-    pub_pages: Regex,
-
-    /// Matches strings that look like dates using `"/"` as a separator.
-    /// Examples: `3/10/2011`, `31/10/96`, or `08/31/95`.
-    slash_separated_dates: Regex,
-
-    /// Matches timestamps.  Example: `"2012-01-02 08:00"`.  Note that the
-    /// regex does not include the trailing `":\d\d"` — that is covered by
-    /// [`time_stamps_suffix`].
-    time_stamps: Regex,
-    time_stamps_suffix: Regex,
-
-    /// Pattern to check that brackets match.  Opening brackets should be
-    /// closed within a phone number.  This also checks that there is something
-    /// inside the brackets.  Having no brackets at all is also fine.
-    matching_brackets_full_match: Regex,
-
-    /// Patterns used to extract phone numbers from a larger
-    /// phone-number-like pattern.  These are ordered according to specificity.
-    /// For example, white-space is last since that is frequently used in
-    /// numbers, not just to separate two numbers.  We have separate patterns
-    /// since we don't want to break up the phone-number-like text on more than
-    /// one different kind of symbol at one time, although symbols of the same
-    /// type (e.g. space) can be safely grouped together.
-    ///
-    /// Note that if there is a match, we will always check any text found up
-    /// to the first match as well.
-    inner_matches: Vec<Regex>,
-
-    /// Punctuation that may be at the start of a phone number — brackets and
-    /// plus signs.
-    lead_class: Regex,
-
+pub struct PhoneNumberMatcherInternal<
+    'a,
+    U: AsOriginal<PhoneNumberUtilInternal>,
+    T: Deref<Target = U>,
+> {
+    regexps: Arc<MatcherRegex>,
     // ── instance state ────────────────────────────────────────────────────────
     /// The phone number utility.
     _phone_util: T,
@@ -146,7 +90,19 @@ pub struct PhoneNumberMatcher<'a, T: Deref<Target = PhoneNumberUtil>> {
     alternate_formats: Option<Arc<AlternateFormats>>,
 }
 
-impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
+#[public_wrapper(
+    PhoneNumberMatcher {
+        ret: Self -> Self => | v | Self { inner: v },
+        ret: Result<$t, InternalError<Infallible>> -> $t => | v | unwrap_internal_infallible(v)
+    },
+
+    PhoneNUmberMatcherFallible {
+        ret: Self -> Self => | v | Self { inner: v },
+    }
+)]
+impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
+    PhoneNumberMatcherInternal<'a, U, T>
+{
     /// Creates a new instance.  See the factory methods in [`PhoneNumberUtil`]
     /// on how to obtain a new instance.
     ///
@@ -160,109 +116,18 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
     /// * `max_tries` – the maximum number of invalid numbers to try before
     ///   giving up on the text.  This covers degenerate cases where the text
     ///   has many false positives.  Must be `>= 0`.
+    #[export]
     pub fn new(
         util: T,
+        regexps: Arc<MatcherRegex>,
         text: &'a str,
         preferred_region: Option<Region>,
         leniency: Leniency,
         max_tries: u64,
         alternate_formats: Option<Arc<AlternateFormats>>,
     ) -> Self {
-        /* Build the `matching_brackets` and `pattern` regular expressions.
-         * The building blocks below exist to make the pattern more easily
-         * understood. */
-
-        let opening_parens = "(\\[\u{FF08}\u{FF3B}";
-        let closing_parens = ")\\]\u{FF09}\u{FF3D}";
-        let non_parens = format!("[^{opening_parens}{closing_parens}]");
-
-        /* Limit on the number of pairs of brackets in a phone number. */
-        let bracket_pair_limit = limit(0, 3);
-
-        /* An opening bracket at the beginning may not be closed, but
-         * subsequent ones should be.  It's also possible that the leading
-         * bracket was dropped, so we shouldn't be surprised if we see a
-         * closing bracket first.  We limit the sets of brackets in a phone
-         * number to four. */
-        let matching_brackets_full_match = Regex::new(&format!(
-            "^(?:(?:[{opening_parens}])?(?:{non_parens}+[{closing_parens}])?{non_parens}+\
-             (?:[{opening_parens}]{non_parens}+[{closing_parens}]){bracket_pair_limit}{non_parens}*)$"
-        ))
-        .unwrap();
-
-        /* Limit on the number of leading (plus) characters. */
-        let lead_limit = limit(0, 2);
-        /* Limit on the number of consecutive punctuation characters. */
-        let punctuation_limit = limit(0, 4);
-        /* The maximum number of digits allowed in a digit-separated block.
-         * As we allow all digits in a single block, set high enough to
-         * accommodate the entire national number and the international country
-         * code. */
-        let digit_block_limit = MAX_LENGTH_FOR_NSN + MAX_LENGTH_COUNTRY_CODE;
-        /* Limit on the number of blocks separated by punctuation.  Uses
-         * `digit_block_limit` since some formats use spaces to separate each
-         * digit. */
-        let block_limit = limit(0, digit_block_limit);
-
-        /* A punctuation sequence allowing white space. */
-        let punctuation = format!("[{}]{punctuation_limit}", VALID_PUNCTUATION);
-        let digit_sequence = format!("[{}]{}", DIGITS, limit(1, digit_block_limit));
-
-        let lead_class_chars = format!("{opening_parens}{}", PLUS_CHARS);
-        let lead_class_str = format!("[{lead_class_chars}]");
-        let lead_class = Regex::new(&lead_class_str).unwrap();
-
-        /* Phone number pattern allowing optional punctuation. */
-        let pattern = Regex::new(&format!(
-            "(?:{lead_class_str}{punctuation}){lead_limit}\
-             {digit_sequence}(?:{punctuation}{digit_sequence}){block_limit}\
-             (?:{})?",
-            create_extn_pattern(false),
-        ))
-        .unwrap();
-
-        let inner_matches = vec![
-            // Breaks on the slash — e.g. "651-234-2345/332-445-1234"
-            Regex::new("/+(.*)").unwrap(),
-            // Note that the bracket here is inside the capturing group, since
-            // we consider it part of the phone number.  Will match a pattern
-            // like "(650) 223 3345 (754) 223 3321".
-            Regex::new("(\\([^(]*)").unwrap(),
-            // Breaks on a hyphen — e.g. "12345 - 332-445-1234 is my number."
-            // We require a space on either side of the hyphen for it to be
-            // considered a separator.
-            Regex::new(
-                format!(
-                    "(?:[{}]-|-[{}])[{}]*(.+)",
-                    SEPARATORS, SEPARATORS, SEPARATORS
-                )
-                .as_str(),
-            )
-            .unwrap(),
-            // Various types of wide hyphens.  Note we have decided not to
-            // enforce a space here, since it's possible that it's supposed to
-            // be used to break two numbers without spaces, and we haven't seen
-            // many instances of it used within a number.
-            Regex::new(format!("[\u{2012}-\u{2015}\u{FF0D}][{}]*(.+)", SEPARATORS).as_str())
-                .unwrap(),
-            // Breaks on a full stop — e.g. "12345. 332-445-1234 is my number."
-            Regex::new(format!("\\.+[{}]*([^.]+)", SEPARATORS).as_str()).unwrap(),
-            // Breaks on space — e.g. "3324451234 8002341234"
-            Regex::new(format!("[{}]+([{}]+)", SEPARATORS, SEPARATORS).as_str()).unwrap(),
-        ];
-
         Self {
-            pattern,
-            pub_pages: Regex::new("\\d{1,5}-+\\d{1,5}\\s{0,4}\\(\\d{1,4}").unwrap(),
-            slash_separated_dates: Regex::new(
-                "(?:(?:[0-3]?\\d/[01]?\\d)|(?:[01]?\\d/[0-3]?\\d))/(?:[12]\\d)?\\d{2}",
-            )
-            .unwrap(),
-            time_stamps: Regex::new("[12]\\d{3}[-/]?[01]\\d[-/]?[0-3]\\d +[0-2]\\d$").unwrap(),
-            time_stamps_suffix: Regex::new(":[0-5]\\d").unwrap(),
-            matching_brackets_full_match,
-            inner_matches,
-            lead_class,
+            regexps,
             _phone_util: util,
             text,
             preferred_region,
@@ -276,7 +141,7 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
     }
 
     fn phone_util(&self) -> &PhoneNumberUtilInternal {
-        self._phone_util.util_internal()
+        self._phone_util.as_original()
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
@@ -284,6 +149,7 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
     /// Attempts to find the next subsequence in the searched text on or after
     /// `index` that represents a phone number.  Returns the next match, or
     /// `None` if none was found.
+    #[export]
     fn find(
         &self,
         index: usize,
@@ -292,7 +158,7 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
 
         while self.max_tries.get() > 0 {
             let text = self.text;
-            let Some(m) = self.pattern.find_at(text, pos) else {
+            let Some(m) = self.regexps.pattern.find_at(text, pos) else {
                 return Ok(None);
             };
             let start = m.start();
@@ -337,8 +203,7 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
     /// Helper method to determine if a character is a Latin-script letter or
     /// not.  For our purposes, combining marks should also return `true` since
     /// we assume they have been added to a preceding Latin character.
-    // #[cfg(test)]
-    pub fn is_latin_letter(letter: char) -> bool {
+    fn is_latin_letter(letter: char) -> bool {
         uniprops_latin_letters::uniprops::Category::from_char(letter).is_some()
     }
 
@@ -358,14 +223,18 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
         offset: usize,
     ) -> Result<Option<PhoneNumberMatch<'a>>, InternalError<Infallible>> {
         // Skip a match that is more likely to be a date.
-        if self.slash_separated_dates.find(candidate).is_some() {
+        if self.regexps.slash_separated_dates.find(candidate).is_some() {
             return Ok(None);
         }
 
         // Skip potential time-stamps.
-        if self.time_stamps.find(candidate).is_some() {
+        if self.regexps.time_stamps.find(candidate).is_some() {
             let following_text = &self.text[offset + candidate.len()..];
-            if self.time_stamps_suffix.is_match_at(following_text, 0) {
+            if self
+                .regexps
+                .time_stamps_suffix
+                .is_match_at(following_text, 0)
+            {
                 return Ok(None);
             }
         }
@@ -394,7 +263,7 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
         // immutably by the loop while `self` must also be borrowed mutably for
         // the parse calls.
 
-        for possible_inner_match in &self.inner_matches {
+        for possible_inner_match in &self.regexps.inner_matches {
             let mut is_first_match = true;
             let mut search_pos = 0;
 
@@ -449,8 +318,11 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
     ) -> Result<Option<PhoneNumberMatch<'a>>, InternalError<Infallible>> {
         // Check the candidate doesn't contain any formatting which would
         // indicate that it really isn't a phone number.
-        if !self.matching_brackets_full_match.is_match(candidate)
-            || self.pub_pages.find(candidate).is_some()
+        if !self
+            .regexps
+            .matching_brackets_full_match
+            .is_match(candidate)
+            || self.regexps.pub_pages.find(candidate).is_some()
         {
             return Ok(None);
         }
@@ -462,7 +334,7 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
             // If the candidate is not at the start of the text, and does not
             // start with phone-number punctuation, check the previous
             // character.
-            if offset > 0 && !self.lead_class.is_match_at(candidate, 0) {
+            if offset > 0 && !self.regexps.lead_class.is_match_at(candidate, 0) {
                 let Some(previous_char) = self.text[..offset].chars().last() else {
                     return Ok(None);
                 };
@@ -511,9 +383,7 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
         Ok(None)
     }
 
-    // ── Public static helpers ─────────────────────────────────────────────────
-
-    pub fn all_number_groups_remain_grouped<'b>(
+    fn all_number_groups_remain_grouped<'b>(
         &self,
         number: &PhoneNumber,
         normalized_candidate: &str,
@@ -582,7 +452,7 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
         Ok(normalized_candidate[from_index..].contains(number.extension()))
     }
 
-    pub fn all_number_groups_are_exactly_present<'b>(
+    fn all_number_groups_are_exactly_present<'b>(
         &self,
         number: &PhoneNumber,
         normalized_candidate: &str,
@@ -731,7 +601,7 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
         Ok(false)
     }
 
-    pub fn contains_more_than_one_slash_in_national_number(
+    fn contains_more_than_one_slash_in_national_number(
         &self,
         number: &PhoneNumber,
         candidate: &str,
@@ -768,7 +638,7 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
         true
     }
 
-    pub fn contains_only_valid_x_chars(&self, number: &PhoneNumber, candidate: &str) -> bool {
+    fn contains_only_valid_x_chars(&self, number: &PhoneNumber, candidate: &str) -> bool {
         // The characters 'x' and 'X' can be (1) a carrier code, in which case
         // they always precede the national significant number or (2) an
         // extension sign, in which case they always precede the extension
@@ -808,7 +678,7 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
         true
     }
 
-    pub fn is_national_prefix_present_if_required(
+    fn is_national_prefix_present_if_required(
         &self,
         number: &PhoneNumber,
     ) -> Result<bool, InternalError<Infallible>> {
@@ -934,13 +804,15 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> PhoneNumberMatcher<'a, T> {
     }
 }
 
-impl<'a, T: Deref<Target = PhoneNumberUtil>> Iterator for PhoneNumberMatcher<'a, T> {
+impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>> Iterator
+    for PhoneNumberMatcherInternal<'a, U, T>
+{
     type Item = Result<PhoneNumberMatch<'a>, InternalError<Infallible>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.state == State::NotReady {
             let index = self.search_index;
-            let new_match = PhoneNumberMatcher::<'a>::find(self, index);
+            let new_match = PhoneNumberMatcherInternal::<'a>::find(self, index);
             self.last_match = match new_match {
                 Ok(last_match) => last_match,
                 Err(err) => return Some(Err(err)),
@@ -961,5 +833,25 @@ impl<'a, T: Deref<Target = PhoneNumberUtil>> Iterator for PhoneNumberMatcher<'a,
         let result = self.last_match.take();
         self.state = State::NotReady;
         Ok(result).transpose()
+    }
+}
+
+impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>> Iterator
+    for PhoneNumberMatcher<'a, U, T>
+{
+    type Item = PhoneNumberMatch<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        unwrap_internal_infallible(self.inner.next().transpose())
+    }
+}
+
+impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>> Iterator
+    for PhoneNUmberMatcherFallible<'a, U, T>
+{
+    type Item = Result<PhoneNumberMatch<'a>, InternalError<Infallible>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
     }
 }

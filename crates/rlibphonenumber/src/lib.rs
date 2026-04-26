@@ -15,12 +15,18 @@
 
 /// This module is automatically generated from /resources/*.proto
 mod generated;
-mod interfaces;
 mod phonenumberutil;
 mod regex_based_matcher;
 pub(crate) mod regexp;
 pub(crate) mod string_util;
 
+pub mod enums;
+pub mod errors;
+pub mod interfaces;
+pub mod phonenumber_matcher;
+
+pub use enums::*;
+pub use errors::*;
 pub use generated::proto::phone_number::CountryCodeSource;
 pub use generated::proto::{
     NumberFormat, PhoneMetadata, PhoneMetadataCollection, PhoneNumber, PhoneNumberDesc,
@@ -31,10 +37,8 @@ mod phone_ext;
 #[cfg(feature = "global_static")]
 pub use crate::phonenumberutil::PHONE_NUMBER_UTIL;
 
-pub mod phonenumber_matcher;
-
 #[cfg(feature = "serde")]
 pub mod serde;
 
-pub use phonenumberutil::{enums::*, errors::*, phonenumberutil_public::PhoneNumberUtil};
+pub use phonenumberutil::phonenumberutil_internal::PhoneNumberUtil;
 mod tests;

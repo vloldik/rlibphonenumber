@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use argh::FromArgs;
-use rlibphonenumber::{PHONE_NUMBER_UTIL, PhoneNumber, PhoneNumberFormat};
+use rlibphonenumber::{PhoneNumber, PhoneNumberFormat, Region};
 use serde_json::json;
 
 #[derive(FromArgs, Debug)]
@@ -26,17 +26,18 @@ pub struct PhoneInfoCommand {
 }
 
 pub fn execute(options: PhoneInfoCommand) -> Result<(), Box<dyn std::error::Error>> {
-    let phone_number = if let Some(region) = &options.region {
-        PHONE_NUMBER_UTIL.parse_with_default_region(&options.number, region)
+    let region = if let Some(region_arg) = options.region {
+        Some(Region::from_code(&region_arg)?)
     } else {
-        PhoneNumber::from_str(&options.number)
-    }?;
+        None
+    };
+
+    let phone_number = PhoneNumber::parse(&options.number, region)?;
     let phone_format = PhoneNumberFormat::from_str(&options.format)?;
     let formatted_number = phone_number.format_as(phone_format);
     let country_code = phone_number.country_code;
     let national_number = phone_number.national_number;
     let is_valid = phone_number.is_valid();
-    let region_code = phone_number.get_region_code().unwrap_or_default();
 
     match options.output.as_str() {
         "plaintext" => {
@@ -49,7 +50,7 @@ pub fn execute(options: PhoneInfoCommand) -> Result<(), Box<dyn std::error::Erro
                 "format_used": options.format,
                 "country_code": country_code,
                 "national_number": national_number,
-                "region_code": region_code,
+                "region_code": region.map(| region | region.as_region_str()).as_deref(),
                 "is_valid": is_valid,
             });
             println!("{}", serde_json::to_string_pretty(&info)?);
@@ -62,7 +63,14 @@ pub fn execute(options: PhoneInfoCommand) -> Result<(), Box<dyn std::error::Erro
             println!("{:<20} | {}", "Format Used", options.format);
             println!("{:<20} | {}", "Country Code", country_code);
             println!("{:<20} | {}", "National Number", national_number);
-            println!("{:<20} | {}", "Region Code", region_code);
+            println!(
+                "{:<20} | {}",
+                "Region Code",
+                region
+                    .map(|region| region.as_region_str())
+                    .as_deref()
+                    .unwrap_or("None")
+            );
             println!("{:<20} | {}", "Is Valid", is_valid);
         }
         _ => {

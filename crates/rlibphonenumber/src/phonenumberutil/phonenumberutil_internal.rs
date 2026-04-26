@@ -21,10 +21,7 @@ use std::{
 };
 
 use super::{
-    enums::{MatchType, NumberLengthType, PhoneNumberFormat, PhoneNumberType},
-    errors::{
-        ExtractNumberError, GetExampleNumberError, NotANumberError, ParseError, ValidationError,
-    },
+    helper_constants::PLUS_CHARS,
     helper_constants::{
         DEFAULT_EXTN_PREFIX, MAX_LENGTH_COUNTRY_CODE, MAX_LENGTH_FOR_NSN, MIN_LENGTH_FOR_NSN,
         NANPA_COUNTRY_CODE, PLUS_SIGN, REGION_CODE_FOR_NON_GEO_ENTITY, RFC3966_EXTN_PREFIX,
@@ -36,30 +33,33 @@ use super::{
         is_national_number_suffix_of_the_other, load_compiled_metadata, normalize_helper,
         test_number_length, test_number_length_with_unknown_type,
     },
+    helper_functions::{get_national_significant_number, is_unwanted_end_char},
     helper_types::PhoneNumberWithCountryCodeSource,
+    helper_types::{PrefixParts, new_formatted_number_builder},
     phone_number_regexps_and_mappings::PhoneNumberRegExpsAndMappings,
+    regex_wrapper_types::{
+        NumberFormatWrapper, PhoneMetadataWrapper, PhoneNumberDescWrapper, RegexTriplets,
+    },
 };
 use crate::{
-    CreateUtilError, InternalError, InvalidNumberError, Region,
+    enums::{MatchType, NumberLengthType, PhoneNumberFormat, PhoneNumberType, Region},
+    errors::{
+        CreateUtilError, ExtractNumberError, GetExampleNumberError, InternalError,
+        InvalidNumberError, NotANumberError, ParseError, ValidationError, unwrap_internal,
+        unwrap_internal_infallible,
+    },
     generated::{
         proto::{PhoneMetadataCollection, PhoneNumber, phone_number::CountryCodeSource},
         uniprops_digits,
     },
-    phonenumberutil::{
-        helper_constants::PLUS_CHARS,
-        helper_functions::{get_national_significant_number, is_unwanted_end_char},
-        helper_types::{PrefixParts, new_formatted_number_builder},
-        regex_wrapper_types::{
-            NumberFormatWrapper, PhoneMetadataWrapper, PhoneNumberDescWrapper, RegexTriplets,
-        },
-    },
+    interfaces::AsOriginal,
     regex_based_matcher::RegexBasedMatcher,
     string_util::strip_cow_prefix,
 };
 
 use crate::regexp::Regex;
 use log::{error, trace, warn};
-use rlibphonenumbers_macro::public_wrapper;
+use rlibphonenumbers_macro::{export, public_wrapper};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 // Helper type for Result
@@ -75,7 +75,7 @@ pub type ExtractNumberResult<T> = std::result::Result<T, ExtractNumberError>;
 
 pub struct PhoneNumberUtilInternal {
     /// Helper class holding useful regular expressions and character mappings.
-    pub reg_exps: PhoneNumberRegExpsAndMappings,
+    pub(crate) reg_exps: PhoneNumberRegExpsAndMappings,
 
     /// A mapping from a country calling code to a RegionCode object which denotes
     /// NANPA share the country calling code 1 and Russia and Kazakhstan share the
@@ -98,8 +98,28 @@ pub struct PhoneNumberUtilInternal {
     matcher_api: RegexBasedMatcher,
 }
 
-#[public_wrapper]
+#[public_wrapper(
+    PhoneNumberUtil {
+        ret: Self -> Self => | ret | Self { inner: ret? },
+        ret: Result<Self, $err> -> Result<Self, $err> => | v | Ok(Self { inner: v? }),
+        ret: RegexResult<$t> -> $t => | v | unwrap_internal_infallible(v),
+        ret: ParseResult<$t> -> Result<$t, ParseError> => | v | unwrap_internal(v),
+        ret: ExampleNumberResult<$t> -> Result<$t, GetExampleNumberError> => | v | unwrap_internal(v),
+        ret: MatchResult<$t> -> Result<$t, InvalidNumberError> => | v | unwrap_internal(v),
+        
+        arg: &str -> impl AsRef<str> => | v | v.as_ref(),
+        arg: &'a str -> &'a str => | v | v,
+ },
+    PhoneNumberUtilFallible {
+        ret: Self -> Self => | ret | Self { inner: ret? },
+        ret: Result<Self, $err> -> Result<Self, $err> => | v | Ok(Self { inner: v? }),
+        
+        arg: &str -> impl AsRef<str> => | v | v.as_ref(),
+    }
+)]
 impl PhoneNumberUtilInternal {
+
+    #[export]
     pub fn new_for_metadata(
         metadata_collection: PhoneMetadataCollection,
     ) -> Result<Self, CreateUtilError> {
@@ -174,6 +194,7 @@ impl PhoneNumberUtilInternal {
     /// This method loads the compiled metadata for parsing, formatting, and validating phone numbers.
     ///
     /// You probably want use `PHONE_NUMBER_UTIL` singleton instead
+    #[export]
     pub fn new() -> Result<Self, CreateUtilError> {
         let metadata_collection = load_compiled_metadata()?;
         Self::new_for_metadata(metadata_collection)
@@ -181,12 +202,14 @@ impl PhoneNumberUtilInternal {
 
     /// Gets an iterator over all region codes supported by the library.
     /// These are the regions for which metadata is available.
+    #[export]
     pub fn get_supported_regions(&self) -> impl ExactSizeIterator<Item = Region> {
         self.region_to_metadata_map.keys().copied()
     }
 
     /// Gets an iterator over all supported global network calling codes.
     /// These are country codes for non-geographical entities, such as satellite services.
+    #[export]
     pub fn get_supported_global_network_calling_codes(&self) -> impl Iterator<Item = i32> {
         self.country_code_to_non_geographical_metadata_map
             .keys()
@@ -194,12 +217,14 @@ impl PhoneNumberUtilInternal {
     }
 
     /// Gets an iterator over all supported country calling codes.
+    #[export]
     pub fn get_supported_calling_codes(&self) -> impl Iterator<Item = i32> {
         self.country_calling_code_to_region_map
             .iter()
             .map(|(k, _)| *k)
     }
 
+    #[export]
     pub fn is_nanpa_country(&self, region: Region) -> bool {
         self.nanpa_regions.contains(&region)
     }
@@ -209,6 +234,7 @@ impl PhoneNumberUtilInternal {
     /// # Arguments
     ///
     /// * `region` - The region code for which to get the types.
+    #[export]
     pub fn get_supported_types_for_region(
         &self,
         region: Region,
@@ -227,6 +253,7 @@ impl PhoneNumberUtilInternal {
     /// # Arguments
     ///
     /// * `country_calling_code` - The non-geographical country calling code.
+    #[export]
     pub fn get_supported_types_for_non_geo_entity(
         &self,
         country_calling_code: i32,
@@ -243,6 +270,7 @@ impl PhoneNumberUtilInternal {
             })
     }
 
+    #[export]
     pub fn get_country_code_for_region(&self, region: Region) -> Option<i32> {
         self.region_to_metadata_map
             .get(&region)
@@ -308,6 +336,7 @@ impl PhoneNumberUtilInternal {
     ///
     /// * `phone_number` - The phone number to be formatted.
     /// * `number_format` - The format to be used.
+    #[export]
     pub fn format<'b>(
         &self,
         phone_number: &'b PhoneNumber,
@@ -361,6 +390,7 @@ impl PhoneNumberUtilInternal {
     /// # Arguments
     ///
     /// * `country_calling_code` - The country calling code.
+    #[export]
     pub fn get_region_for_country_code(&self, country_calling_code: i32) -> Option<Region> {
         let regions = self.get_regions_for_country_calling_code(country_calling_code);
         regions.and_then(|mut codes| codes.next())
@@ -372,6 +402,7 @@ impl PhoneNumberUtilInternal {
     /// # Arguments
     ///
     /// * `country_calling_code` - The country calling code.
+    #[export]
     pub fn get_regions_for_country_calling_code(
         &self,
         country_calling_code: i32,
@@ -616,6 +647,7 @@ impl PhoneNumberUtilInternal {
     /// * `phone_number` - The phone number to format.
     /// * `number_format` - The phone number format to apply.
     /// * `user_defined_formats` - A slice of user-defined formatting patterns.
+    #[export]
     pub fn format_by_pattern(
         &self,
         phone_number: &PhoneNumber,
@@ -684,6 +716,7 @@ impl PhoneNumberUtilInternal {
     ///
     /// * `phone_number` - The phone number to format.
     /// * `carrier_code` - The carrier code to include in the formatted number.
+    #[export]
     pub fn format_national_number_with_carrier_code(
         &self,
         phone_number: &PhoneNumber,
@@ -725,6 +758,7 @@ impl PhoneNumberUtilInternal {
     ///
     /// * `phone_number` - The phone number to format.
     /// * `fallback_carrier_code` - The carrier code to use if a preferred one is not available.
+    #[export]
     pub fn format_national_number_with_preferred_carrier_code(
         &self,
         phone_number: &PhoneNumber,
@@ -745,6 +779,7 @@ impl PhoneNumberUtilInternal {
     /// * `phone_number` - The phone number to format.
     /// * `calling_from` - The region where the call is being placed.
     /// * `with_formatting` - Whether to include formatting characters.
+    #[export]
     pub fn format_number_for_mobile_dialing<'b>(
         &self,
         phone_number: &'b PhoneNumber,
@@ -913,6 +948,7 @@ impl PhoneNumberUtilInternal {
     /// # Arguments
     ///
     /// * `phone_number` - The phone number to get the type for.
+    #[export]
     pub fn get_number_type(&self, phone_number: &PhoneNumber) -> RegexResult<PhoneNumberType> {
         let region = self.get_region_for_number(phone_number)?;
         let Some(metadata) = region.and_then(|region| {
@@ -931,6 +967,7 @@ impl PhoneNumberUtilInternal {
     /// # Arguments
     ///
     /// * `phone_number` - The phone number to get the region for.
+    #[export]
     pub fn get_region_for_number(&self, phone_number: &PhoneNumber) -> RegexResult<Option<Region>> {
         let country_calling_code: i32 = phone_number.country_code;
 
@@ -1080,6 +1117,7 @@ impl PhoneNumberUtilInternal {
     /// # Arguments
     ///
     /// * `phone_number` - The phone number to check.
+    #[export]
     pub fn can_be_internationally_dialled(&self, phone_number: &PhoneNumber) -> RegexResult<bool> {
         let region = self.get_region_for_number(phone_number)?;
         let Some(metadata) = region.and_then(|region| self.region_to_metadata_map.get(&region))
@@ -1097,6 +1135,7 @@ impl PhoneNumberUtilInternal {
         )?)
     }
 
+    #[export]
     pub fn normalize_diallable_chars_only(&self, phone_number: &str) -> String {
         normalize_helper(&self.reg_exps.diallable_char_mappings, true, phone_number)
     }
@@ -1107,6 +1146,7 @@ impl PhoneNumberUtilInternal {
     /// # Arguments
     ///
     /// * `phone_number` - The phone number string to normalize.
+    #[export]
     pub fn normalize_digits_only(&self, phone_number: &str) -> String {
         phone_number
             .chars()
@@ -1122,6 +1162,7 @@ impl PhoneNumberUtilInternal {
     ///
     /// * `phone_number` - The phone number to format.
     /// * `calling_from` - The region where the call is being placed from.
+    #[export]
     pub fn format_out_of_country_calling_number<'a>(
         &self,
         phone_number: &'a PhoneNumber,
@@ -1245,6 +1286,7 @@ impl PhoneNumberUtilInternal {
     ///
     /// * `phone_number` - The phone number to format.
     /// * `region_calling_from` - The region from which the number was originally parsed.
+    #[export]
     pub fn format_in_original_format<'a>(
         &self,
         phone_number: &'a PhoneNumber,
@@ -1400,6 +1442,7 @@ impl PhoneNumberUtilInternal {
     ///
     /// * `number_to_parse` - The number string to parse.
     /// * `default_region` - The region to assume if the number is not in international format.
+    #[export]
     pub fn parse(
         &self,
         number_to_parse: &str,
@@ -1414,6 +1457,7 @@ impl PhoneNumberUtilInternal {
     ///
     /// * `number_to_parse` - The number string to parse.
     /// * `default_region` - The region to assume if the number is not in international format.
+    #[export]
     pub fn parse_and_keep_raw_input(
         &self,
         number_to_parse: &str,
@@ -1427,6 +1471,7 @@ impl PhoneNumberUtilInternal {
     /// # Arguments
     ///
     /// * `phone_number` - The phone number to validate.
+    #[export]
     pub fn is_valid_number(&self, phone_number: &PhoneNumber) -> RegexResult<bool> {
         let region = self.get_region_for_number(phone_number)?;
         if let Some(region) = region {
@@ -1442,6 +1487,7 @@ impl PhoneNumberUtilInternal {
     ///
     /// * `phone_number` - The phone number to validate.
     /// * `region` - The region to validate against.
+    #[export]
     pub fn is_valid_number_for_region(
         &self,
         phone_number: &PhoneNumber,
@@ -1469,6 +1515,7 @@ impl PhoneNumberUtilInternal {
     ///
     /// * `phone_number` - The phone number to format.
     /// * `calling_from` - The region where the call is being placed from.
+    #[export]
     pub fn format_out_of_country_keeping_alpha_chars<'a>(
         &self,
         phone_number: &'a PhoneNumber,
@@ -1677,7 +1724,7 @@ impl PhoneNumberUtilInternal {
     ///
     /// Returns the extracted `Some(possibly empty)`, or a `None` if no
     /// phone-context parameter is found.
-    pub fn extract_phone_context(
+    fn extract_phone_context(
         number_to_extract_from: &str,
         index_of_phone_context: usize,
     ) -> &str {
@@ -1748,6 +1795,7 @@ impl PhoneNumberUtilInternal {
     /// # Arguments
     ///
     /// * `phone_number` - The phone number to check.
+    #[export]
     pub fn is_possible_number(&self, phone_number: &PhoneNumber) -> bool {
         self.is_possible_number_with_reason(phone_number).is_ok()
     }
@@ -1758,6 +1806,7 @@ impl PhoneNumberUtilInternal {
     ///
     /// * `phone_number` - The phone number to check.
     /// * `phone_number_type` - The type of number to check for.
+    #[export]
     pub fn is_possible_number_for_type(
         &self,
         phone_number: &PhoneNumber,
@@ -1773,6 +1822,7 @@ impl PhoneNumberUtilInternal {
     ///
     /// * `number` - The number string to check.
     /// * `region` - The region to check against.
+    #[export]
     pub fn is_possible_number_for_string(
         &self,
         phone_number: &str,
@@ -1791,10 +1841,12 @@ impl PhoneNumberUtilInternal {
         }
     }
 
+    #[export]
     pub fn is_possible_number_with_reason(&self, phone_number: &PhoneNumber) -> ValidationResult {
         self.is_possible_number_for_type_with_reason(phone_number, PhoneNumberType::Unknown)
     }
 
+    #[export]
     pub fn is_possible_number_for_type_with_reason(
         &self,
         phone_number: &PhoneNumber,
@@ -1822,6 +1874,7 @@ impl PhoneNumberUtilInternal {
     /// # Arguments
     ///
     /// * `phone_number` - The number to truncate
+    #[export]
     pub fn truncate_too_long_number(&self, phone_number: &mut PhoneNumber) -> RegexResult<bool> {
         if self.is_valid_number(phone_number)? {
             return Ok(true);
@@ -2014,6 +2067,7 @@ impl PhoneNumberUtilInternal {
     /// method does not require the number to be normalized in advance - but does
     /// assume that leading non-number symbols have been removed, such as by the
     /// method `ExtractPossibleNumber`.
+    #[export]
     pub fn is_viable_phone_number(&self, phone_number: &str) -> bool {
         if phone_number.len() < MIN_LENGTH_FOR_NSN {
             false
@@ -2190,6 +2244,7 @@ impl PhoneNumberUtilInternal {
     /// # Arguments
     ///
     /// * `region` - The region for which to get an example number.
+    #[export]
     pub fn get_example_number(&self, region: Region) -> ExampleNumberResult {
         self.get_example_number_for_type_and_region(region, PhoneNumberType::FixedLine)
     }
@@ -2199,6 +2254,7 @@ impl PhoneNumberUtilInternal {
     /// # Arguments
     ///
     /// * `region` - The region for which to get an invalid example number.
+    #[export]
     pub fn get_invalid_example_number(&self, region: Region) -> ExampleNumberResult {
         let Some(region_metadata) = self.region_to_metadata_map.get(&region) else {
             warn!("Invalid or unknown region code ({}) provided.", region);
@@ -2258,6 +2314,7 @@ impl PhoneNumberUtilInternal {
     ///
     /// * `region` - The region for which to get an example number.
     /// * `number_type` - The type of number to get an example for.
+    #[export]
     pub fn get_example_number_for_type_and_region(
         &self,
         region: Region,
@@ -2283,6 +2340,7 @@ impl PhoneNumberUtilInternal {
     ///
     /// * `region` - The region for which to get an example number.
     /// * `phone_number_type` - The type of number to get an example for.
+    #[export]
     pub fn get_example_number_for_type(
         &self,
         phone_number_type: PhoneNumberType,
@@ -2335,6 +2393,7 @@ impl PhoneNumberUtilInternal {
     /// # Arguments
     ///
     /// * `country_calling_code` - The non-geographical country calling code.
+    #[export]
     pub fn get_example_number_for_non_geo_entity(
         &self,
         country_calling_code: i32,
@@ -2451,6 +2510,7 @@ impl PhoneNumberUtilInternal {
     /// # Arguments
     ///
     /// * `phone_number` - Number to normalize.
+    #[export]
     pub fn normalize(&self, phone_number: &str) -> String {
         if self
             .reg_exps
@@ -2493,6 +2553,7 @@ impl PhoneNumberUtilInternal {
     /// # Arguments
     ///
     /// * `phone_number` - The phone number to check.
+    #[export]
     pub fn is_number_geographical(&self, phone_number: &PhoneNumber) -> RegexResult<bool> {
         Ok(self.is_number_geographical_by_country_code_and_type(
             self.get_number_type(phone_number)?,
@@ -2500,6 +2561,7 @@ impl PhoneNumberUtilInternal {
         ))
     }
 
+    #[export]
     pub fn is_number_geographical_by_country_code_and_type(
         &self,
         phone_number_type: PhoneNumberType,
@@ -2520,6 +2582,7 @@ impl PhoneNumberUtilInternal {
     /// # Arguments
     ///
     /// * `phone_number` - The phone number to check.
+    #[export]
     pub fn get_length_of_geographical_area_code(
         &self,
         phone_number: &PhoneNumber,
@@ -2572,6 +2635,7 @@ impl PhoneNumberUtilInternal {
     /// # Arguments
     ///
     /// * `phone_number` - The phone number to check.
+    #[export]
     pub fn get_length_of_national_destination_code(
         &self,
         phone_number: &PhoneNumber,
@@ -2613,6 +2677,7 @@ impl PhoneNumberUtilInternal {
         Ok(captured_groups[ndc_index])
     }
 
+    #[export]
     pub fn get_country_mobile_token(&self, country_calling_code: i32) -> Option<char> {
         self.reg_exps
             .mobile_token_mappings
@@ -2761,6 +2826,7 @@ impl PhoneNumberUtilInternal {
     /// # Arguments
     ///
     /// * `phone_number` - The phone number string with alpha characters.
+    #[export]
     pub fn convert_alpha_characters_in_number(&self, phone_number: &str) -> String {
         normalize_helper(&self.reg_exps.alpha_phone_mappings, false, phone_number)
     }
@@ -2772,6 +2838,7 @@ impl PhoneNumberUtilInternal {
     ///
     /// * `number1` - The first phone number to compare.
     /// * `number2` - The second phone number to compare.
+    #[export]
     pub fn is_number_match(
         &self,
         first_number_in: &PhoneNumber,
@@ -2829,6 +2896,7 @@ impl PhoneNumberUtilInternal {
     ///
     /// * `number1` - The first phone number to compare.
     /// * `number2` - The second phone number to compare.
+    #[export]
     pub fn is_number_match_with_two_strings(
         &self,
         first_number: &str,
@@ -2870,6 +2938,7 @@ impl PhoneNumberUtilInternal {
     ///
     /// * `number1` - The first phone number to compare.
     /// * `number2` - The second phone number to compare.
+    #[export]
     pub fn is_number_match_with_one_string(
         &self,
         first_number: &PhoneNumber,
@@ -2917,6 +2986,7 @@ impl PhoneNumberUtilInternal {
     /// # Arguments
     ///
     /// * `phone_number` - The string to check.
+    #[export]
     pub fn is_alpha_number(&self, phone_number: &str) -> bool {
         if !self.is_viable_phone_number(phone_number) {
             // Number is too short, or doesn't match the basic phone number pattern.
@@ -2927,5 +2997,23 @@ impl PhoneNumberUtilInternal {
         self.reg_exps
             .valid_alpha_phone_pattern_fullmatch
             .is_match(number)
+    }
+}
+
+impl AsOriginal<PhoneNumberUtilInternal> for PhoneNumberUtilInternal {
+    fn as_original(&self) -> &PhoneNumberUtilInternal {
+        self
+    }
+}
+
+impl AsOriginal<PhoneNumberUtilInternal> for PhoneNumberUtil {
+    fn as_original(&self) -> &PhoneNumberUtilInternal {
+        &self.inner
+    }
+}
+
+impl AsOriginal<PhoneNumberUtilInternal> for PhoneNumberUtilFallible {
+    fn as_original(&self) -> &PhoneNumberUtilInternal {
+        &self.inner
     }
 }

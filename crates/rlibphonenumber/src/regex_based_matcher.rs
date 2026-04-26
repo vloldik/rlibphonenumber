@@ -14,7 +14,8 @@
 // limitations under the License.
 
 use crate::{
-    InvalidRegexError, interfaces,
+    errors::InvalidRegexError,
+    interfaces,
     phonenumberutil::regex_wrapper_types::{PhoneNumberDescWrapper, RegexTriplets},
 };
 

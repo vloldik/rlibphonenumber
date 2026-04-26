@@ -22,13 +22,15 @@ use std::{
 use prost::DecodeError;
 use thiserror::Error;
 
+use crate::InvalidRegionError;
+
 #[derive(Debug, PartialEq, Error, Clone)]
 #[error("An error occurred while trying to create regex: {0}")]
 pub struct InvalidRegexError(#[from] crate::regexp::Error);
 
 /// Represents the possible errors that can occur when parsing a phone number string.
 /// This is a public-facing error enum.
-#[derive(Debug, PartialEq, Error)]
+#[derive(Debug, PartialEq, Clone, Error)]
 pub enum ParseError {
     /// **Invalid country code.**
     /// This error occurs if the number begins with a `+` but is followed by an
@@ -58,7 +60,7 @@ pub enum ParseError {
 }
 
 /// Provides more specific details for a `ParseError::NotANumber` failure.
-#[derive(Debug, PartialEq, Error)]
+#[derive(Debug, PartialEq, Clone, Error)]
 pub enum NotANumberError {
     /// The number string does not match the basic regular expression for a valid
     /// phone number pattern.
@@ -76,7 +78,7 @@ pub enum NotANumberError {
 }
 
 /// Represents errors during the low-level extraction of a number string.
-#[derive(Debug, PartialEq, Error)]
+#[derive(Debug, PartialEq, Clone, Error)]
 pub enum ExtractNumberError {
     /// The input string does not contain a character that could begin a phone number
     /// (e.g., a digit, `+`, or `#`).
@@ -87,7 +89,7 @@ pub enum ExtractNumberError {
     NotANumber,
 }
 
-#[derive(Debug, PartialEq, Error)]
+#[derive(Debug, PartialEq, Clone, Error)]
 pub enum InternalError<T: Debug + Display> {
     #[error("Wrapped error: {0}")]
     Wrapped(T),
@@ -99,48 +101,8 @@ pub enum InternalError<T: Debug + Display> {
 
 pub type InternalRegexError = InternalError<Infallible>;
 
-impl<T: Debug + Display> InternalError<T> {
-    pub fn translate<O: From<T> + Debug + Display>(self) -> InternalError<O> {
-        match self {
-            Self::RegexError(e) => InternalError::RegexError(e),
-            Self::Wrapped(e) => InternalError::Wrapped(e.into()),
-        }
-    }
-}
-
-impl InternalError<Infallible> {
-    pub fn translate_internal<O: Debug + Display>(self) -> InternalError<O> {
-        match self {
-            InternalError::RegexError(invalid_regex_error) => {
-                InternalError::RegexError(invalid_regex_error)
-            }
-        }
-    }
-}
-
-macro_rules! delegate_from {
-    ($inner:ty : $($t:ty),*) => {
-        impl From<$inner> for InternalError<$inner> {
-            fn from(value: $inner) -> Self {
-                Self::Wrapped(value)
-            }
-        }
-        $(
-            impl From<$t> for InternalError<$inner> {
-                fn from(value: $t) -> Self {
-                    InternalError::from(<$inner>::from(value))
-                }
-            }
-        )*
-    };
-}
-
-delegate_from!(GetExampleNumberError: ParseError);
-delegate_from!(ParseError: NotANumberError);
-delegate_from!(NotANumberError: ExtractNumberError);
-
 /// Represents possible failures when requesting an example phone number.
-#[derive(Debug, PartialEq, Error)]
+#[derive(Debug, PartialEq, Clone, Error)]
 pub enum GetExampleNumberError {
     /// An internal parsing error occurred while constructing the example number.
     #[error("Parse error: {0}")]
@@ -159,7 +121,7 @@ pub enum GetExampleNumberError {
 /// A specific error indicating that the provided input is not a number.
 ///
 /// This is typically returned when a check requires a valid number, but parsing fails.
-#[derive(Error, Debug, PartialEq)]
+#[derive(Error, Debug, Clone, PartialEq)]
 #[error("Invalid number given")]
 pub struct InvalidNumberError(#[from] pub ParseError);
 
@@ -167,7 +129,7 @@ pub struct InvalidNumberError(#[from] pub ParseError);
 ///
 /// This represents a critical bug in the library's metadata loading or structure,
 /// as a supported region should always have associated metadata.
-#[derive(Debug, Error, PartialEq)]
+#[derive(Debug, Error, Clone, PartialEq)]
 #[error("Metadata for valid region MUST not be null")]
 pub struct InvalidMetadataForValidRegionError;
 
@@ -205,27 +167,66 @@ pub enum ValidationError {
     TooLong,
 }
 
-pub(crate) fn unwrap_internal<T: Debug + Display>(err: InternalError<T>) -> T {
-    match err {
-        InternalError::Wrapped(err) => err,
-        InternalError::RegexError(invalid_regex_error) => panic!(
-            "A valid regex is expected in metadata; this indicates a library bug: {}",
-            invalid_regex_error
-        ),
-    }
-}
-
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum CreateUtilError {
     #[error("Failed to create region: region should be valid 2-digit ascii string, got: {0}")]
-    InvalidRegionError(String),
+    InvalidRegion(#[from] InvalidRegionError),
 
     #[error("Failed to decode metadata from static file, this indicates library bug: {0}")]
     Decode(#[from] DecodeError),
 }
 
-impl From<String> for CreateUtilError {
-    fn from(value: String) -> Self {
-        CreateUtilError::InvalidRegionError(value)
+pub fn unwrap_internal<T, E: Debug + Display>(result: Result<T, InternalError<E>>) -> Result<T, E> {
+    match result {
+        Err(InternalError::Wrapped(err)) => Err(err),
+        Err(InternalError::RegexError(invalid_regex_error)) => panic!(
+            "A valid regex is expected in metadata; this indicates a library bug: {}",
+            invalid_regex_error
+        ),
+        Ok(result) => Ok(result),
+    }
+}
+
+pub fn unwrap_internal_infallible<T>(result: Result<T, InternalError<Infallible>>) -> T {
+    unwrap_internal(result).unwrap_or_else(|err| match err {})
+}
+
+macro_rules! delegate_from {
+    ($inner:ty : $($t:ty),*) => {
+        impl From<$inner> for InternalError<$inner> {
+            fn from(value: $inner) -> Self {
+                Self::Wrapped(value)
+            }
+        }
+        $(
+            impl From<$t> for InternalError<$inner> {
+                fn from(value: $t) -> Self {
+                    InternalError::from(<$inner>::from(value))
+                }
+            }
+        )*
+    };
+}
+
+delegate_from!(GetExampleNumberError: ParseError);
+delegate_from!(ParseError: NotANumberError);
+delegate_from!(NotANumberError: ExtractNumberError);
+
+impl<T: Debug + Display> InternalError<T> {
+    pub fn translate<O: From<T> + Debug + Display>(self) -> InternalError<O> {
+        match self {
+            Self::RegexError(e) => InternalError::RegexError(e),
+            Self::Wrapped(e) => InternalError::Wrapped(e.into()),
+        }
+    }
+}
+
+impl InternalError<Infallible> {
+    pub fn translate_internal<O: Debug + Display>(self) -> InternalError<O> {
+        match self {
+            InternalError::RegexError(invalid_regex_error) => {
+                InternalError::RegexError(invalid_regex_error)
+            }
+        }
     }
 }

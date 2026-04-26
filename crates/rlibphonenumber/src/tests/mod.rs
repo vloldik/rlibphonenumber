@@ -4,8 +4,6 @@ mod fuzz_artifacts;
 mod metadata_tests;
 #[cfg(test)]
 mod phonenumberutil_tests;
-#[cfg(test)]
-mod region_code;
 
 #[cfg(test)]
 mod common {
@@ -18,8 +16,6 @@ mod common {
 
     pub static ONCE: std::sync::Once = std::sync::Once::new();
 
-    pub const UNKNOWN_REGION_CODE: Option<&str> = Some("ZZ");
-
     pub fn get_phone_util() -> PhoneNumberUtilInternal {
         ONCE.call_once(|| {
             colog::default_builder()
@@ -28,7 +24,7 @@ mod common {
         });
 
         let metadata = load_metadata();
-        PhoneNumberUtilInternal::new_for_metadata(metadata)
+        PhoneNumberUtilInternal::new_for_metadata(metadata).unwrap()
     }
 
     pub fn load_metadata() -> PhoneMetadataCollection {
