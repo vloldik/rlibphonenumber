@@ -4,6 +4,7 @@ use rlibphonenumber::PhoneMetadata;
 
 pub struct MetadataFilter {
     program: Option<Program>,
+    ctx: Context<'static>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -28,12 +29,16 @@ impl MetadataFilter {
         let program =
             Program::compile(expression).map_err(|e| MetadataError::Cel(e.to_string()))?;
         Ok(Self {
+            ctx: Context::default(),
             program: Some(program),
         })
     }
 
     pub fn empty_filter() -> Self {
-        Self { program: None }
+        Self {
+            program: None,
+            ctx: Context::empty(),
+        }
     }
 
     fn should_drop(
@@ -46,7 +51,7 @@ impl MetadataFilter {
             return Ok(false);
         };
 
-        let mut ctx = Context::default();
+        let mut ctx = self.ctx.new_inner_scope();
         macro_rules! add_variable {
             ($name:literal, $field: expr) => {
                 ctx.add_variable($name, $field)
