@@ -3,7 +3,7 @@ use libfuzzer_sys::{
     arbitrary::{Arbitrary, Error, Unstructured},
     fuzz_target,
 };
-use rlibphonenumber::{PHONE_NUMBER_UTIL, PhoneNumberFormat};
+use rlibphonenumber::{PHONE_NUMBER_UTIL, PhoneNumberFormat, Region};
 use rlibphonenumber_fuzz::ffi;
 
 const ALPHABET: &[u8] = b"+0123456789()-=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -29,9 +29,30 @@ fuzz_target!(|data: (CustomString, CustomString)| {
     let (number_str, region_str) = (data.0.0, data.1.0);
 
     let cpp_res = ffi::test_cpp_impl(&number_str, &region_str);
+    let Ok(region) = Region::from_code(&region_str)
+        .map(|code| Some(code))
+        .or_else(|err| {
+            // Empty regions as None
+            if region_str.is_empty() || region_str == "ZZ" {
+                Ok(None::<Region>)
+            } else {
+                Err(err)
+            }
+        })
+    else {
+        assert_eq!(
+            cpp_res.is_parsed, false,
+            "Mismatch on invalid code parsing! Cpp parsed country code, while rust rejected"
+        );
+        assert!(
+            !cpp_res.error.is_empty(),
+            "Mismatch on invalid code parsing! Cpp parsed country code, while rust rejected"
+        );
+        return;
+    };
 
     let util = &PHONE_NUMBER_UTIL;
-    let rust_parsed = util.parse_with_default_region(&number_str, &region_str);
+    let rust_parsed = util.parse(&number_str, region);
 
     assert_eq!(
         cpp_res.is_parsed,
@@ -55,10 +76,18 @@ fuzz_target!(|data: (CustomString, CustomString)| {
         );
 
         // ZZ for unknown
-        let rust_region = util.get_region_code_for_number(&rust_num).unwrap_or("ZZ");
-        assert_eq!(cpp_res.region_code, rust_region, "Mismatch on RegionCode");
+        if let Some(region) = region {
+            let rust_region = util
+                .get_region_for_number(&rust_num)
+                .map(|reg| reg.as_region_str());
+            let rust_region_str = rust_region.as_deref().unwrap_or("ZZ");
+            assert_eq!(
+                cpp_res.region_code, rust_region_str,
+                "Mismatch on RegionCode"
+            );
+        }
 
-        let rust_nsn = PHONE_NUMBER_UTIL.get_national_significant_number(&rust_num);
+        let rust_nsn = rust_num.get_national_significant_number();
         assert_eq!(
             cpp_res.nsn,
             rust_nsn.as_ref(),
@@ -94,21 +123,23 @@ fuzz_target!(|data: (CustomString, CustomString)| {
                 "Mismatch on RFC3966 Format"
             );
 
-            let rust_mobile = util
-                .format_number_for_mobile_dialing(&rust_num, &region_str, true)
-                .unwrap_or_default();
-            assert_eq!(
-                cpp_res.format_mobile,
-                rust_mobile.as_ref(),
-                "Mismatch on Mobile Dialing Format"
-            );
+            if let Some(region) = region {
+                let rust_mobile = util
+                    .format_number_for_mobile_dialing(&rust_num, region, true)
+                    .unwrap_or_default();
+                assert_eq!(
+                    cpp_res.format_mobile,
+                    rust_mobile.as_ref(),
+                    "Mismatch on Mobile Dialing Format"
+                );
 
-            let rust_ouc_keepeng_alpha =
-                util.format_out_of_country_keeping_alpha_chars(&rust_num, &region_str);
-            assert_eq!(
-                cpp_res.out_of_country_keeping_alpha, rust_ouc_keepeng_alpha,
-                "Mismatch on Out Of Country Format"
-            );
+                let rust_ouc_keepeng_alpha =
+                    util.format_out_of_country_keeping_alpha_chars(&rust_num, region);
+                assert_eq!(
+                    cpp_res.out_of_country_keeping_alpha, rust_ouc_keepeng_alpha,
+                    "Mismatch on Out Of Country Format"
+                );
+            }
         }
     }
 });

@@ -14,7 +14,7 @@
 // limitations under the License.
 
 #[cfg(all(feature = "lite", not(feature = "regex")))]
-use crate::generated::uniprops_digits_pat;
+use crate::generated::{uniprops_digits_pat, uniprops_separators_pat};
 
 // The minimum and maximum length of the national significant number.
 pub const MIN_LENGTH_FOR_NSN: usize = 2;

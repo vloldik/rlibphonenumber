@@ -31,6 +31,7 @@ pub use generated::proto::phone_number::CountryCodeSource;
 pub use generated::proto::{
     NumberFormat, PhoneMetadata, PhoneMetadataCollection, PhoneNumber, PhoneNumberDesc,
 };
+pub use phonenumberutil::helper_functions::get_national_significant_number_owned;
 
 #[cfg(feature = "global_static")]
 mod phone_ext;

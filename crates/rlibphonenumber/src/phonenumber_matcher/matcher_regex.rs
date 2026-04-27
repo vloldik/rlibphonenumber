@@ -1,4 +1,4 @@
-use regex::Regex;
+use crate::regexp::Regex;
 
 use crate::phonenumberutil::{
     helper_constants::{

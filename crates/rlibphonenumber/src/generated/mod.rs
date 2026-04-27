@@ -37,3 +37,8 @@ pub mod uniprops_currencies {
 pub mod uniprops_digits_pat {
     include!(concat!(env!("OUT_DIR"), "/uniprops_digits_pat.rs"));
 }
+
+#[cfg(all(feature = "lite", not(feature = "regex")))]
+pub mod uniprops_separators_pat {
+    include!(concat!(env!("OUT_DIR"), "/uniprops_separators_pat.rs"));
+}
