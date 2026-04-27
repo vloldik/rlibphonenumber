@@ -17,7 +17,7 @@
     "mounts": [
         "type=volume,source=dind-var-lib-docker,target=/var/lib/docker"
     ],
-    "postCreateCommand": "sudo /usr/local/share/docker-init.sh",
+    "postCreateCommand": "sudo /usr/local/share/docker-init.sh && echo '{}' > ~/.docker/config.json || true && echo 'alias dagger=\"env -u GIT_ASKPASS -u SSH_ASKPASS -u SSH_AUTH_SOCK dagger\"' >> ~/.bashrc && source ~/.bashrc",
     "customizations": {
         "vscode": {
             "settings": {
