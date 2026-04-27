@@ -68,8 +68,8 @@ pub enum GetPrefixArguments<'a> {
     InternationalPrefix(&'a str),
 }
 
-pub struct FormattedNumberBuilder<'a, 'b> {
-    util: &'b PhoneNumberUtilInternal,
+pub struct FormattedNumberBuilder<'a> {
+    util: &'a PhoneNumberUtilInternal,
     leading_zeroes: usize,
     number: &'a PhoneNumber,
     format_nsn_args: FormatNsnArguments<'a>,
@@ -77,10 +77,10 @@ pub struct FormattedNumberBuilder<'a, 'b> {
     ext: PhoneExt<'a>,
 }
 
-pub fn new_formatted_number_builder<'a, 'b>(
-    util: &'b PhoneNumberUtilInternal,
+pub fn new_formatted_number_builder<'a>(
+    util: &'a PhoneNumberUtilInternal,
     number: &'a PhoneNumber,
-) -> FormattedNumberBuilder<'a, 'b> {
+) -> FormattedNumberBuilder<'a> {
     FormattedNumberBuilder {
         util,
         leading_zeroes: if number.italian_leading_zero() {
@@ -95,7 +95,7 @@ pub fn new_formatted_number_builder<'a, 'b>(
     }
 }
 
-impl<'a, 'b> FormattedNumberBuilder<'a, 'b> {
+impl<'a> FormattedNumberBuilder<'a> {
     pub fn with_ext(mut self, ext: PhoneExt<'a>) -> Self {
         self.ext = ext;
         self
