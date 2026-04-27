@@ -74,20 +74,15 @@ pub fn get_number_prefix_by_format_and_calling_code(
     number_format: PhoneNumberFormat,
 ) -> PrefixParts<'_> {
     match number_format {
-        PhoneNumberFormat::E164 => {
-            PrefixParts::Parts2([PLUS_SIGN.into(), country_calling_code.into()])
-        }
+        PhoneNumberFormat::E164 => PrefixParts([PLUS_SIGN, country_calling_code, "", ""], 2),
         PhoneNumberFormat::International => {
-            PrefixParts::Parts3([PLUS_SIGN.into(), country_calling_code.into(), " ".into()])
+            PrefixParts([PLUS_SIGN, country_calling_code, " ", ""], 3)
         }
-        PhoneNumberFormat::RFC3966 => PrefixParts::Parts4([
-            RFC3966_PREFIX.into(),
-            PLUS_SIGN.into(),
-            country_calling_code.into(),
-            "-".into(),
-        ]),
+        PhoneNumberFormat::RFC3966 => {
+            PrefixParts([RFC3966_PREFIX, PLUS_SIGN, country_calling_code, "-"], 4)
+        }
         // here code is already returned
-        PhoneNumberFormat::National => PrefixParts::Empty,
+        PhoneNumberFormat::National => PrefixParts([""; 4], 0),
     }
 }
 
@@ -412,87 +407,81 @@ pub fn get_supported_types_for_metadata(
     types
 }
 
+#[inline]
+fn build_length_mask(lengths: &[i32]) -> u64 {
+    let mut mask = 0u64;
+    for &l in lengths {
+        if l != -1 {
+            mask |= 1 << l;
+        } else {
+            mask = 0;
+        }
+    }
+    mask
+}
+
 /// Helper method to check a number against possible lengths for this number
 /// type, and determine whether it matches, or is too short or too long.
-pub fn test_number_length(
+/// Metadata REQUIRED to have AT MOST 63 possible lengths
+pub(crate) fn test_number_length(
     phone_number: &str,
     phone_metadata: &PhoneMetadataWrapper,
     phone_number_type: PhoneNumberType,
 ) -> Result<NumberLengthType, ValidationError> {
     let desc_for_type = get_number_desc_by_type(phone_metadata, phone_number_type);
-    // There should always be "possibleLengths" set for every element. This is
-    // declared in the XML schema which is verified by
-    // PhoneNumberMetadataSchemaTest. For size efficiency, where a
-    // sub-description (e.g. fixed-line) has the same possibleLengths as the
-    // parent, this is missing, so we fall back to the general desc (where no
-    // numbers of the type exist at all, there is one possible length (-1) which
-    // is guaranteed not to match the length of any real phone number).
-    let mut possible_lengths = if desc_for_type.original.possible_length.is_empty() {
-        phone_metadata.general_desc.original.possible_length.clone()
+    let mut possible_mask = if desc_for_type.original.possible_length.is_empty() {
+        build_length_mask(&phone_metadata.general_desc.original.possible_length)
     } else {
-        desc_for_type.original.possible_length.clone()
+        build_length_mask(&desc_for_type.original.possible_length)
     };
 
-    let mut local_lengths = desc_for_type.original.possible_length_local_only.clone();
+    let mut local_mask = build_length_mask(&desc_for_type.original.possible_length_local_only);
+
     if phone_number_type == PhoneNumberType::FixedLineOrMobile {
         let fixed_line_desc = get_number_desc_by_type(phone_metadata, PhoneNumberType::FixedLine);
         if !desc_has_possible_number_data(fixed_line_desc) {
-            // The rare case has been encountered where no fixedLine data is available
-            // (true for some non-geographical entities), so we just check mobile.
             return test_number_length(phone_number, phone_metadata, PhoneNumberType::Mobile);
         } else {
             let mobile_desc = get_number_desc_by_type(phone_metadata, PhoneNumberType::Mobile);
             if desc_has_possible_number_data(mobile_desc) {
-                // Merge the mobile data in if there was any. Note that when adding the
-                // possible lengths from mobile, we have to again check they aren't
-                // empty since if they are this indicates they are the same as the
-                // general desc and should be obtained from there.
-
-                // RUST NOTE: since merge adds elements to the end of the list, we can do the same
                 let len_to_append = if mobile_desc.original.possible_length.is_empty() {
                     &phone_metadata.general_desc.original.possible_length
                 } else {
                     &mobile_desc.original.possible_length
                 };
-                possible_lengths.extend_from_slice(len_to_append);
-                possible_lengths.sort();
 
-                if local_lengths.is_empty() {
-                    local_lengths = mobile_desc.original.possible_length_local_only.clone();
-                } else {
-                    local_lengths
-                        .extend_from_slice(&mobile_desc.original.possible_length_local_only);
-                    local_lengths.sort();
-                }
+                possible_mask |= build_length_mask(len_to_append);
+                local_mask |= build_length_mask(&mobile_desc.original.possible_length_local_only);
             }
         }
     }
 
-    // If the type is not suported at all (indicated by the possible lengths
-    // containing -1 at this point) we return invalid length.
-    if *possible_lengths.first().unwrap_or(&-1) == -1 {
+    if possible_mask == 0 {
         return Err(ValidationError::InvalidLength);
     }
 
-    let actual_length = phone_number.len() as i32;
-    // This is safe because there is never an overlap beween the possible lengths
-    // and the local-only lengths; this is checked at build time.
-    if local_lengths.contains(&actual_length) {
+    let actual_length = phone_number.len() as u32;
+    if actual_length >= 64 {
+        return Err(ValidationError::TooLong);
+    }
+
+    let actual_length_bit = 1u64 << actual_length;
+    if (local_mask & actual_length_bit) != 0 {
         return Ok(NumberLengthType::IsPossibleLocalOnly);
     }
 
-    // here we can unwrap safe
-    let minimum_length = possible_lengths[0];
+    let minimum_length = possible_mask.trailing_zeros();
+    let maximum_length = 63 - possible_mask.leading_zeros();
 
     if minimum_length == actual_length {
         return Ok(NumberLengthType::IsPossible);
     } else if minimum_length > actual_length {
         return Err(ValidationError::TooShort);
-    } else if possible_lengths[possible_lengths.len() - 1] < actual_length {
+    } else if maximum_length < actual_length {
         return Err(ValidationError::TooLong);
     }
-    // We skip the first element; we've already checked it.
-    if possible_lengths[1..].contains(&actual_length) {
+
+    if (possible_mask & actual_length_bit) != 0 {
         Ok(NumberLengthType::IsPossible)
     } else {
         Err(ValidationError::InvalidLength)

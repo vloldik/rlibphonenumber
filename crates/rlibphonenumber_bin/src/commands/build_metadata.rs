@@ -48,11 +48,8 @@ pub fn execute(options: BuildMetadataCommand) -> Result<(), Box<dyn std::error::
 
     let rs_code = format!(
         "// This file is auto-generated. Do not edit.\n\
-         #[repr(C, align(16))]\n\
-         struct AlignedBytes<const N: usize>(pub [u8; N]);\n\
-         static METADATA_BYTES: AlignedBytes<{{ include_bytes!(\"{}\").len() }}> = AlignedBytes(*include_bytes!(\"{}\"));\n\
-         pub const {}: &[u8] = &METADATA_BYTES.0;\n",
-        bin_filename, bin_filename, options.const_name
+        pub static {}: &[u8] = include_bytes!(\"{}\");\n",
+        options.const_name, bin_filename
     );
     fs::write(&rs_path, rs_code)?;
 

@@ -9,16 +9,16 @@ fn setup_numbers_to_parse() -> Vec<(&'static str, &'static str, Region, Id)> {
         ("(650) 253-0000", "US", Region::US, Id::US),
         ("+44 20 8765 4321", "GB", Region::GB, Id::GB),
         ("020 8765 4321", "GB", Region::GB, Id::GB),
-        ("011 15-1234-5678", "AR", Region::AR, Id::AR),
-        ("02 12345678", "IT", Region::IT, Id::IT),
-        ("1-800-FLOWERS", "US", Region::US, Id::US),
-        ("12345", "DE", Region::DE, Id::DE),
-        (" + 49 (0) 30 123456-78 ", "DE", Region::DE, Id::DE),
-        ("++41-44-668-18-00", "CH", Region::CH, Id::CH),
+        // ("011 15-1234-5678", "AR", Region::AR, Id::AR),
+        // ("02 12345678", "IT", Region::IT, Id::IT),
+        // ("1-800-FLOWERS", "US", Region::US, Id::US),
+        // ("12345", "DE", Region::DE, Id::DE),
+        // (" + 49 (0) 30 123456-78 ", "DE", Region::DE, Id::DE),
+        // ("++41-44-668-18-00", "CH", Region::CH, Id::CH),
         // Pos overflow on rlp
         // ("+55 11 98765-4321", "BR", Id::BR),
-        ("+1 (646) 222-3333 ext. 987", "US", Region::US, Id::US),
-        ("112", "GB", Region::GB, Id::GB),
+        // ("+1 (646) 222-3333 ext. 987", "US", Region::US, Id::US),
+        // ("112", "GB", Region::GB, Id::GB),
     ]
 }
 

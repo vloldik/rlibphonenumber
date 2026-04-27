@@ -45,8 +45,6 @@ pub const VALID_PUNCTUATION: &str = "-x\
 // This corresponds to SECOND_NUMBER_START in the java version.
 pub const CAPTURE_UP_TO_SECOND_NUMBER_START: &str = r"(.*)[\\/] *x";
 
-pub const REGION_CODE_FOR_NON_GEO_ENTITY: &str = "001";
-
 pub const PLUS_SIGN: &str = "+";
 pub const STAR_SIGN: &str = "*";
 pub const RFC3966_EXTN_PREFIX: &str = ";ext=";
