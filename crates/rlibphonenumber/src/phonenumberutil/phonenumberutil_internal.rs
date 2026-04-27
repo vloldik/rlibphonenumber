@@ -1799,8 +1799,8 @@ impl PhoneNumberUtilInternal {
             );
         }
 
-        if let Some(default_region) = default_region
-            && check_region
+        if 
+            check_region
             && !self.check_region_for_parsing(&national_number, default_region)
         {
             trace!("Missing or invalid default country.");
@@ -1964,8 +1964,8 @@ impl PhoneNumberUtilInternal {
     /// the number to parse starts with a + symbol so that we can attempt to infer
     /// the country from the number. Returns false if it cannot use the region
     /// provided and the region cannot be inferred.
-    pub fn check_region_for_parsing(&self, number_to_parse: &str, default_region: Region) -> bool {
-        self.get_metadata_for_region(default_region).is_some()
+    pub fn check_region_for_parsing(&self, number_to_parse: &str, default_region: Option<Region>) -> bool {
+        default_region.is_some_and(|region | self.get_metadata_for_region(region).is_some())
             || number_to_parse.is_empty()
             || self
                 .reg_exps
