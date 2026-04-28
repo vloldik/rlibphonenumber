@@ -1,16 +1,16 @@
-#[cfg(test)]
 mod fuzz_artifacts;
-#[cfg(test)]
+mod matcher_tests;
 mod metadata_tests;
-#[cfg(test)]
 mod phonenumberutil_tests;
 
-#[cfg(test)]
 mod common {
+    use std::sync::Arc;
+
     use prost::Message;
 
     use crate::{
         PhoneMetadataCollection, generated::metadata::TEST_METADATA,
+        phonenumber_matcher::PhoneNumberMatcherFactory,
         phonenumberutil::phonenumberutil_internal::PhoneNumberUtilInternal,
     };
 
@@ -25,6 +25,14 @@ mod common {
 
         let metadata = load_metadata();
         PhoneNumberUtilInternal::new_for_metadata(metadata).unwrap()
+    }
+
+    pub fn get_phone_matcher_factory()
+    -> PhoneNumberMatcherFactory<PhoneNumberUtilInternal, Arc<PhoneNumberUtilInternal>> {
+        PhoneNumberMatcherFactory::new(
+            Arc::new(PhoneNumberUtilInternal::new_for_metadata(load_metadata()).unwrap()),
+            None,
+        )
     }
 
     pub fn load_metadata() -> PhoneMetadataCollection {

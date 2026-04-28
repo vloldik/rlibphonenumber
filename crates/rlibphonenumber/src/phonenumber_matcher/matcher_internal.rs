@@ -203,11 +203,11 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
     /// Helper method to determine if a character is a Latin-script letter or
     /// not.  For our purposes, combining marks should also return `true` since
     /// we assume they have been added to a preceding Latin character.
-    fn is_latin_letter(letter: char) -> bool {
+    pub fn is_latin_letter(letter: char) -> bool {
         uniprops_latin_letters::uniprops::Category::from_char(letter).is_some()
     }
 
-    fn is_invalid_punctuation_symbol(character: char) -> bool {
+    pub fn is_invalid_punctuation_symbol(character: char) -> bool {
         character == '%'
             || uniprops_currencies::uniprops::Category::from_char(character)
                 == Some(uniprops_currencies::uniprops::Category::Sc)
@@ -230,11 +230,7 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
         // Skip potential time-stamps.
         if self.regexps.time_stamps.find(candidate).is_some() {
             let following_text = &self.text[offset + candidate.len()..];
-            if self
-                .regexps
-                .time_stamps_suffix
-                .is_match_at(following_text, 0)
-            {
+            if self.regexps.time_stamps_suffix.is_match(following_text) {
                 return Ok(None);
             }
         }
@@ -275,10 +271,8 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
 
                 if is_first_match {
                     // We should handle any group before this one too.
-                    let before = Self::trim_after_first_match(
-                        |s| s.find(is_unwanted_end_char),
-                        &candidate[..group_m.start()],
-                    );
+                    let before =
+                        candidate[..group_m.start()].trim_end_matches(is_unwanted_end_char);
                     if let Some(result) = self.parse_and_verify(before, offset)? {
                         return Ok(Some(result));
                     }
@@ -292,7 +286,7 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
                     .map(|m| m.as_str())
                     .unwrap_or("");
 
-                let group = Self::trim_after_first_match(|s| s.find(is_unwanted_end_char), group1);
+                let group = group1.trim_end_matches(is_unwanted_end_char);
                 let group_offset =
                     offset + (group1.as_ptr() as usize - candidate.as_ptr() as usize);
 
@@ -334,7 +328,7 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
             // If the candidate is not at the start of the text, and does not
             // start with phone-number punctuation, check the previous
             // character.
-            if offset > 0 && !self.regexps.lead_class.is_match_at(candidate, 0) {
+            if offset > 0 && !self.regexps.lead_class.is_match(candidate) {
                 let Some(previous_char) = self.text[..offset].chars().last() else {
                     return Ok(None);
                 };
@@ -365,7 +359,9 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
         {
             Ok(number) => number,
             Err(InternalError::RegexError(e)) => return Err(InternalError::RegexError(e)),
-            Err(InternalError::Wrapped(_)) => return Ok(None),
+            Err(InternalError::Wrapped(_)) => {
+                return Ok(None);
+            }
         };
         if self.verify_according_to_leniency(&number, candidate)? {
             // We used `parse_and_keep_raw_input` to create this number, but
@@ -601,7 +597,7 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
         Ok(false)
     }
 
-    fn contains_more_than_one_slash_in_national_number(
+    pub fn contains_more_than_one_slash_in_national_number(
         &self,
         number: &PhoneNumber,
         candidate: &str,
@@ -853,5 +849,29 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>> Iterator
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
+    }
+}
+
+impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
+    AsOriginal<PhoneNumberMatcherInternal<'a, U, T>> for PhoneNumberMatcher<'a, U, T>
+{
+    fn as_original(&self) -> &PhoneNumberMatcherInternal<'a, U, T> {
+        &self.inner
+    }
+}
+
+impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
+    AsOriginal<PhoneNumberMatcherInternal<'a, U, T>> for PhoneNUmberMatcherFallible<'a, U, T>
+{
+    fn as_original(&self) -> &PhoneNumberMatcherInternal<'a, U, T> {
+        &self.inner
+    }
+}
+
+impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
+    AsOriginal<PhoneNumberMatcherInternal<'a, U, T>> for PhoneNumberMatcherInternal<'a, U, T>
+{
+    fn as_original(&self) -> &PhoneNumberMatcherInternal<'a, U, T> {
+        self
     }
 }

@@ -42,4 +42,6 @@ pub use crate::phonenumberutil::PHONE_NUMBER_UTIL;
 pub mod serde;
 
 pub use phonenumberutil::phonenumberutil_internal::PhoneNumberUtil;
+
+#[cfg(test)]
 mod tests;

@@ -50,11 +50,11 @@ use crate::PhoneNumber;
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct PhoneNumberMatch<'a> {
     /** The start index into the text. */
-    start: usize,
+    pub start: usize,
     /** The raw substring matched. */
-    raw_string: &'a str,
+    pub raw_string: &'a str,
     /** The matched phone number. */
-    number: PhoneNumber,
+    pub number: PhoneNumber,
 }
 
 impl<'a> PhoneNumberMatch<'a> {

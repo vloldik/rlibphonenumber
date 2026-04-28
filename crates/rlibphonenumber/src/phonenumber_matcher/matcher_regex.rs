@@ -44,18 +44,18 @@ impl MatcherRegex {
 
         let lead_limit = limit(0, 2);
         let punctuation_limit = limit(0, 4);
-        let digit_block_limit = MAX_LENGTH_FOR_NSN + MAX_LENGTH_COUNTRY_CODE;
-        let block_limit = limit(0, digit_block_limit);
+        const DIGIT_BLOCK_LIMIT: usize = MAX_LENGTH_FOR_NSN + MAX_LENGTH_COUNTRY_CODE;
+        let block_limit = limit(0, DIGIT_BLOCK_LIMIT);
 
         let punctuation = format!("[{}]{punctuation_limit}", VALID_PUNCTUATION);
-        let digit_sequence = format!("[{}]{}", DIGITS, limit(1, digit_block_limit));
+        let digit_sequence = format!("[{}]{}", DIGITS, limit(1, DIGIT_BLOCK_LIMIT));
 
         let lead_class_chars = format!("{opening_parens}{}", PLUS_CHARS);
         let lead_class_str = format!("[{lead_class_chars}]");
-        let lead_class = Regex::new(&lead_class_str).unwrap();
+        let lead_class = Regex::new(&format!("^{lead_class_str}")).unwrap();
 
         let pattern = Regex::new(&format!(
-            "(?:{lead_class_str}{punctuation}){lead_limit}\
+            "(?i)(?:{lead_class_str}{punctuation}){lead_limit}\
              {digit_sequence}(?:{punctuation}{digit_sequence}){block_limit}\
              (?:{})?",
             create_extn_pattern(false),
@@ -72,7 +72,7 @@ impl MatcherRegex {
             .unwrap(),
             Regex::new(&format!("[\u{2012}-\u{2015}\u{FF0D}][{}]*(.+)", SEPARATORS)).unwrap(),
             Regex::new(&format!("\\.+[{}]*([^.]+)", SEPARATORS)).unwrap(),
-            Regex::new(&format!("[{}]+([{}]+)", SEPARATORS, SEPARATORS)).unwrap(),
+            Regex::new(&format!("[{}]+([^{}]+)", SEPARATORS, SEPARATORS)).unwrap(),
         ];
 
         Self {
@@ -83,7 +83,7 @@ impl MatcherRegex {
             )
             .unwrap(),
             time_stamps: Regex::new("[12]\\d{3}[-/]?[01]\\d[-/]?[0-3]\\d +[0-2]\\d$").unwrap(),
-            time_stamps_suffix: Regex::new(":[0-5]\\d").unwrap(),
+            time_stamps_suffix: Regex::new("^:[0-5]\\d").unwrap(),
             matching_brackets_full_match,
             inner_matches,
             lead_class,

@@ -24,15 +24,11 @@ pub struct PhoneNumberMatcherFactory<
 impl<U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U> + Clone>
     PhoneNumberMatcherFactory<U, T>
 {
-    pub fn new(
-        phone_util: T,
-        regexps: Arc<MatcherRegex>,
-        formats: Option<Arc<AlternateFormats>>,
-    ) -> Self {
+    pub fn new(phone_util: T, formats: Option<Arc<AlternateFormats>>) -> Self {
         Self {
-            regexps,
             alternate_formats: formats,
             phone_util,
+            regexps: Arc::new(MatcherRegex::new()),
         }
     }
     pub fn create_matcher_fallible<'a>(

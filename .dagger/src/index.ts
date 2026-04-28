@@ -13,8 +13,10 @@ export class Rlibphonenumber {
 
   buildLibphonenumber(
     version: string,
-    re2Version: string = RE2_DEFAULT,
+    re2Version: string | null = RE2_DEFAULT,
+    useRe2 = true,
   ): Container {
+    const re2 = (text: string, orElse: string = '') => useRe2 ? text : orElse
     return this.buildBase()
       .withWorkdir("/tmp")
       .withExec(["git", "clone", "--depth", "1", "--branch", version,
@@ -43,27 +45,13 @@ export class Rlibphonenumber {
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_CXX_FLAGS="-O3 -DNDEBUG" \
         -DCMAKE_CXX_STANDARD=17 \
-        -DUSE_BOOST=OFF -DUSE_RE2=ON -DUSE_ICU_REGEXP=OFF \
+        -DUSE_BOOST=OFF -DUSE_RE2=${re2('ON', 'OFF')} -DUSE_ICU_REGEXP=${re2('OFF', 'ON')} \
         -DCMAKE_INSTALL_PREFIX=/opt/libphonenumber \
         -DCMAKE_INSTALL_LIBDIR=lib \
-        -DCMAKE_PREFIX_PATH=/opt/re2 \
+        ${re2('-DCMAKE_PREFIX_PATH=/opt/re2')} \
         .
       make -j$(nproc) && make install
     `])
-  }
-
-
-  @func()
-  async devSetup(
-    @argument({ defaultPath: '/' }) source: Directory,
-    re2Version: string = RE2_DEFAULT,
-  ): Promise<Directory> {
-    const version = await this.readLock(source)
-    const built = this.buildLibphonenumber(version, re2Version)
-
-    return dag.directory()
-      .withDirectory("re2", built.directory("/opt/re2"))
-      .withDirectory("libphonenumber", built.directory("/opt/libphonenumber"))
   }
 
   @func()
@@ -102,37 +90,37 @@ export class Rlibphonenumber {
   }
 
   @func({ cache: 'never' })
-  async diffTest(
+  async fuzz(
+    variant: string,
     @argument({ defaultPath: '/' }) source: Directory,
     maxTotalTime: number = 60,
     re2Version: string = RE2_DEFAULT,
+    useRe2: boolean = true,
   ): Promise<string> {
     const version = await this.readLock(source)
-    const built = this.buildLibphonenumber(version, re2Version)
+    const built = this.buildLibphonenumber(version, re2Version, useRe2)
+
     const cargoRegistry = dag.cacheVolume("cargo-registry")
     const cargoGit = dag.cacheVolume("cargo-git")
-    const cargoTarget = dag.cacheVolume(`cargo-target-nightly-fuzz-${version}`)
+    const cargoTarget = dag.cacheVolume(`cargo-target-nightly-fuzz`)
 
     const fuzzArgs = maxTotalTime > 0
-      ? ["cargo", "+nightly", "fuzz", "run", "diff-test", "--", `-max_total_time=${maxTotalTime}`]
-      : ["cargo", "+nightly", "fuzz", "run", "diff-test"]
+      ? ["cargo", "+nightly", "fuzz", "run", variant, "--", `-max_total_time=${maxTotalTime}`]
+      : ["cargo", "+nightly", "fuzz", "run", variant]
 
-    const base = this.buildBase()
-
-
-    return this.withPhoneLibs(base, built)
-      .withEnvVariable("DEBIAN_FRONTEND", "noninteractive")
-      .withDirectory("/usr/local/include",
-        built.directory("/opt/libphonenumber/include"))
-      .withDirectory("/usr/local/lib",
-        built.directory("/opt/libphonenumber/lib"))
-      .withExec(["ldconfig"])
+    const baseWithRust = this.buildBase()
       .withExec(["rustup", "toolchain", "install", "nightly", "--no-self-update"])
       .withExec(["cargo", "install", "cargo-fuzz", "--locked"])
+
+    return this.withPhoneLibs(baseWithRust, built)
+      .withEnvVariable("DEBIAN_FRONTEND", "noninteractive")
+      .withDirectory("/usr/local/include", built.directory("/opt/libphonenumber/include"))
+      .withDirectory("/usr/local/lib", built.directory("/opt/libphonenumber/lib"))
+      .withExec(["ldconfig"])
       .withMountedCache("/usr/local/cargo/registry", cargoRegistry)
       .withMountedCache("/usr/local/cargo/git", cargoGit)
-      .withMountedCache("/project/fuzz/target", cargoTarget)
       .withMountedDirectory("/project", source)
+      .withMountedCache("/project/fuzz/target", cargoTarget)
       .withWorkdir("/project")
       .withExec(fuzzArgs)
       .stdout()
@@ -192,8 +180,8 @@ export class Rlibphonenumber {
 
   private withPhoneLibs(ctr: Container, built: Container): Container {
     return ctr
-      .withDirectory("/opt/re2", built.directory("/opt/re2"))
       .withDirectory("/opt/libphonenumber", built.directory("/opt/libphonenumber"))
+      .withDirectory("/opt/re2", built.directory("/opt/re2"))
   }
 
   private async readLock(source: Directory): Promise<string> {

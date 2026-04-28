@@ -1,5 +1,6 @@
 #[cxx::bridge]
 pub mod ffi {
+    #[derive(Debug)]
     struct CppResult {
         is_parsed: bool,
         is_valid: bool,
@@ -16,8 +17,18 @@ pub mod ffi {
         error: String,
     }
 
+    #[derive(Debug)]
+    pub struct MatchResult {
+        pub start: i32,
+        pub end: i32,
+        pub raw_string: String,
+        pub e164: String,
+    }
+
     unsafe extern "C++" {
         include!("cpp/wrapper.h");
         fn test_cpp_impl(number_str: &str, region_str: &str) -> CppResult;
+        fn test_cpp_matcher(number_str: &str, region_str: &str) -> Vec<MatchResult>;
+
     }
 }
