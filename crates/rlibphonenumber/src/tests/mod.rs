@@ -30,7 +30,7 @@ mod common {
 
     pub fn get_phone_matcher_factory()
     -> PhoneNumberMatcherFactory<PhoneNumberUtilInternal, &'static PhoneNumberUtilInternal> {
-        PhoneNumberMatcherFactory::new(&UTIL)
+        PhoneNumberMatcherFactory::new_for_util(&UTIL)
     }
 
     pub fn load_metadata() -> PhoneMetadataCollection {

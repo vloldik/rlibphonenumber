@@ -8,7 +8,7 @@ pub use {
     leniency::Leniency,
     matcher_internal::{PhoneNUmberMatcherFallible, PhoneNumberMatcher},
     phonenumber_match::PhoneNumberMatch,
-    phonenumber_match_factory::PhoneNumberMatcherFactory,
+    phonenumber_match_factory::{MatcherBuilder, PhoneNumberExt, PhoneNumberMatcherFactory},
 };
 
 #[cfg(test)]

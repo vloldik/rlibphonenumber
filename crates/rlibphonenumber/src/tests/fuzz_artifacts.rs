@@ -24,7 +24,7 @@ fn is_valid_number_mismatch() {
 
 #[test]
 fn matcher_number_of_outputs_mismatch() {
-    let factory = PhoneNumberMatcherFactory::new_with_formats(
+    let factory = PhoneNumberMatcherFactory::new_with_for_util_formats(
         Arc::new(PhoneNumberUtil::new().unwrap()),
         None,
     );

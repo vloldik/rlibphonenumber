@@ -29,7 +29,7 @@ impl<'a> Arbitrary<'a> for FuzzText {
 
 static PHONE_NUMBER_MATCHER_FACTORY: LazyLock<
     PhoneNumberMatcherFactory<PhoneNumberUtil, &PhoneNumberUtil>,
-> = LazyLock::new(|| PhoneNumberMatcherFactory::new_with_formats(&PHONE_NUMBER_UTIL, None));
+> = LazyLock::new(|| PhoneNumberMatcherFactory::new());
 
 fuzz_target!(|data: (FuzzText, FuzzText)| {
     let text = data.0.0;
@@ -56,7 +56,7 @@ fuzz_target!(|data: (FuzzText, FuzzText)| {
     let matcher = PHONE_NUMBER_MATCHER_FACTORY.create_matcher(
         &text,
         Leniency::Valid,
-        (i32::MAX.try_into().unwrap()),
+        i32::MAX.try_into().unwrap(),
         region,
     );
     let rust_matches: Vec<_> = matcher.collect();

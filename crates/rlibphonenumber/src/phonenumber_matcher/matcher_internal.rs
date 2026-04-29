@@ -118,7 +118,7 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
     ///   giving up on the text.  This covers degenerate cases where the text
     ///   has many false positives.  Must be `>= 0`.
     #[export]
-    pub fn new(
+    pub fn new_for_util(
         util: T,
         regexps: Arc<MatcherRegex>,
         text: &'a str,
