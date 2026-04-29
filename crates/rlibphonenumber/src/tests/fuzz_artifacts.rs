@@ -3,7 +3,6 @@ use std::sync::Arc;
 use crate::{
     PHONE_NUMBER_UTIL, PhoneNumberUtil, Region,
     phonenumber_matcher::{Leniency, PhoneNumberMatch, PhoneNumberMatcherFactory},
-    tests::common::get_phone_matcher_factory,
 };
 
 #[test]

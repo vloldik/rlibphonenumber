@@ -953,7 +953,7 @@ mod tests {
             assert_eq!(number, extracted);
             assert_eq!(match_.raw_string, extracted);
 
-            // ensure_termination(&text, default_country, leniency);
+            ensure_termination(&text, default_country, leniency);
         }
     }
 

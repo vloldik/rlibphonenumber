@@ -4,7 +4,7 @@ mod metadata_tests;
 mod phonenumberutil_tests;
 
 mod common {
-    use std::sync::{Arc, LazyLock};
+    use std::sync::LazyLock;
 
     use prost::Message;
 
