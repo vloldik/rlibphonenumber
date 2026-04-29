@@ -29,7 +29,7 @@ impl<'a> Arbitrary<'a> for FuzzText {
 
 static PHONE_NUMBER_MATCHER_FACTORY: LazyLock<
     PhoneNumberMatcherFactory<PhoneNumberUtil, &PhoneNumberUtil>,
-> = LazyLock::new(|| PhoneNumberMatcherFactory::new(&PHONE_NUMBER_UTIL, None));
+> = LazyLock::new(|| PhoneNumberMatcherFactory::new_with_formats(&PHONE_NUMBER_UTIL, None));
 
 fuzz_target!(|data: (FuzzText, FuzzText)| {
     let text = data.0.0;
@@ -66,11 +66,12 @@ fuzz_target!(|data: (FuzzText, FuzzText)| {
     assert_eq!(
         rust_matches.len(),
         cpp_matches.len(),
-        "Match count mismatch: rust={}, cpp={} | text='{}', region='{}'",
+        "Match count mismatch: rust={}, cpp={} | text='{}', region='{}', {:?}",
         rust_matches.len(),
         cpp_matches.len(),
         text,
         region_str,
+        cpp_matches
     );
 
     for (i, (rust_m, cpp_m)) in rust_matches.iter().zip(cpp_matches.iter()).enumerate() {

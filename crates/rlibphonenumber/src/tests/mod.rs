@@ -4,7 +4,7 @@ mod metadata_tests;
 mod phonenumberutil_tests;
 
 mod common {
-    use std::sync::Arc;
+    use std::sync::{Arc, LazyLock};
 
     use prost::Message;
 
@@ -15,24 +15,22 @@ mod common {
     };
 
     pub static ONCE: std::sync::Once = std::sync::Once::new();
+    pub static UTIL: LazyLock<PhoneNumberUtilInternal> =
+        LazyLock::new(|| PhoneNumberUtilInternal::new_for_metadata(load_metadata()).unwrap());
 
-    pub fn get_phone_util() -> PhoneNumberUtilInternal {
+    pub fn get_phone_util() -> &'static PhoneNumberUtilInternal {
         ONCE.call_once(|| {
             colog::default_builder()
                 .filter_level(log::LevelFilter::Trace)
                 .init()
         });
 
-        let metadata = load_metadata();
-        PhoneNumberUtilInternal::new_for_metadata(metadata).unwrap()
+        &UTIL
     }
 
     pub fn get_phone_matcher_factory()
-    -> PhoneNumberMatcherFactory<PhoneNumberUtilInternal, Arc<PhoneNumberUtilInternal>> {
-        PhoneNumberMatcherFactory::new(
-            Arc::new(PhoneNumberUtilInternal::new_for_metadata(load_metadata()).unwrap()),
-            None,
-        )
+    -> PhoneNumberMatcherFactory<PhoneNumberUtilInternal, &'static PhoneNumberUtilInternal> {
+        PhoneNumberMatcherFactory::new(&UTIL)
     }
 
     pub fn load_metadata() -> PhoneMetadataCollection {

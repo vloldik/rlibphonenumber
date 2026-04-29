@@ -1,4 +1,3 @@
-mod alternate_formats;
 mod leniency;
 mod matcher_internal;
 mod matcher_regex;
@@ -12,4 +11,5 @@ pub use {
     phonenumber_match_factory::PhoneNumberMatcherFactory,
 };
 
-pub(crate) use matcher_internal::PhoneNumberMatcherInternal;
+#[cfg(test)]
+pub use matcher_internal::PhoneNumberMatcherInternal;

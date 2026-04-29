@@ -23,32 +23,38 @@ use super::{
     helper_constants::PLUS_CHARS,
     helper_constants::{
         DEFAULT_EXTN_PREFIX, MAX_LENGTH_COUNTRY_CODE, MAX_LENGTH_FOR_NSN, MIN_LENGTH_FOR_NSN,
-        NANPA_COUNTRY_CODE, PLUS_SIGN, RFC3966_EXTN_PREFIX,
-        RFC3966_ISDN_SUBADDRESS, RFC3966_PHONE_CONTEXT, RFC3966_PREFIX,
+        NANPA_COUNTRY_CODE, PLUS_SIGN, RFC3966_EXTN_PREFIX, RFC3966_ISDN_SUBADDRESS,
+        RFC3966_PHONE_CONTEXT, RFC3966_PREFIX,
     },
     helper_functions::{
-        self, copy_core_fields_only, get_number_desc_by_type,
-         get_supported_types_for_metadata,
+        self, copy_core_fields_only, get_number_desc_by_type, get_supported_types_for_metadata,
         is_national_number_suffix_of_the_other, load_compiled_metadata, normalize_helper,
         test_number_length, test_number_length_with_unknown_type,
     },
     helper_functions::{get_national_significant_number, is_unwanted_end_char},
     helper_types::PhoneNumberWithCountryCodeSource,
-    helper_types::{new_formatted_number_builder},
+    helper_types::new_formatted_number_builder,
     phone_number_regexps_and_mappings::PhoneNumberRegExpsAndMappings,
     regex_wrapper_types::{
         NumberFormatWrapper, PhoneMetadataWrapper, PhoneNumberDescWrapper, RegexTriplets,
     },
 };
 use crate::{
-    InvalidRegionError, enums::{MatchType, NumberLengthType, PhoneNumberFormat, PhoneNumberType, Region}, errors::{
+    InvalidRegionError,
+    enums::{MatchType, NumberLengthType, PhoneNumberFormat, PhoneNumberType, Region},
+    errors::{
         CreateUtilError, ExtractNumberError, GetExampleNumberError, InternalError,
         InvalidNumberError, NotANumberError, ParseError, ValidationError, unwrap_internal,
         unwrap_internal_infallible,
-    }, generated::{
+    },
+    generated::{
         proto::{PhoneMetadataCollection, PhoneNumber, phone_number::CountryCodeSource},
         uniprops_digits,
-    }, interfaces::AsOriginal, phonenumberutil::helper_types::{FormatNsnArguments, GetPrefixArguments}, regex_based_matcher::RegexBasedMatcher, string_util::strip_cow_prefix
+    },
+    interfaces::AsOriginal,
+    phonenumberutil::helper_types::{FormatNsnArguments, GetPrefixArguments},
+    regex_based_matcher::RegexBasedMatcher,
+    string_util::strip_cow_prefix,
 };
 
 use crate::regexp::Regex;
@@ -100,19 +106,18 @@ pub struct PhoneNumberUtilInternal {
         ret: ParseResult<$t> -> Result<$t, ParseError> => | v | unwrap_internal(v),
         ret: ExampleNumberResult<$t> -> Result<$t, GetExampleNumberError> => | v | unwrap_internal(v),
         ret: MatchResult<$t> -> Result<$t, InvalidNumberError> => | v | unwrap_internal(v),
-        
+
         arg: &str -> impl AsRef<str> => | v | v.as_ref(),
         arg: &'a str -> &'a str => | v | v,
  },
     PhoneNumberUtilFallible {
         ret: Self -> Self => | ret | Self { inner: ret? },
         ret: Result<Self, $err> -> Result<Self, $err> => | v | Ok(Self { inner: v? }),
-        
+
         arg: &str -> impl AsRef<str> => | v | v.as_ref(),
     }
 )]
 impl PhoneNumberUtilInternal {
-
     #[export]
     pub fn new_for_metadata(
         metadata_collection: PhoneMetadataCollection,
@@ -140,8 +145,8 @@ impl PhoneNumberUtilInternal {
             let Some(country_calling_code) = metadata.country_code else {
                 continue;
             };
-            let region = Region::from_code(region)?; 
-            
+            let region = Region::from_code(region)?;
+
             if region == Region::World {
                 instance
                     .country_code_to_non_geographical_metadata_map
@@ -348,8 +353,7 @@ impl PhoneNumberUtilInternal {
             }
         }
         let country_calling_code = phone_number.country_code;
-        let formatted_number_builder =
-            new_formatted_number_builder(self, phone_number)
+        let formatted_number_builder = new_formatted_number_builder(self, phone_number)
             .with_get_prefix_args(GetPrefixArguments::WithFormat(number_format));
 
         if matches!(number_format, PhoneNumberFormat::E164) {
@@ -652,15 +656,18 @@ impl PhoneNumberUtilInternal {
         let country_calling_code = phone_number.country_code;
         // Note GetRegionCodeForCountryCode() is used because formatting information
         // contained in the metadata for US.
-        let formatted_number_builder =
-            new_formatted_number_builder(self, phone_number)
+        let formatted_number_builder = new_formatted_number_builder(self, phone_number)
             .with_get_prefix_args(GetPrefixArguments::WithFormat(number_format));
         let Some(metadata) = self.get_metadata_for_calling_code(country_calling_code) else {
             return Ok(formatted_number_builder.early_exit());
         };
 
         formatted_number_builder
-            .with_format_nsn_args(FormatNsnArguments::WithUserDefinedFormats(metadata, user_defined_formats, number_format))
+            .with_format_nsn_args(FormatNsnArguments::WithUserDefinedFormats(
+                metadata,
+                user_defined_formats,
+                number_format,
+            ))
             .with_ext(Self::get_formatted_extension(
                 phone_number,
                 metadata,
@@ -682,8 +689,7 @@ impl PhoneNumberUtilInternal {
         carrier_code: &str,
     ) -> RegexResult<String> {
         let country_calling_code = phone_number.country_code;
-        let formatted_number_builder =
-            new_formatted_number_builder(self, phone_number);
+        let formatted_number_builder = new_formatted_number_builder(self, phone_number);
 
         // Note GetRegionCodeForCountryCode() is used because formatting information
         // contained in the metadata for US.
@@ -692,7 +698,11 @@ impl PhoneNumberUtilInternal {
         };
 
         let formatted_number = formatted_number_builder
-            .with_format_nsn_args(FormatNsnArguments::WithCarrier(metadata, PhoneNumberFormat::National, carrier_code))
+            .with_format_nsn_args(FormatNsnArguments::WithCarrier(
+                metadata,
+                PhoneNumberFormat::National,
+                carrier_code,
+            ))
             .with_ext(Self::get_formatted_extension(
                 phone_number,
                 metadata,
@@ -1152,17 +1162,22 @@ impl PhoneNumberUtilInternal {
         };
 
         let formatted_number = formatted_number_builder
-            .with_format_nsn_args(FormatNsnArguments::Format(metadata_for_region, PhoneNumberFormat::International))
+            .with_format_nsn_args(FormatNsnArguments::Format(
+                metadata_for_region,
+                PhoneNumberFormat::International,
+            ))
             .with_ext(Self::get_formatted_extension(
                 phone_number,
                 metadata_for_region,
                 PhoneNumberFormat::International,
             ))
-            .with_get_prefix_args(if let Some(international_prefix) = international_prefix_for_formatting {
-                GetPrefixArguments::InternationalPrefix(international_prefix)
-            } else {
-                GetPrefixArguments::WithFormat(PhoneNumberFormat::International)
-            })
+            .with_get_prefix_args(
+                if let Some(international_prefix) = international_prefix_for_formatting {
+                    GetPrefixArguments::InternationalPrefix(international_prefix)
+                } else {
+                    GetPrefixArguments::WithFormat(PhoneNumberFormat::International)
+                },
+            )
             .build()?;
 
         Ok(formatted_number.into())
@@ -1503,11 +1518,13 @@ impl PhoneNumberUtilInternal {
         let (number_no_prefix, _) = self.maybe_strip_extension(&normalized_raw_input);
         let result = new_formatted_number_builder(self, phone_number)
             .with_format_nsn_args(FormatNsnArguments::RawBorrowed(number_no_prefix))
-            .with_get_prefix_args(if let Some(international_prefix) = international_prefix_for_formatting {
-                GetPrefixArguments::InternationalPrefix(international_prefix)
-            } else {
-                GetPrefixArguments::WithFormat(PhoneNumberFormat::International)
-            })
+            .with_get_prefix_args(
+                if let Some(international_prefix) = international_prefix_for_formatting {
+                    GetPrefixArguments::InternationalPrefix(international_prefix)
+                } else {
+                    GetPrefixArguments::WithFormat(PhoneNumberFormat::International)
+                },
+            )
             .with_ext(Self::get_formatted_extension(
                 phone_number,
                 metadata_for_region,
@@ -1606,10 +1623,7 @@ impl PhoneNumberUtilInternal {
     ///
     /// Returns the extracted `Some(possibly empty)`, or a `None` if no
     /// phone-context parameter is found.
-    fn extract_phone_context(
-        number_to_extract_from: &str,
-        index_of_phone_context: usize,
-    ) -> &str {
+    fn extract_phone_context(number_to_extract_from: &str, index_of_phone_context: usize) -> &str {
         let phone_context_start = index_of_phone_context + RFC3966_PHONE_CONTEXT.len();
         // If phone-context parameter is empty
         if phone_context_start >= number_to_extract_from.len() {
@@ -1799,10 +1813,7 @@ impl PhoneNumberUtilInternal {
             );
         }
 
-        if 
-            check_region
-            && !self.check_region_for_parsing(&national_number, default_region)
-        {
+        if check_region && !self.check_region_for_parsing(&national_number, default_region) {
             trace!("Missing or invalid default country.");
             return Err(ParseError::InvalidCountryCode.into());
         }
@@ -1964,8 +1975,12 @@ impl PhoneNumberUtilInternal {
     /// the number to parse starts with a + symbol so that we can attempt to infer
     /// the country from the number. Returns false if it cannot use the region
     /// provided and the region cannot be inferred.
-    pub fn check_region_for_parsing(&self, number_to_parse: &str, default_region: Option<Region>) -> bool {
-        default_region.is_some_and(|region | self.get_metadata_for_region(region).is_some())
+    pub fn check_region_for_parsing(
+        &self,
+        number_to_parse: &str,
+        default_region: Option<Region>,
+    ) -> bool {
+        default_region.is_some_and(|region| self.get_metadata_for_region(region).is_some())
             || number_to_parse.is_empty()
             || self
                 .reg_exps
@@ -2079,7 +2094,7 @@ impl PhoneNumberUtilInternal {
                 strip_cow_prefix(national_number.clone(), default_country_code_string)
             {
                 let general_num_desc = &default_region_metadata.general_desc;
-                let phone_number_and_carrier_code = self
+                let (potential_national_number, _) = self
                     .maybe_strip_national_prefix_and_carrier_code(
                         default_region_metadata,
                         &potential_national_number,
@@ -2087,8 +2102,8 @@ impl PhoneNumberUtilInternal {
                     .map_err(|err| err.translate_internal())?;
 
                 trace!(
-                    "Number without country calling code prefix: {:?}",
-                    phone_number_and_carrier_code
+                    "Number without country calling code prefix: {}",
+                    potential_national_number
                 );
                 // If the number was not valid before but is valid now, or if it was too
                 // long before, we consider the number with the country code stripped to
@@ -2112,7 +2127,7 @@ impl PhoneNumberUtilInternal {
                             .set_country_code_source(CountryCodeSource::FromNumberWithoutPlusSign);
                     }
                     phone_number.country_code = default_country_code;
-                    return Ok(potential_national_number);
+                    return Ok(potential_national_number.into_owned().into());
                 }
             }
         }
@@ -2377,7 +2392,7 @@ impl PhoneNumberUtilInternal {
     /// Normalizes a string of characters representing a phone number. This performs
     /// the following conversions:
     ///   - Punctuation is stripped.
-    ///   
+    ///
     /// For ALPHA/VANITY numbers:
     ///   - Letters are converted to their numeric representation on a telephone
     ///     keypad. The keypad used here is the one defined in ITU Recommendation
@@ -2626,7 +2641,7 @@ impl PhoneNumberUtilInternal {
         // copy so that we can revert to the original string if necessary.
         let transform_rule = metadata.original.national_prefix_transform_rule();
 
-        let captures = possible_national_prefix_pattern.captures(phone_number);
+        let captures = possible_national_prefix_pattern.captures(&phone_number);
         let first_capture = captures.as_ref().and_then(|c| c.get(1));
         let second_capture = captures.as_ref().and_then(|c| c.get(2));
 
@@ -2652,7 +2667,7 @@ impl PhoneNumberUtilInternal {
             // Rust note: There is no known transform rules containing $\d\d
             // But if any appears this should be handled with {} braces: {$\d}\d
             let replaced_number =
-                possible_national_prefix_pattern.replace(phone_number, transform_rule);
+                possible_national_prefix_pattern.replace(&phone_number, transform_rule);
             if is_viable_original_number
                 && !helper_functions::is_match(&self.matcher_api, &replaced_number, general_desc)?
             {
@@ -2678,8 +2693,9 @@ impl PhoneNumberUtilInternal {
             return Ok((stripped_number.into(), carrier_code_temp));
         }
         trace!(
-            "The first digits did not match the national prefix for number '{}'.",
-            phone_number
+            "The first digits did not match the national prefix for number '{}' ({}).",
+            phone_number,
+            possible_national_prefix_pattern.as_str(),
         );
         Ok((phone_number.into(), None))
     }

@@ -1,9 +1,9 @@
 use std::ops::Deref;
 use std::sync::Arc;
 
+use crate::alternate_formats::AlternateFormats;
 use crate::enums::Region;
 use crate::interfaces::AsOriginal;
-use crate::phonenumber_matcher::alternate_formats::AlternateFormats;
 use crate::phonenumber_matcher::leniency::Leniency;
 use crate::phonenumber_matcher::matcher_internal::{
     PhoneNUmberMatcherFallible, PhoneNumberMatcher,
@@ -24,7 +24,11 @@ pub struct PhoneNumberMatcherFactory<
 impl<U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U> + Clone>
     PhoneNumberMatcherFactory<U, T>
 {
-    pub fn new(phone_util: T, formats: Option<Arc<AlternateFormats>>) -> Self {
+    pub fn new(phone_util: T) -> Self {
+        Self::new_with_formats(phone_util, Some(Arc::new(AlternateFormats::new())))
+    }
+
+    pub fn new_with_formats(phone_util: T, formats: Option<Arc<AlternateFormats>>) -> Self {
         Self {
             alternate_formats: formats,
             phone_util,

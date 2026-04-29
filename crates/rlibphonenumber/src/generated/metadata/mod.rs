@@ -13,13 +13,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
+mod alternate_formats;
 #[allow(clippy::module_inception)]
 mod metadata;
 
 #[cfg(test)]
 mod test_metadata;
 
+pub use alternate_formats::ALTERNATE_FORMATS_METADATA;
 pub use metadata::METADATA;
 
 #[cfg(test)]

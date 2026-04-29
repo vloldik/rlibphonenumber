@@ -17,17 +17,18 @@
 use core::str;
 use std::{cell::Cell, convert::Infallible, ops::Deref, sync::Arc};
 
+use log::trace;
 use rlibphonenumbers_macro::{export, public_wrapper};
 
 use crate::{
     CountryCodeSource, PhoneNumber,
+    alternate_formats::AlternateFormats,
     enums::{MatchType, PhoneNumberFormat, Region},
     errors::InternalError,
     generated::{uniprops_currencies, uniprops_latin_letters},
     interfaces::AsOriginal,
     phonenumber_matcher::{
-        alternate_formats::AlternateFormats, leniency::Leniency, matcher_regex::MatcherRegex,
-        phonenumber_match::PhoneNumberMatch,
+        leniency::Leniency, matcher_regex::MatcherRegex, phonenumber_match::PhoneNumberMatch,
     },
     phonenumberutil::{
         helper_functions::{
@@ -157,27 +158,27 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
         let mut pos = index;
 
         while self.max_tries.get() > 0 {
-            let text = self.text;
-            let Some(m) = self.regexps.pattern.find_at(text, pos) else {
+            let Some(m) = self.regexps.pattern.find_at(self.text, pos) else {
                 return Ok(None);
             };
             let start = m.start();
-            let mut candidate = &text[start..m.end()];
+            let mut candidate = m.as_str();
+            trace!("Found candidate: {candidate}, {start}");
 
             // Check for extra numbers at the end.
             // TODO: This is the place to start when trying to support
             // extraction of multiple phone numbers from split notations
             // (+41 79 123 45 67 / 68).
-            candidate = Self::trim_after_first_match(
-                |s| {
-                    self.phone_util()
-                        .reg_exps
-                        .capture_up_to_second_number_start_pattern
-                        .find(s)
-                        .map(|s| s.start())
-                },
-                candidate,
-            );
+            candidate = self
+                .phone_util()
+                .reg_exps
+                .capture_up_to_second_number_start_pattern
+                .captures(candidate)
+                .and_then(|m| m.get(1))
+                .map(|c| c.as_str())
+                .unwrap_or(candidate);
+
+            trace!("Stripped candidate: {candidate}, {start}");
 
             let extract_match = self.extract_match(candidate, start)?;
             if let Some(result) = extract_match {
@@ -189,15 +190,6 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
         }
 
         Ok(None)
-    }
-
-    /// Trims away any characters after the first match of `pattern` in
-    /// `candidate`, returning the trimmed version.
-    fn trim_after_first_match<P: Fn(&str) -> Option<usize>>(pattern: P, candidate: &str) -> &str {
-        match pattern(candidate) {
-            Some(m) => &candidate[..m],
-            None => candidate,
-        }
     }
 
     /// Helper method to determine if a character is a Latin-script letter or
@@ -255,6 +247,7 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
         candidate: &'a str,
         offset: usize,
     ) -> Result<Option<PhoneNumberMatch<'a>>, InternalError<Infallible>> {
+        trace!("Extracting inner match");
         // Clone to satisfy the borrow checker — `inner_matches` is borrowed
         // immutably by the loop while `self` must also be borrowed mutably for
         // the parse calls.
@@ -268,6 +261,7 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
                     Some(m) => m,
                     None => break,
                 };
+                trace!("Found group {}", group_m.as_str());
 
                 if is_first_match {
                     // We should handle any group before this one too.
@@ -276,6 +270,7 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
                     if let Some(result) = self.parse_and_verify(before, offset)? {
                         return Ok(Some(result));
                     }
+                    trace!("Parsed before: {}", before);
                     self.decrement_tries();
                     is_first_match = false;
                 }
@@ -287,6 +282,8 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
                     .unwrap_or("");
 
                 let group = group1.trim_end_matches(is_unwanted_end_char);
+
+                trace!("Found group: {}", group);
                 let group_offset =
                     offset + (group1.as_ptr() as usize - candidate.as_ptr() as usize);
 
@@ -375,6 +372,7 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
             number.preferred_domestic_carrier_code = None;
             return Ok(Some(PhoneNumberMatch::new(offset, candidate, number)));
         }
+        trace!("Failed to verify leniency for number, {number}, {candidate}");
 
         Ok(None)
     }
@@ -456,6 +454,7 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
     ) -> bool {
         let mut candidate_groups = normalized_candidate
             .split(|c: char| !c.is_ascii_digit())
+            .filter(|s| !s.is_empty())
             .rev()
             .peekable();
 
@@ -604,12 +603,12 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
     ) -> bool {
         let first_slash = match candidate.find('/') {
             Some(i) => i,
-            None => return false, // No slashes, this is okay.
+            None => return false,
         };
         // Now look for a second one.
         let second_slash = match candidate[first_slash + 1..].find('/') {
             Some(i) => first_slash + 1 + i,
-            None => return false, // Only one slash, this is okay.
+            None => return false,
         };
 
         // If the first slash is after the country calling code, this is
@@ -624,10 +623,8 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
                 .phone_util()
                 .normalize_digits_only(&candidate[..first_slash]);
             let mut buf = itoa::Buffer::new();
-            let source = number.country_code_source();
-            let source_str = buf.format(source as i32);
-            if digits_before_slash == source_str {
-                // Any more slashes and this is illegal.
+            let cc_str = buf.format(number.country_code);
+            if digits_before_slash == cc_str {
                 return candidate[second_slash + 1..].contains('/');
             }
         }
@@ -707,7 +704,7 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
         // present and that it wasn't just the first-group symbol ($1) with
         // punctuation.
         if let Some(rule) = format_rule
-            && !rule.original.national_prefix_formatting_rule().is_empty()
+            && rule.original.national_prefix_formatting_rule.is_some()
         {
             if rule.original.national_prefix_optional_when_formatting() {
                 // The national-prefix is optional in these cases, so we
@@ -724,11 +721,12 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
             let raw_input_copy = self.phone_util().normalize_digits_only(number.raw_input());
             // Check if we found a national prefix and/or carrier code at
             // the start of the raw input, and return the result.
+
             return Ok(self
                 .phone_util()
                 .maybe_strip_national_prefix_and_carrier_code(metadata, &raw_input_copy)?
-                .1
-                .is_some());
+                .0
+                != raw_input_copy);
         }
         Ok(true)
     }
@@ -764,6 +762,11 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
         phone_number: &PhoneNumber,
         candidate: &str,
     ) -> Result<bool, InternalError<Infallible>> {
+        trace!(
+            "IS POSSIBLE {candidate}, {phone_number}, {:?}",
+            self.phone_util()
+                .is_possible_number_with_reason(phone_number)
+        );
         let is_valid = || {
             Ok::<_, InternalError<Infallible>>(
                 self.phone_util().is_valid_number(phone_number)?
