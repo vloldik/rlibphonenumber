@@ -1,7 +1,5 @@
-use std::sync::Arc;
-
 use crate::{
-    PHONE_NUMBER_UTIL, PhoneNumberUtil, Region,
+    PHONE_NUMBER_UTIL, Region,
     phonenumber_matcher::{Leniency, PhoneNumberMatch, PhoneNumberMatcherFactory},
 };
 
@@ -24,10 +22,7 @@ fn is_valid_number_mismatch() {
 
 #[test]
 fn matcher_number_of_outputs_mismatch() {
-    let factory = PhoneNumberMatcherFactory::new_with_for_util_formats(
-        Arc::new(PhoneNumberUtil::new().unwrap()),
-        None,
-    );
+    let factory = PhoneNumberMatcherFactory::new();
 
     let match_text = |text: &'static str, region| -> Vec<PhoneNumberMatch<'_>> {
         let matcher = factory.create_matcher(text, Leniency::Possible, u64::MAX, region);
@@ -35,11 +30,7 @@ fn matcher_number_of_outputs_mismatch() {
     };
 
     assert_eq!(
-        match_text(
-            "0wJ++6262222XxCwJ++62622226666X8888888888888888880",
-            Some(Region::US)
-        )
-        .len(),
+        match_text("0wJ++6262222XxCwJ++62622226666X8888888888888888880", None).len(),
         1
     );
 }
