@@ -24,6 +24,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         CommandEnum::PhoneInfo(cmd) => {
             commands::phone_info::execute(cmd)?;
         }
+        CommandEnum::ValidateMetadata(cmd) => {
+            commands::validate_metadata::execute(cmd)?;
+        }
     }
 
     Ok(())

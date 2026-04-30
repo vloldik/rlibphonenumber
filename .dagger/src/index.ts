@@ -235,6 +235,7 @@ export class Rlibphonenumber {
                 "resources/PhoneNumberAlternateFormats.xml",
                 "crates/rlibphonenumber/src/generated/metadata",
                 "alternate_formats", "ALTERNATE_FORMATS_METADATA",
+                /* validate as alternate formats */true
             ))
             .withNewFile(
                 "crates/rlibphonenumber/src/generated/metadata/mod.rs",
@@ -247,13 +248,19 @@ export class Rlibphonenumber {
     }
 
     private callCliGenerate(
-        input: string, output: string, name: string, constName: string,
+        input: string, output: string, name: string, constName: string, alternateFormats?: boolean,
     ): string[] {
-        return [
+        let args = [
             "cargo", "run", "-p", "rlibphonenumber_cli",
             "build-metadata",
             input, output, name,
-            "--const-name", constName
+            "--const-name", constName,
+            '-m'
         ]
+        if (alternateFormats) {
+            args.push('--alternate-formats')
+        }
+
+        return args
     }
 }

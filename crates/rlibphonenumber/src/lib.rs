@@ -47,3 +47,5 @@ pub use phonenumberutil::phonenumberutil_internal::PhoneNumberUtil;
 
 #[cfg(test)]
 mod tests;
+
+pub mod metadata_validator;
