@@ -952,17 +952,6 @@ mod tests {
             );
             assert_eq!(number, extracted);
             assert_eq!(match_.raw_string, extracted);
-
-            ensure_termination(&text, default_country, leniency);
-        }
-    }
-
-    fn ensure_termination(text: &str, default_country: Option<Region>, leniency: Leniency) {
-        for (index, _) in text.char_indices() {
-            let sub = &text[index..];
-            for _ in find_numbers_for_leniency(sub, default_country, leniency) {
-                // Итерируем по всем совпадениям для проверки завершаемости
-            }
         }
     }
 

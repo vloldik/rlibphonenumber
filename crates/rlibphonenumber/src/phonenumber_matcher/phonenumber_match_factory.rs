@@ -261,7 +261,7 @@ pub trait PhoneNumberExt {
     ///
     /// # Example
     /// ```rust
-    /// use rlibphonenumber::PhoneNumberExt;
+    /// use rlibphonenumber::phonenumber_matcher::PhoneNumberExt;
     ///
     /// let text = "Call +1 555-0199 for more details.";
     /// for match_result in text.find_phone_numbers() {
@@ -289,8 +289,8 @@ pub trait PhoneNumberExt {
     ///
     /// # Example
     /// ```rust
-    /// use rlibphonenumber::PhoneNumberExt;
-    /// use rlibphonenumber::phonenumber_matcher::leniency::Leniency;
+    /// use rlibphonenumber::phonenumber_matcher::PhoneNumberExt;
+    /// use rlibphonenumber::phonenumber_matcher::Leniency;
     /// use rlibphonenumber::enums::Region;
     ///
     /// let text = "Contact us at 020 7183 8750";
