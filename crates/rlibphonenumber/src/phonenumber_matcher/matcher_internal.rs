@@ -94,7 +94,6 @@ pub struct PhoneNumberMatcherInternal<
 #[public_wrapper(
     PhoneNumberMatcher {
         ret: Self -> Self => | v | Self { inner: v },
-        ret: Result<$t, InternalError<Infallible>> -> $t => | v | unwrap_internal_infallible(v)
     },
 
     PhoneNUmberMatcherFallible {
