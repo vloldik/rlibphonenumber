@@ -1840,7 +1840,11 @@ impl PhoneNumberUtilInternal {
                 &mut temp_number,
             )
             .or_else(|err| {
-                if !matches!(err, InternalError::Wrapped(ParseError::InvalidCountryCode)) {
+                if !matches!(
+                    err,
+                    InternalError::Wrapped(ParseError::InvalidCountryCode)
+                        | InternalError::RegexError(_)
+                ) {
                     return Err(err);
                 }
                 let plus_match = self.reg_exps.plus_chars_pattern_start.find(national_number);
@@ -2805,7 +2809,11 @@ impl PhoneNumberUtilInternal {
                 return self.is_number_match_with_one_string(&first_number_as_proto, second_number);
             }
             Err(err) => {
-                if !matches!(err, InternalError::Wrapped(ParseError::InvalidCountryCode)) {
+                if !matches!(
+                    err,
+                    InternalError::Wrapped(ParseError::InvalidCountryCode)
+                        | InternalError::RegexError(_)
+                ) {
                     return Err(err.translate());
                 }
             }
@@ -2815,7 +2823,11 @@ impl PhoneNumberUtilInternal {
                 self.is_number_match_with_one_string(&second_number_as_proto, first_number)
             }
             Err(err) => {
-                if !matches!(err, InternalError::Wrapped(ParseError::InvalidCountryCode)) {
+                if !matches!(
+                    err,
+                    InternalError::Wrapped(ParseError::InvalidCountryCode)
+                        | InternalError::RegexError(_)
+                ) {
                     return Err(err.translate());
                 }
                 let first_number_as_proto = self
@@ -2849,7 +2861,11 @@ impl PhoneNumberUtilInternal {
                 return Ok(self.is_number_match(first_number, &second_number_as_proto));
             }
             Err(err) => {
-                if !matches!(err, InternalError::Wrapped(ParseError::InvalidCountryCode)) {
+                if !matches!(
+                    err,
+                    InternalError::Wrapped(ParseError::InvalidCountryCode)
+                        | InternalError::RegexError(_)
+                ) {
                     return Err(err.translate());
                 }
             }
