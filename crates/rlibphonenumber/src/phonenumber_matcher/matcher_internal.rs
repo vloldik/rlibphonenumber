@@ -145,12 +145,9 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
         self._phone_util.as_original()
     }
 
-    // ── Private helpers ───────────────────────────────────────────────────────
-
     /// Attempts to find the next subsequence in the searched text on or after
     /// `index` that represents a phone number.  Returns the next match, or
     /// `None` if none was found.
-    #[export]
     fn find(
         &self,
         index: usize,
