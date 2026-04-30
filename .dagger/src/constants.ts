@@ -24,12 +24,15 @@ export const COPYRIGHT_HEADER = `\
 export const RUST_MODULE_CONTENT = `\
 ${COPYRIGHT_HEADER}
 
+mod alternate_formats;
+
 #[allow(clippy::module_inception)]
 mod metadata;
 
 #[cfg(test)]
 mod test_metadata;
 
+pub use alternate_formats::ALTERNATE_FORMATS_METADATA;
 pub use metadata::METADATA;
 
 #[cfg(test)]

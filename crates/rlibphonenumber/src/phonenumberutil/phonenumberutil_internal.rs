@@ -59,7 +59,7 @@ use crate::{
 
 use crate::regexp::Regex;
 use log::{error, trace, warn};
-use rlibphonenumbers_macro::{export, public_wrapper};
+use rlibphonenumber_macro::{export, public_wrapper};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 // Helper type for Result

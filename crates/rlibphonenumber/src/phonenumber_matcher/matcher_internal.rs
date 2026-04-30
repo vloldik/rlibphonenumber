@@ -18,7 +18,7 @@ use core::str;
 use std::{cell::Cell, convert::Infallible, ops::Deref, sync::Arc};
 
 use log::trace;
-use rlibphonenumbers_macro::{export, public_wrapper};
+use rlibphonenumber_macro::{export, public_wrapper};
 
 use crate::{
     CountryCodeSource, PhoneNumber,

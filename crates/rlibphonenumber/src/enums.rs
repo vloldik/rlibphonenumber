@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use rlibphonenumbers_macro::countries_enum;
+use rlibphonenumber_macro::countries_enum;
 use strum::{EnumIter, EnumString};
 
 /// Defines the various standardized formats for representing phone numbers.
