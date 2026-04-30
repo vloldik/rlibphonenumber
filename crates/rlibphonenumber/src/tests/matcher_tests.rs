@@ -6,11 +6,11 @@ mod tests {
             Leniency, PhoneNumberMatch, PhoneNumberMatcher, PhoneNumberMatcherInternal,
         },
         phonenumberutil::phonenumberutil_internal::PhoneNumberUtilInternal,
-        tests::common::{UTIL, get_phone_matcher_factory},
+        tests::common::{get_phone_matcher_factory, get_phone_util},
     };
 
     fn phone_util() -> &'static PhoneNumberUtilInternal {
-        &UTIL
+        get_phone_util()
     }
 
     fn find_numbers(
