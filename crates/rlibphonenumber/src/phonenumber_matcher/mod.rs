@@ -40,5 +40,8 @@ pub use {
     phonenumber_match_factory::{MatcherBuilder, PhoneNumberExt, PhoneNumberMatcherFactory},
 };
 
+#[cfg(feature = "global_static")]
+pub use phonenumber_match_factory::PHONE_MATCHER_FACTORY;
+
 #[cfg(test)]
 pub use matcher_internal::PhoneNumberMatcherInternal;

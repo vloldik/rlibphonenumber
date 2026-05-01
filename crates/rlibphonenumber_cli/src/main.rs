@@ -6,6 +6,7 @@ use crate::commands::CommandEnum;
 
 mod commands;
 mod parser;
+mod sources;
 
 #[derive(FromArgs, Debug)]
 /// rlibphonenumber CLI utility
@@ -27,6 +28,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         CommandEnum::ValidateMetadata(cmd) => {
             commands::validate_metadata::execute(cmd)?;
         }
+        CommandEnum::FindNumbers(cmd) => commands::find_numbers::execute(cmd)?,
     }
 
     Ok(())

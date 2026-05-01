@@ -192,8 +192,8 @@ impl<'a, 'f, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U> + Clon
     ///
     /// The preferred region is used as a fallback for phone numbers that are
     /// found without explicit country codes (e.g., numbers without a `+` prefix).
-    pub fn preferred_region(mut self, region: Region) -> Self {
-        self.preferred_region = Some(region);
+    pub fn preferred_region(mut self, region: impl Into<Option<Region>>) -> Self {
+        self.preferred_region = region.into();
         self
     }
 
@@ -281,7 +281,7 @@ pub trait PhoneNumberExt {
     /// Extracts phone numbers using a preferred region for numbers without country codes.
     fn find_phone_numbers_with_preferred_region(
         &self,
-        region: Region,
+        region: impl Into<Option<Region>>,
     ) -> PhoneNumberMatcher<'_, PhoneNumberUtil, &'static PhoneNumberUtil>;
 
     /// Returns a `MatcherBuilder` to fully configure the matching process directly
@@ -324,7 +324,7 @@ impl PhoneNumberExt for str {
 
     fn find_phone_numbers_with_preferred_region(
         &self,
-        region: Region,
+        region: impl Into<Option<Region>>,
     ) -> PhoneNumberMatcher<'_, PhoneNumberUtil, &'static PhoneNumberUtil> {
         self.phone_number_matcher_builder()
             .preferred_region(region)

@@ -1,5 +1,7 @@
 #![allow(deprecated)]
 
+use crate::sources::Source;
+
 use super::{
     constants::*,
     error::{MetadataError, Result},
@@ -19,12 +21,15 @@ impl MetadataBuilder {
         Self { custom_filter }
     }
 
-    pub fn build_from_file(&self, file_path: &str) -> Result<PhoneMetadataCollection> {
-        let content = std::fs::read_to_string(file_path)?;
-        let is_short_number = file_path.contains("ShortNumberMetadata");
-        let is_alternate_formats = file_path.contains("PhoneNumberAlternateFormats");
-
-        self.build_collection(&content, is_short_number, is_alternate_formats)
+    pub fn build_from_source(
+        &self,
+        source: Source,
+        is_short_number: bool,
+        is_alternate_formats: bool,
+    ) -> Result<PhoneMetadataCollection> {
+        let mut s = String::new();
+        source.read()?.read_to_string(&mut s)?;
+        self.build_collection(&s, is_short_number, is_alternate_formats)
     }
 
     pub fn build_collection(
@@ -255,11 +260,7 @@ impl MetadataBuilder {
 
         let mut has_explicit_intl = false;
 
-        // ОШИБКА БЫЛА ЗДЕСЬ: Раньше мы возвращали Ok(false), если узлов нет.
-        // Но даже если узлов нет, формат должен добавиться в массив как копия национального!
-        if intl_nodes.is_empty() {
-            // Оставляем intl_format точной копией national_format
-        } else {
+        if !intl_nodes.is_empty() {
             intl_format.pattern = node.attribute(PATTERN).unwrap_or("").to_string();
             intl_format.leading_digits_pattern.clear();
             self.set_leading_digits_patterns(node, &mut intl_format)?;

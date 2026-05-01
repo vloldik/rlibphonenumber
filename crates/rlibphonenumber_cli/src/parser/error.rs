@@ -1,7 +1,12 @@
 use thiserror::Error;
 
+use crate::sources;
+
 #[derive(Debug, Error)]
 pub enum MetadataError {
+    #[error("Failed to read from source: {0}")]
+    Source(#[from] sources::SourceReadError),
+
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 

@@ -11,7 +11,11 @@ use crate::parser::{builder::MetadataBuilder, transform_for_rust::transform_for_
 #[argh(subcommand, name = "build-metadata")]
 /// Rust metadata generator for rlibphonenumbers.
 pub struct BuildMetadataCommand {
-    /// input xml file path (e.g., PhoneNumberMetadata.xml)
+    /// input source. Supports:
+    /// - Local file paths (e.g., path/to/file.xml)
+    /// - HTTP/HTTPS URLs (e.g., https://example.com/data.bin)
+    /// - SSH paths (e.g., user@host:/path/to/file)
+    /// - Git repositories (e.g., git://github.com/user/repo.git?file=data.xml&branch=main)
     #[argh(positional)]
     pub input_xml: String,
 
@@ -47,7 +51,11 @@ pub struct BuildMetadataCommand {
 pub fn execute(options: BuildMetadataCommand) -> Result<(), Box<dyn std::error::Error>> {
     let builder = MetadataBuilder::new(options.filter);
 
-    let collection = builder.build_from_file(&options.input_xml)?;
+    let collection = builder.build_from_source(
+        options.input_xml.parse()?,
+        /* short number not supported yet */ false,
+        options.alternate_formats,
+    )?;
     let transformed = transform_for_rust(collection);
 
     if !options.skip_validate {

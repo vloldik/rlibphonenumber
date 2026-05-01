@@ -1,8 +1,11 @@
+use strum::EnumString;
+
 /**
-Leniency when {@linkplain PhoneNumberUtil#findNumbers finding} potential phone numbers in text
+Leniency when findNumbers finding potential phone numbers in text
 segments. The levels here are ordered in increasing strictness.
 */
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, EnumString)]
+#[strum(serialize_all = "snake_case")]
 pub enum Leniency {
     /// Phone numbers accepted are possible, but not necessarily valid.
     Possible = 0,
