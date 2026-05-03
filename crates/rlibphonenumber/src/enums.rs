@@ -134,4 +134,12 @@ pub enum NumberLengthType {
     IsPossibleLocalOnly,
 }
 
+/// Specifies whether to keep raw input, country code source or none of these
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum KeepMetadataType {
+    None,
+    KeepRawInputAndCountryCodeSource,
+    KeepCountryCodeSource,
+}
+
 countries_enum!(Region);

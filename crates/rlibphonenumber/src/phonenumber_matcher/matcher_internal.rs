@@ -295,7 +295,7 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
     }
 
     /// Parses a phone number from `candidate` using
-    /// [`PhoneNumberUtil::parse_and_keep_raw_input`] and verifies it matches
+    /// [`PhoneNumberUtil::parse`] and verifies it matches
     /// the requested [`leniency`].  Returns a [`PhoneNumberMatch`] on success,
     /// or `None` otherwise.
     fn parse_and_verify(
@@ -346,10 +346,12 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
             }
         }
 
-        let number = match self
-            .phone_util()
-            .parse_and_keep_raw_input(candidate, self.preferred_region)
-        {
+        let number = match self.phone_util().parse_helper(
+            candidate,
+            self.preferred_region,
+            crate::KeepMetadataType::KeepCountryCodeSource,
+            true,
+        ) {
             Ok(number) => number,
             Err(InternalError::RegexError(e)) => return Err(InternalError::RegexError(e)),
             Err(InternalError::Wrapped(_)) => {
@@ -357,15 +359,10 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
             }
         };
         if self.verify_according_to_leniency(&number, candidate)? {
-            // We used `parse_and_keep_raw_input` to create this number, but
+            // We used `parse` to create this number, but
             // for now we don't return the extra values parsed.
-            // TODO: stop clearing all values here and switch all users over to
-            // using `raw_input()` rather than the `raw_string()` of
-            // `PhoneNumberMatch`.
             let mut number = number;
             number.country_code_source = None;
-            number.raw_input = None;
-            number.preferred_domestic_carrier_code = None;
             return Ok(Some(PhoneNumberMatch::new(offset, candidate, number)));
         }
         trace!("Failed to verify leniency for number, {number}, {candidate}");
@@ -670,6 +667,7 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
     fn is_national_prefix_present_if_required(
         &self,
         number: &PhoneNumber,
+        candidate: &str,
     ) -> Result<bool, InternalError<Infallible>> {
         // First, check how we deduced the country code.  If it was written in
         // international format, then the national prefix is not required.
@@ -714,7 +712,7 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
                 return Ok(true);
             }
             // Normalize the remainder.
-            let raw_input_copy = self.phone_util().normalize_digits_only(number.raw_input());
+            let raw_input_copy = self.phone_util().normalize_digits_only(candidate);
             // Check if we found a national prefix and/or carrier code at
             // the start of the raw input, and return the result.
 
@@ -767,7 +765,7 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
             Ok::<_, InternalError<Infallible>>(
                 self.phone_util().is_valid_number(phone_number)?
                     && self.contains_only_valid_x_chars(phone_number, candidate)
-                    && self.is_national_prefix_present_if_required(phone_number)?,
+                    && self.is_national_prefix_present_if_required(phone_number, candidate)?,
             )
         };
         let result = match self.leniency {
