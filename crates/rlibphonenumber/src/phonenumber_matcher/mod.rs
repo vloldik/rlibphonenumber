@@ -37,7 +37,7 @@ pub use {
     leniency::Leniency,
     matcher_internal::{PhoneNUmberMatcherFallible, PhoneNumberMatcher},
     phonenumber_match::PhoneNumberMatch,
-    phonenumber_match_factory::{MatcherBuilder, PhoneNumberExt, PhoneNumberMatcherFactory},
+    phonenumber_match_factory::{FindNumberExt, MatcherBuilder, PhoneNumberMatcherFactory},
 };
 
 #[cfg(feature = "global_static")]

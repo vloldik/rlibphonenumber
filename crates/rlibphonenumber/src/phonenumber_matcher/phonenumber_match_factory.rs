@@ -254,7 +254,7 @@ pub static PHONE_MATCHER_FACTORY: LazyLock<
 /// This trait is available when the `global_static` feature is enabled. It provides
 /// convenient methods directly on string types (`&str`, `String`) to find phone numbers
 /// without having to manually instantiate factories or utilities.
-pub trait PhoneNumberExt {
+pub trait FindNumberExt {
     /// Extracts valid phone numbers from the string using default settings.
     ///
     /// Uses `Leniency::Valid` and no preferred region.
@@ -306,7 +306,7 @@ pub trait PhoneNumberExt {
 }
 
 #[cfg(feature = "global_static")]
-impl PhoneNumberExt for str {
+impl FindNumberExt for str {
     fn find_phone_numbers(
         &self,
     ) -> PhoneNumberMatcher<'_, PhoneNumberUtil, &'static PhoneNumberUtil> {

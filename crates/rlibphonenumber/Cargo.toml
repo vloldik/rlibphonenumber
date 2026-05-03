@@ -88,3 +88,7 @@ harness = false
 [[bench]]
 name = "create_bench"
 harness = false
+
+[[bench]]
+name = "matcher_bench"
+harness = false
