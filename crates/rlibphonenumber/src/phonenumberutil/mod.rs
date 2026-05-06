@@ -20,7 +20,9 @@ mod phone_number_regexps_and_mappings;
 pub(super) mod phonenumberutil_internal;
 pub(super) mod regex_wrapper_types;
 
+#[cfg(feature = "global_static")]
 use crate::phonenumberutil::phonenumberutil_internal::PhoneNumberUtil;
+#[cfg(feature = "global_static")]
 use std::sync::LazyLock;
 
 /// Singleton instance of phone number util for general use

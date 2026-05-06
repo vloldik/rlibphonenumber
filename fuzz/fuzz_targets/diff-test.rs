@@ -6,7 +6,7 @@ use libfuzzer_sys::{
 use rlibphonenumber::{PHONE_NUMBER_UTIL, PhoneNumberFormat, Region};
 use rlibphonenumber_fuzz::ffi;
 
-const ALPHABET: &[u8] = b"+0123456789()-=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const ALPHABET: &[u8] = b"+0123456789()-=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ;";
 
 #[derive(Debug)]
 pub struct CustomString(pub String);

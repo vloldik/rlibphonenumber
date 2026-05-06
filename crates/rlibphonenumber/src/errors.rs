@@ -176,13 +176,19 @@ pub enum CreateUtilError {
     Decode(#[from] DecodeError),
 }
 
+pub fn panic_internal(err: InternalError<Infallible>) -> ! {
+    panic!(
+        "A valid regex is expected in metadata; this indicates a library bug: {}",
+        err
+    )
+}
+
 pub fn unwrap_internal<T, E: Debug + Display>(result: Result<T, InternalError<E>>) -> Result<T, E> {
     match result {
         Err(InternalError::Wrapped(err)) => Err(err),
-        Err(InternalError::RegexError(invalid_regex_error)) => panic!(
-            "A valid regex is expected in metadata; this indicates a library bug: {}",
-            invalid_regex_error
-        ),
+        Err(InternalError::RegexError(invalid_regex_error)) => {
+            panic_internal(InternalError::RegexError(invalid_regex_error))
+        }
         Ok(result) => Ok(result),
     }
 }

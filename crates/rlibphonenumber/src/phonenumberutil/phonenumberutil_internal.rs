@@ -1633,7 +1633,10 @@ impl PhoneNumberUtilInternal {
     ///
     /// Returns the extracted `Some(possibly empty)`, or a `None` if no
     /// phone-context parameter is found.
-    fn extract_phone_context(number_to_extract_from: &str, index_of_phone_context: usize) -> &str {
+    pub fn extract_phone_context(
+        number_to_extract_from: &str,
+        index_of_phone_context: usize,
+    ) -> &str {
         let phone_context_start = index_of_phone_context + RFC3966_PHONE_CONTEXT.len();
         // If phone-context parameter is empty
         if phone_context_start >= number_to_extract_from.len() {
@@ -1837,7 +1840,7 @@ impl PhoneNumberUtilInternal {
         let (national_number, extension) = self.maybe_strip_extension(&national_number);
 
         if let Some(extension) = extension {
-            temp_number.extension = Some(extension.to_owned());
+            temp_number.extension = Some(extension.as_str().to_string());
         }
         let mut country_metadata = default_region.and_then(|m| self.get_metadata_for_region(m));
         // Check to see if the number is given in international format so we know
@@ -2007,7 +2010,10 @@ impl PhoneNumberUtilInternal {
     /// Strips any extension (as in, the part of the number dialled after the call is
     /// connected, usually indicated with extn, ext, x or similar) from the end of
     /// the number, and returns stripped number and extension. The number passed in should be non-normalized.
-    pub fn maybe_strip_extension<'a>(&self, phone_number: &'a str) -> (&'a str, Option<&'a str>) {
+    pub fn maybe_strip_extension<'a>(
+        &self,
+        phone_number: &'a str,
+    ) -> (&'a str, Option<crate::regexp::Match<'a>>) {
         let Some(captures) = self.reg_exps.extn_pattern.captures(phone_number) else {
             return (phone_number, None);
         };
@@ -2024,7 +2030,7 @@ impl PhoneNumberUtilInternal {
             return (phone_number, None);
         }
         if let Some(ext) = captures.iter().skip(1).flatten().find(|m| !m.is_empty()) {
-            return (phone_number_no_extn, Some(ext.as_str()));
+            return (phone_number_no_extn, Some(ext));
         }
 
         (phone_number, None)

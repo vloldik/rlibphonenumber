@@ -3639,7 +3639,10 @@ fn maybe_strip_extension() {
     let (number, extension) = phone_util.maybe_strip_extension(number);
     assert!(extension.is_some());
     assert_eq!(stripped_number, number);
-    assert_eq!(expected_extension, extension.unwrap());
+    assert_eq!(
+        expected_extension,
+        extension.map(|ext| ext.as_str()).unwrap()
+    );
 }
 
 #[test]

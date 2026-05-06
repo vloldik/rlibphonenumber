@@ -14,7 +14,8 @@
 // limitations under the License.
 
 use crate::{
-    errors::InvalidRegexError, phonenumberutil::regex_wrapper_types::PhoneNumberDescWrapper,
+    PhoneNumber, errors::InvalidRegexError, phonenumber_mask::Hashed,
+    phonenumberutil::regex_wrapper_types::PhoneNumberDescWrapper,
 };
 
 /// Internal phonenumber matching API used to isolate the underlying
@@ -35,4 +36,43 @@ pub(crate) trait MatcherApi: Send + Sync {
 // Used for wrappers to get common behavior on different wrappers
 pub trait AsOriginal<T> {
     fn as_original(&self) -> &T;
+}
+
+pub trait LenWrite {
+    fn grow(&mut self, len: usize);
+    fn write_all(&mut self, buf: &[u8]) -> std::io::Result<()>;
+}
+
+impl LenWrite for String {
+    fn grow(&mut self, len: usize) {
+        self.reserve_exact(len);
+    }
+
+    fn write_all(&mut self, buf: &[u8]) -> std::io::Result<()> {
+        let s = std::str::from_utf8(buf)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        self.push_str(s);
+        Ok(())
+    }
+}
+
+macro_rules! impl_len_write {
+    ($($t:ty),+) => {
+        $(impl LenWrite for $t {
+            fn grow(&mut self, _: usize) {}
+
+            fn write_all(&mut self, buf: &[u8]) -> std::io::Result<()> {
+                std::io::Write::write_all(self, buf)
+            }
+        })+
+    };
+}
+
+impl_len_write! {
+    ::std::fs::File,
+    ::std::io::Stdout
+}
+
+pub trait PhoneHasher {
+    fn hash_phone(self, phone: &PhoneNumber) -> Option<Hashed>;
 }

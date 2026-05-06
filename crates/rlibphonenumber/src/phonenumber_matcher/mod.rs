@@ -37,11 +37,11 @@ pub use {
     leniency::Leniency,
     matcher_internal::{PhoneNUmberMatcherFallible, PhoneNumberMatcher},
     phonenumber_match::PhoneNumberMatch,
-    phonenumber_match_factory::{FindNumberExt, MatcherBuilder, PhoneNumberMatcherFactory},
+    phonenumber_match_factory::{MatcherBuilder, PhoneNumberMatcherFactory},
 };
 
 #[cfg(feature = "global_static")]
-pub use phonenumber_match_factory::PHONE_MATCHER_FACTORY;
+pub use phonenumber_match_factory::{FindNumberExt, PHONE_MATCHER_FACTORY};
 
 #[cfg(test)]
 pub use matcher_internal::PhoneNumberMatcherInternal;

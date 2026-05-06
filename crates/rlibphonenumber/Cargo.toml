@@ -25,11 +25,15 @@ categories = [
 build = "build/rust_build.rs"
 
 [features]
-default = ["global_static", "regex"]
+default = ["global_static", "regex", "digest", "digest_mac"]
+
+global_static = []
+
 regex = ["dep:regex"]
 lite = ["dep:regex-lite"]
 
-global_static = []
+digest_mac = ["digest", "digest?/mac"]
+digest = ["dep:digest"]
 serde = ["global_static", "dep:serde"]
 
 [lib]
@@ -63,6 +67,8 @@ zeroes_itoa = { path = "../zeroes_itoa", version = "0.1" }
 serde = { workspace = true, optional = true }
 
 rustc-hash = { version = "2.1" }
+
+digest = { version = "0.11", optional = true }
 
 [build-dependencies]
 thiserror = "1.0"

@@ -6,7 +6,7 @@ import {
     func,
     argument,
 } from "@dagger.io/dagger"
-import { JAR, JDK_IMAGE, LOCK_FILE, RE2_DEFAULT, RUST_IMAGE, RUST_MODULE_CONTENT } from "./constants"
+import { LOCK_FILE, RE2_DEFAULT, RUST_IMAGE, RUST_MODULE_CONTENT } from "./constants"
 
 @object()
 export class Rlibphonenumber {
@@ -91,10 +91,9 @@ export class Rlibphonenumber {
         @argument({ defaultPath: '/' }) source: Directory,
         maxTotalTime: number = 60,
         re2Version: string = RE2_DEFAULT,
-        useRe2: boolean = true,
     ): Promise<string> {
         const version = await this.readLock(source)
-        const built = this.buildLibphonenumber(version, re2Version, useRe2)
+        const built = this.buildLibphonenumber(version, re2Version, false /** In fuzz test we use always use ICU because of matcher */)
 
         const cargoRegistry = dag.cacheVolume("cargo-registry")
         const cargoGit = dag.cacheVolume("cargo-git")
@@ -118,6 +117,7 @@ export class Rlibphonenumber {
             .withMountedDirectory("/project", source)
             .withMountedCache("/project/fuzz/target", cargoTarget)
             .withWorkdir("/project")
+            .withEnvVariable("CARGO_PROFILE_RELEASE_LTO", "false")
             .withExec(fuzzArgs)
             .stdout()
     }
@@ -170,7 +170,7 @@ export class Rlibphonenumber {
                 "pkg-config", "libssl-dev",
                 "libprotobuf-dev", "protobuf-compiler",
                 "libicu-dev", "libabsl-dev", "libgtest-dev",
-                "llvm", "clang"
+                "llvm", "clang", "default-jre"
             ])
     }
 

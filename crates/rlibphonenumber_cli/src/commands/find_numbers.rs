@@ -12,10 +12,6 @@ fn parse_leniency(s: &str) -> Result<Leniency, String> {
     Leniency::from_str(s).map_err(|err| err.to_string())
 }
 
-fn parse_region(s: &str) -> Result<Region, String> {
-    Region::from_str(s).map_err(|err| err.to_string())
-}
-
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "find-numbers")]
 /// Extracts and deduplicates phone numbers from a text source using a sliding window.

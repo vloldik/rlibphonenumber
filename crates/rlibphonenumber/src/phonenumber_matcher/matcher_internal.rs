@@ -365,7 +365,7 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
             number.country_code_source = None;
             return Ok(Some(PhoneNumberMatch::new(offset, candidate, number)));
         }
-        trace!("Failed to verify leniency for number, {number}, {candidate}");
+        trace!("Failed to verify leniency for number, {candidate}");
 
         Ok(None)
     }
@@ -757,7 +757,7 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
         candidate: &str,
     ) -> Result<bool, InternalError<Infallible>> {
         trace!(
-            "IS POSSIBLE {candidate}, {phone_number}, {:?}",
+            "IS POSSIBLE {candidate}, {:?}",
             self.phone_util()
                 .is_possible_number_with_reason(phone_number)
         );
