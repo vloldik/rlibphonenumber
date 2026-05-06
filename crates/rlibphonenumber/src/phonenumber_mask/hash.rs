@@ -1,42 +1,52 @@
-use std::hash::{Hash, Hasher};
+use std::hash::{Hash, Hasher as StdHasher};
 
 #[cfg(feature = "digest")]
-use digest::{Digest, OutputSizeUser, Update};
+use digest::{Digest as TraitDigest, OutputSizeUser, Update as TraitUpdate};
 
 #[cfg(feature = "digest_mac")]
-use digest::Mac;
+use digest::Mac as TraitMac;
 
-use crate::phonenumber_mask::Hashed;
-use crate::{PhoneNumber, interfaces::PhoneHasher};
+use crate::phonenumber_mask::Hashed as LocalHashed;
+use crate::{PhoneNumber as LocalPhoneNumber, interfaces::PhoneHasher as TraitPhoneHasher};
 
+/// A wrapper for standard, non-cryptographic Rust Hashers (e.g., `DefaultHasher`, `AHash`).
+///
+/// Output size is always fixed to 8 bytes (`u64`).
 #[repr(transparent)]
-pub struct PhoneStdHasher<T: Hasher>(pub T);
+pub struct PhoneStdHasher<T: StdHasher>(pub T);
 
+/// A wrapper for cryptographic algorithms from the `RustCrypto` ecosystem (e.g., `Sha256`).
 #[cfg(feature = "digest")]
 #[repr(transparent)]
-pub struct PhoneDigestHasher<T: Digest + Update>(pub T);
+pub struct PhoneDigestHasher<T: TraitDigest + TraitUpdate>(pub T);
 
+/// A wrapper for cryptographic Message Authentication Codes (e.g., `Hmac<Sha256>`).
 #[cfg(feature = "digest_mac")]
 #[repr(transparent)]
-pub struct PhoneMacHasher<T: Mac + Update>(pub T);
+pub struct PhoneMacHasher<T: TraitMac + TraitUpdate>(pub T);
 
-impl<T: Hasher> PhoneHasher for PhoneStdHasher<T> {
-    fn hash_phone(mut self, phone: &PhoneNumber) -> Option<Hashed> {
+impl<T: StdHasher> TraitPhoneHasher for PhoneStdHasher<T> {
+    fn hash_phone(mut self, phone: &LocalPhoneNumber) -> Option<LocalHashed> {
         phone.hash(&mut self.0);
-        Hashed::from_slice(&self.0.finish().to_be_bytes())
+        LocalHashed::from_slice(&self.0.finish().to_be_bytes())
     }
 }
 
 #[cfg(feature = "digest")]
-impl<T: Digest + Update> PhoneDigestHasher<T> {
+impl<T: TraitDigest + TraitUpdate> PhoneDigestHasher<T> {
+    /// Initializes a cryptographic digest and immediately applies a salt.
     pub fn new_with_salt(mut digest: T, salt: &[u8]) -> Self {
-        Update::update(&mut digest, salt);
+        TraitUpdate::update(&mut digest, salt);
         Self(digest)
     }
 }
 
+/// Feeds standardized, canonical fields of a phone number into the underlying digest/MAC stream.
+///
+/// This guarantees that visually different string representations of the same logical
+/// number yield the same cryptographic hash.
 #[cfg(feature = "digest")]
-fn feed_phone_bytes(updater: &mut impl Update, phone: &PhoneNumber) {
+fn feed_phone_bytes(updater: &mut impl TraitUpdate, phone: &LocalPhoneNumber) {
     updater.update(&phone.country_code.to_be_bytes());
     updater.update(&phone.national_number.to_be_bytes());
     updater.update(&phone.extension().len().to_be_bytes());
@@ -50,21 +60,21 @@ fn feed_phone_bytes(updater: &mut impl Update, phone: &PhoneNumber) {
 }
 
 #[cfg(feature = "digest")]
-impl<D: Digest + Update> PhoneHasher for PhoneDigestHasher<D> {
-    fn hash_phone(mut self, phone: &PhoneNumber) -> Option<Hashed> {
+impl<D: TraitDigest + TraitUpdate> TraitPhoneHasher for PhoneDigestHasher<D> {
+    fn hash_phone(mut self, phone: &LocalPhoneNumber) -> Option<LocalHashed> {
         if <D as OutputSizeUser>::output_size() > 64 {
             return None;
         }
         feed_phone_bytes(&mut self.0, phone);
         let out = self.0.finalize();
 
-        Hashed::from_slice(out)
+        LocalHashed::from_slice(out)
     }
 }
 
 #[cfg(feature = "digest_mac")]
-impl<M: Mac + Update> PhoneHasher for PhoneMacHasher<M> {
-    fn hash_phone(mut self, phone: &PhoneNumber) -> Option<Hashed> {
+impl<M: TraitMac + TraitUpdate> TraitPhoneHasher for PhoneMacHasher<M> {
+    fn hash_phone(mut self, phone: &LocalPhoneNumber) -> Option<LocalHashed> {
         if <M as OutputSizeUser>::output_size() > 64 {
             return None;
         }
@@ -72,6 +82,6 @@ impl<M: Mac + Update> PhoneHasher for PhoneMacHasher<M> {
         feed_phone_bytes(&mut self.0, phone);
         let out = self.0.finalize();
 
-        Hashed::from_slice(out.as_bytes())
+        LocalHashed::from_slice(out.as_bytes())
     }
 }

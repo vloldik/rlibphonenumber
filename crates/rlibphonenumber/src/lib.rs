@@ -16,7 +16,6 @@
 mod alternate_formats;
 /// This module is automatically generated from /resources/*.proto
 mod generated;
-mod phonenumber_mask;
 mod phonenumberutil;
 mod regex_based_matcher;
 
@@ -50,3 +49,4 @@ pub use phonenumberutil::phonenumberutil_internal::PhoneNumberUtil;
 mod tests;
 
 pub mod metadata_validator;
+pub mod phonenumber_mask;

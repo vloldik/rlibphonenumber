@@ -151,7 +151,7 @@ mod tests {
 
     #[test]
     fn fixed_mask() {
-        let mask = MaskType::Fixed("REDACTED".to_string());
+        let mask = MaskType::Fixed("REDACTED".into());
         let raw_input = "+19181234567";
         let util = get_phone_util();
         let mut writer = AllocationTrackedWriter::new();
