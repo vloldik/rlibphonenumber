@@ -1,11 +1,13 @@
 use std::{char, cmp::min};
 
+#[cfg(feature = "global_static")]
+use crate::PhoneNumberUtil;
 use crate::{
     InternalError, PhoneNumber, PhoneNumberFormat, Region,
     generated::uniprops_digits,
     interfaces::{AsOriginal, LenWrite, OptionalHasher, PhoneHasher},
     panic_internal,
-    phonenumber_mask::{Hashed, MaskDigitsConfig, helper_types},
+    phonenumber_mask::{Hashed, MaskDigitsConfig, MaxHashedLengthExceededError, helper_types},
     phonenumberutil::{
         helper_constants::{PLUS_CHARS, RFC3966_PHONE_CONTEXT},
         phonenumberutil_internal::PhoneNumberUtilInternal,
@@ -252,13 +254,20 @@ impl<U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>> PhoneMaskUtil
     ///
     /// You can supply either an active `PhoneHasher` or `()` to skip the hashing process entirely.
     #[export]
-    pub fn tokenize_to_string(&self, phone: &PhoneNumber, hasher: impl OptionalHasher) -> String {
+    pub fn tokenize_to_string(
+        &self,
+        phone: &PhoneNumber,
+        hasher: impl OptionalHasher,
+    ) -> helper_types::Result<String> {
         let mut writer = String::new();
 
-        self.tokenize(phone, hasher, &mut writer)
-            .expect("In-memory string write should never fail");
+        if let Err(err) = self.tokenize(phone, hasher, &mut writer) {
+            return Err(err
+                .downcast::<MaxHashedLengthExceededError>()
+                .expect("In-memory string write should never fail"));
+        }
 
-        writer
+        Ok(writer)
     }
 
     /// Helper function to zero-allocation convert a `Hashed` buffer into a lowercase hexadecimal string.
@@ -286,5 +295,16 @@ impl<U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>> PhoneMaskUtil
                 uniprops_digits::uniprops::get_digit_value(*c).is_some() || c.is_ascii_alphabetic()
             })
             .count()
+    }
+}
+
+#[cfg(feature = "global_static")]
+impl PhoneMaskUtil<PhoneNumberUtil, &'static PhoneNumberUtil> {
+    pub fn new() -> Self {
+        use crate::PHONE_NUMBER_UTIL;
+
+        Self {
+            inner: PhoneMaskUtilInternal::new_for_util(&PHONE_NUMBER_UTIL),
+        }
     }
 }

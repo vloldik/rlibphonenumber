@@ -11,7 +11,7 @@ use crate::{PhoneNumber, interfaces::PhoneHasher, phonenumber_mask::hash::PhoneS
 /// An error indicating that a cryptographic digest or MAC output exceeded the maximum allowed length.
 ///
 /// The stack-allocated buffer for hashed phone numbers supports up to 64 bytes.
-/// Using a hashing algorithm with a larger output size (e.g., SHA-512) will trigger this error.
+/// Using a hashing algorithm with a larger output size will trigger this error.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error, Hash)]
 #[error("Invalid length: digest must be at most 64 bytes long, got: {0}")]
 pub struct MaxHashedLengthExceededError(pub usize);
