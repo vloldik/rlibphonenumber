@@ -44,6 +44,12 @@ impl<U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>> PhoneMaskUtil
         self.util.as_original()
     }
 
+    /// Masks digits in a raw phone number string and writes the output directly to the provided writer.
+    ///
+    /// This method is memory-efficient and uses a zero-allocation strategy by predicting
+    /// the required capacity and utilizing the `LenWrite` sink.
+    ///
+    /// Extracted extensions (e.g., `;ext=123`) and RFC3966 `phone-context` URIs are fully masked automatically.
     #[export]
     fn mask_digits(
         &self,
@@ -151,6 +157,11 @@ impl<U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>> PhoneMaskUtil
         Ok(())
     }
 
+    /// Generates a semantic XML-like token representing the parsed phone number.
+    ///
+    /// # Hasher Parameter
+    /// * Pass an implementation of `PhoneHasher` to generate and append a cryptographic hash.
+    /// * Pass `()` to omit hashing. The token will only include the country mapping.
     #[export]
     fn tokenize(
         &self,
@@ -163,10 +174,11 @@ impl<U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>> PhoneMaskUtil
         const SEMANTIC_TOKEN_END: &str = "\">";
         const SEMANTIC_TOKEN_DEFAULT_LEN: usize = 16 + 3 + 2;
 
+        // Hash phone if a valid hasher is provided, otherwise evaluate to None
         let hashed = hasher.hash_phone(phone)?;
 
-        let len = if let Some(hashed) = hashed {
-            SEMANTIC_TOKEN_DEFAULT_LEN + SEMANTIC_TOKEN_HASH.len() + hashed.len() * 2
+        let len = if let Some(ref h) = hashed {
+            SEMANTIC_TOKEN_DEFAULT_LEN + SEMANTIC_TOKEN_HASH.len() + h.len() * 2
         } else {
             SEMANTIC_TOKEN_DEFAULT_LEN
         };
@@ -182,16 +194,22 @@ impl<U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>> PhoneMaskUtil
         } else {
             writer.write_all(Region::World.as_region_str().as_bytes())?;
         }
+
         if let Some(hashed) = hashed {
             writer.write_all(SEMANTIC_TOKEN_HASH.as_bytes())?;
             let mut buf = [0; 128];
             writer.write_all(Self::hash_to_hex(&hashed, &mut buf).as_bytes())?;
         }
+
         writer.write_all(SEMANTIC_TOKEN_END.as_bytes())?;
 
         Ok(())
     }
 
+    /// Hashes the given phone number and returns the resulting lowercase hexadecimal string.
+    ///
+    /// Requires a concrete implementation of `PhoneHasher`. Passing `()` is intentionally unsupported
+    /// here, as an explicit hash is requested.
     #[export]
     pub fn hash_number_to_string(
         &self,
@@ -203,6 +221,8 @@ impl<U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>> PhoneMaskUtil
         Ok(Self::hash_to_hex(&hashed, &mut buf).to_string())
     }
 
+    /// Formats the given phone number strictly according to the provided `PhoneNumberFormat`,
+    /// then partially obscures the output based on `MaskDigitsConfig`.
     #[export]
     pub fn format_and_mask(
         &self,
@@ -215,35 +235,34 @@ impl<U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>> PhoneMaskUtil
         Ok(self.mask_digits_to_string(&formatted, config))
     }
 
+    /// A convenience method that masks the digits of a raw phone string and allocates a new `String`.
+    ///
+    /// For memory-sensitive contexts, consider using the `mask_digits` method with a custom sink.
     #[export]
     pub fn mask_digits_to_string(&self, raw_input: &str, config: MaskDigitsConfig) -> String {
         let mut writer = String::new();
 
         self.mask_digits(&raw_input, config, &mut writer)
-            .expect("In-memory write should never fail");
+            .expect("In-memory string write should never fail");
 
         writer
     }
 
+    /// A convenience method that generates a semantic token string and allocates a new `String`.
+    ///
+    /// You can supply either an active `PhoneHasher` or `()` to skip the hashing process entirely.
     #[export]
     pub fn tokenize_to_string(&self, phone: &PhoneNumber, hasher: impl OptionalHasher) -> String {
         let mut writer = String::new();
 
         self.tokenize(phone, hasher, &mut writer)
-            .expect("In-memory write should never fail");
+            .expect("In-memory string write should never fail");
 
         writer
     }
 
-    /// Helper function to convert a `Hashed` instance into a lowercase hexadecimal string.
-    ///
-    /// # Arguments
-    /// * `hashed` - The hashed byte array.
-    /// * `buf` - A mutable reference to a 128-byte array used as a backing buffer.
-    ///
-    /// # Returns
-    /// A string slice referencing the hex-encoded portion of the buffer.
-    pub fn hash_to_hex<'a>(hashed: &Hashed, buf: &'a mut [u8; 128]) -> &'a str {
+    /// Helper function to zero-allocation convert a `Hashed` buffer into a lowercase hexadecimal string.
+    fn hash_to_hex<'a>(hashed: &Hashed, buf: &'a mut [u8; 128]) -> &'a str {
         const HEX_CHARS: &[u8; 16] = b"0123456789abcdef";
         let bytes = hashed.as_slice();
 
@@ -253,13 +272,14 @@ impl<U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>> PhoneMaskUtil
         }
 
         let hex_len = bytes.len() * 2;
-        // SAFETY: The buffer is filled strictly with ASCII characters ('0'-'9' and 'a'-'f').
+
+        // SAFETY: The buffer is populated strictly with predefined ASCII characters ('0'-'9' and 'a'-'f').
         // It is mathematically guaranteed to be valid UTF-8. No original undefined bytes
-        // from the buffer are exposed, because the slice is bounded by `hex_len`.
+        // from the buffer are exposed, because the slice is bounded precisely by `hex_len`.
         unsafe { std::str::from_utf8_unchecked(&buf[..hex_len]) }
     }
 
-    /// Counts the number of recognizable digits and alphabetic characters (vanity numbers) in a string.
+    /// Counts the number of recognizable digits and alphabetic characters (e.g. vanity numbers) in a string.
     fn count_digits(s: &str) -> usize {
         s.chars()
             .filter(|c| {

@@ -1,4 +1,3 @@
-mod fuzz_artifacts;
 mod mask_tests;
 mod matcher_tests;
 mod metadata_tests;

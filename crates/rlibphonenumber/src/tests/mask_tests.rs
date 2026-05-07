@@ -237,7 +237,7 @@ mod tests {
 
         let min_slice = [0x00; 0];
         let hash_min = Hashed::from_slice(&min_slice).unwrap();
-        assert_eq!(hash_min.as_slice(), &[]);
+        assert_eq!(hash_min.as_slice(), &[] as &[u8]);
 
         let mid_slice = b"hello_world";
         let hash_mid = Hashed::from_slice(mid_slice).unwrap();
