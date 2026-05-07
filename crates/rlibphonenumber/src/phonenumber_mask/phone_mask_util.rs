@@ -21,14 +21,14 @@ pub struct PhoneMaskUtilInternal<U: AsOriginal<PhoneNumberUtilInternal>, T: Dere
 }
 
 #[public_wrapper(
-    MaskUtil {
+    PhoneMaskUtil {
         ret: Self -> Self => | v | Self { inner: v },
         ret: Result<String, InternalError<std::convert::Infallible>> -> String => | v | {
             v.map_err(panic_internal).unwrap_or_else(| err | match err {})
         }
     },
 
-    MaskUtilFallible {
+    PhoneMaskUtilFallible {
         ret: Self -> Self => | v | Self { inner: v },
     }
 )]

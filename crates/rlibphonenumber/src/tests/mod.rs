@@ -10,8 +10,8 @@ mod common {
     use prost::Message;
 
     use crate::{
-        PhoneMetadataCollection, generated::metadata::TEST_METADATA, phonenumber_mask::MaskUtil,
-        phonenumber_matcher::PhoneNumberMatcherFactory,
+        PhoneMetadataCollection, generated::metadata::TEST_METADATA,
+        phonenumber_mask::PhoneMaskUtil, phonenumber_matcher::PhoneNumberMatcherFactory,
         phonenumberutil::phonenumberutil_internal::PhoneNumberUtilInternal,
     };
 
@@ -20,8 +20,8 @@ mod common {
         LazyLock::new(|| PhoneNumberUtilInternal::new_for_metadata(load_metadata()).unwrap());
 
     pub fn get_phone_mask_util()
-    -> MaskUtil<PhoneNumberUtilInternal, &'static PhoneNumberUtilInternal> {
-        MaskUtil::new_for_util(get_phone_util())
+    -> PhoneMaskUtil<PhoneNumberUtilInternal, &'static PhoneNumberUtilInternal> {
+        PhoneMaskUtil::new_for_util(get_phone_util())
     }
 
     pub fn get_phone_util() -> &'static PhoneNumberUtilInternal {
