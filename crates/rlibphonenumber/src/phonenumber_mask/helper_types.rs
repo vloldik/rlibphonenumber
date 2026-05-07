@@ -6,7 +6,11 @@ use digest::Mac;
 use digest::{Digest, Update};
 use thiserror::Error;
 
-use crate::{PhoneNumber, interfaces::PhoneHasher, phonenumber_mask::hash::PhoneStdHasher};
+use crate::{
+    PhoneNumber,
+    interfaces::{LenWrite, PhoneHasher},
+    phonenumber_mask::hash::PhoneStdHasher,
+};
 
 /// An error indicating that a cryptographic digest or MAC output exceeded the maximum allowed length.
 ///
@@ -21,6 +25,10 @@ impl From<MaxHashedLengthExceededError> for std::io::Error {
         std::io::Error::new(ErrorKind::InvalidData, value)
     }
 }
+
+#[repr(transparent)]
+#[derive(Debug, Clone)]
+pub struct LenWriteString(String);
 
 /// A specialized `Result` type for phone number hashing operations.
 pub type Result<T> = std::result::Result<T, MaxHashedLengthExceededError>;
@@ -175,3 +183,29 @@ impl AsRef<[u8]> for Hashed {
         self.as_slice()
     }
 }
+
+impl LenWrite for LenWriteString {
+    fn grow(&mut self, len: usize) {
+        self.0.reserve_exact(len);
+    }
+
+    fn write_all(&mut self, buf: &[u8]) -> std::io::Result<()> {
+        let s = std::str::from_utf8(buf)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        self.0.push_str(s);
+        Ok(())
+    }
+}
+
+impl From<LenWriteString> for String {
+    fn from(value: LenWriteString) -> Self {
+        value.0
+    }
+}
+
+impl LenWriteString {
+    pub fn new() -> Self {
+        Self(String::new())
+    }
+}
+

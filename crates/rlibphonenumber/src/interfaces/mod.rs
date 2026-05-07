@@ -13,6 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::io::Write;
+
 use crate::{
     PhoneNumber,
     errors::InvalidRegexError,
@@ -45,34 +47,12 @@ pub trait LenWrite {
     fn write_all(&mut self, buf: &[u8]) -> std::io::Result<()>;
 }
 
-impl LenWrite for String {
-    fn grow(&mut self, len: usize) {
-        self.reserve_exact(len);
-    }
+impl<T: Write> LenWrite for T {
+    fn grow(&mut self, _: usize) {}
 
     fn write_all(&mut self, buf: &[u8]) -> std::io::Result<()> {
-        let s = std::str::from_utf8(buf)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        self.push_str(s);
-        Ok(())
+        self.write_all(buf)
     }
-}
-
-macro_rules! impl_len_write {
-    ($($t:ty),+) => {
-        $(impl LenWrite for $t {
-            fn grow(&mut self, _: usize) {}
-
-            fn write_all(&mut self, buf: &[u8]) -> std::io::Result<()> {
-                std::io::Write::write_all(self, buf)
-            }
-        })+
-    };
-}
-
-impl_len_write! {
-    ::std::fs::File,
-    ::std::io::Stdout
 }
 
 pub trait PhoneHasher {

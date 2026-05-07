@@ -7,7 +7,10 @@ use crate::{
     generated::uniprops_digits,
     interfaces::{AsOriginal, LenWrite, OptionalHasher, PhoneHasher},
     panic_internal,
-    phonenumber_mask::{Hashed, MaskDigitsConfig, MaxHashedLengthExceededError, helper_types},
+    phonenumber_mask::{
+        Hashed, MaskDigitsConfig, MaxHashedLengthExceededError,
+        helper_types::{self, LenWriteString},
+    },
     phonenumberutil::{
         helper_constants::{PLUS_CHARS, RFC3966_PHONE_CONTEXT},
         phonenumberutil_internal::PhoneNumberUtilInternal,
@@ -242,12 +245,12 @@ impl<U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>> PhoneMaskUtil
     /// For memory-sensitive contexts, consider using the `mask_digits` method with a custom sink.
     #[export]
     pub fn mask_digits_to_string(&self, raw_input: &str, config: MaskDigitsConfig) -> String {
-        let mut writer = String::new();
+        let mut writer = LenWriteString::new();
 
         self.mask_digits(&raw_input, config, &mut writer)
             .expect("In-memory string write should never fail");
 
-        writer
+        writer.into()
     }
 
     /// A convenience method that generates a semantic token string and allocates a new `String`.
@@ -259,7 +262,7 @@ impl<U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>> PhoneMaskUtil
         phone: &PhoneNumber,
         hasher: impl OptionalHasher,
     ) -> helper_types::Result<String> {
-        let mut writer = String::new();
+        let mut writer = LenWriteString::new();
 
         if let Err(err) = self.tokenize(phone, hasher, &mut writer) {
             return Err(err
@@ -267,7 +270,7 @@ impl<U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>> PhoneMaskUtil
                 .expect("In-memory string write should never fail"));
         }
 
-        Ok(writer)
+        Ok(writer.into())
     }
 
     /// Helper function to zero-allocation convert a `Hashed` buffer into a lowercase hexadecimal string.
