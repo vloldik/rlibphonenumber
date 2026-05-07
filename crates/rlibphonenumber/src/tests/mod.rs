@@ -10,7 +10,7 @@ mod common {
     use prost::Message;
 
     use crate::{
-        PhoneMetadataCollection, generated::metadata::TEST_METADATA,
+        PhoneMetadataCollection, generated::metadata::TEST_METADATA, phonenumber_mask::MaskUtil,
         phonenumber_matcher::PhoneNumberMatcherFactory,
         phonenumberutil::phonenumberutil_internal::PhoneNumberUtilInternal,
     };
@@ -18,6 +18,11 @@ mod common {
     pub static ONCE: std::sync::Once = std::sync::Once::new();
     static UTIL: LazyLock<PhoneNumberUtilInternal> =
         LazyLock::new(|| PhoneNumberUtilInternal::new_for_metadata(load_metadata()).unwrap());
+
+    pub fn get_phone_mask_util()
+    -> MaskUtil<PhoneNumberUtilInternal, &'static PhoneNumberUtilInternal> {
+        MaskUtil::new_for_util(get_phone_util())
+    }
 
     pub fn get_phone_util() -> &'static PhoneNumberUtilInternal {
         ONCE.call_once(|| {

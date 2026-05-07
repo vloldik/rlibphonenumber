@@ -1,13 +1,15 @@
 use std::hash::{Hash, Hasher as StdHasher};
 
 #[cfg(feature = "digest")]
-use digest::{Digest as TraitDigest, OutputSizeUser, Update as TraitUpdate};
+use digest::{Digest as TraitDigest, Update as TraitUpdate};
 
 #[cfg(feature = "digest_mac")]
 use digest::Mac as TraitMac;
 
-use crate::phonenumber_mask::Hashed as LocalHashed;
+#[cfg(feature = "digest_mac")]
+use crate::phonenumber_mask::helper_types;
 use crate::{PhoneNumber as LocalPhoneNumber, interfaces::PhoneHasher as TraitPhoneHasher};
+use crate::{interfaces::OptionalHasher, phonenumber_mask::Hashed as LocalHashed};
 
 /// A wrapper for standard, non-cryptographic Rust Hashers (e.g., `DefaultHasher`, `AHash`).
 ///
@@ -26,7 +28,7 @@ pub struct PhoneDigestHasher<T: TraitDigest + TraitUpdate>(pub T);
 pub struct PhoneMacHasher<T: TraitMac + TraitUpdate>(pub T);
 
 impl<T: StdHasher> TraitPhoneHasher for PhoneStdHasher<T> {
-    fn hash_phone(mut self, phone: &LocalPhoneNumber) -> Option<LocalHashed> {
+    fn hash_phone(mut self, phone: &LocalPhoneNumber) -> helper_types::Result<LocalHashed> {
         phone.hash(&mut self.0);
         LocalHashed::from_slice(&self.0.finish().to_be_bytes())
     }
@@ -61,10 +63,7 @@ fn feed_phone_bytes(updater: &mut impl TraitUpdate, phone: &LocalPhoneNumber) {
 
 #[cfg(feature = "digest")]
 impl<D: TraitDigest + TraitUpdate> TraitPhoneHasher for PhoneDigestHasher<D> {
-    fn hash_phone(mut self, phone: &LocalPhoneNumber) -> Option<LocalHashed> {
-        if <D as OutputSizeUser>::output_size() > 64 {
-            return None;
-        }
+    fn hash_phone(mut self, phone: &LocalPhoneNumber) -> helper_types::Result<LocalHashed> {
         feed_phone_bytes(&mut self.0, phone);
         let out = self.0.finalize();
 
@@ -74,14 +73,16 @@ impl<D: TraitDigest + TraitUpdate> TraitPhoneHasher for PhoneDigestHasher<D> {
 
 #[cfg(feature = "digest_mac")]
 impl<M: TraitMac + TraitUpdate> TraitPhoneHasher for PhoneMacHasher<M> {
-    fn hash_phone(mut self, phone: &LocalPhoneNumber) -> Option<LocalHashed> {
-        if <M as OutputSizeUser>::output_size() > 64 {
-            return None;
-        }
-
+    fn hash_phone(mut self, phone: &LocalPhoneNumber) -> helper_types::Result<LocalHashed> {
         feed_phone_bytes(&mut self.0, phone);
         let out = self.0.finalize();
 
-        LocalHashed::from_slice(out.as_bytes())
+        LocalHashed::from_slice(&out.as_bytes())
+    }
+}
+
+impl OptionalHasher for () {
+    fn hash_phone(self, _: &LocalPhoneNumber) -> helper_types::Result<Option<LocalHashed>> {
+        Ok(None)
     }
 }

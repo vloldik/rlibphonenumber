@@ -14,7 +14,9 @@
 // limitations under the License.
 
 use crate::{
-    PhoneNumber, errors::InvalidRegexError, phonenumber_mask::Hashed,
+    PhoneNumber,
+    errors::InvalidRegexError,
+    phonenumber_mask::{self, Hashed},
     phonenumberutil::regex_wrapper_types::PhoneNumberDescWrapper,
 };
 
@@ -74,5 +76,15 @@ impl_len_write! {
 }
 
 pub trait PhoneHasher {
-    fn hash_phone(self, phone: &PhoneNumber) -> Option<Hashed>;
+    fn hash_phone(self, phone: &PhoneNumber) -> phonenumber_mask::Result<Hashed>;
+}
+
+pub trait OptionalHasher {
+    fn hash_phone(self, phone: &PhoneNumber) -> phonenumber_mask::Result<Option<Hashed>>;
+}
+
+impl<T: PhoneHasher> OptionalHasher for T {
+    fn hash_phone(self, phone: &PhoneNumber) -> phonenumber_mask::Result<Option<Hashed>> {
+        Ok(Some(PhoneHasher::hash_phone(self, phone)?))
+    }
 }

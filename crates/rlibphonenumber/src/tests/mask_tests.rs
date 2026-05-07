@@ -3,10 +3,12 @@ mod tests {
     use std::hash::{DefaultHasher, Hash, Hasher};
 
     use crate::{
-        Region,
+        PhoneNumber,
         interfaces::{LenWrite, PhoneHasher},
-        phonenumber_mask::{Hashed, MaskDigitsConfig, MaskType, PhoneStdHasher, mask_number},
-        tests::common::get_phone_util,
+        phonenumber_mask::{
+            self, Hashed, MaskDigitsConfig, MaxHashedLengthExceededError, PhoneStdHasher,
+        },
+        tests::common::{get_phone_mask_util, get_phone_util},
     };
 
     struct AllocationTrackedWriter {
@@ -54,74 +56,91 @@ mod tests {
         }
     }
 
+    struct FakeHasher {
+        hash: Vec<u8>,
+    }
+
+    impl PhoneHasher for FakeHasher {
+        fn hash_phone(self, _phone: &PhoneNumber) -> phonenumber_mask::Result<Hashed> {
+            Hashed::from_slice(&self.hash)
+        }
+    }
+
     #[test]
     fn normal_local_keep_last() {
-        let mask = MaskType::MaskDigits(MaskDigitsConfig::default());
+        let mask = MaskDigitsConfig::default();
         let raw_input = "123-4567";
-        let util = get_phone_util();
         let mut writer = AllocationTrackedWriter::new();
-        mask_number(util, raw_input, &mask, &mut writer).expect("Failed to mask");
+        get_phone_mask_util()
+            .mask_digits(raw_input, mask, &mut writer)
+            .expect("Failed to mask");
         assert_eq!(writer.into_inner(), "***-4567");
     }
 
     #[test]
     fn normal_intl_keep_last() {
-        let mask = MaskType::MaskDigits(MaskDigitsConfig::default());
+        let mask = MaskDigitsConfig::default();
         let raw_input = "+1 (918) 123-4567";
-        let util = get_phone_util();
         let mut writer = AllocationTrackedWriter::new();
-        mask_number(util, raw_input, &mask, &mut writer).expect("Failed to mask");
+        get_phone_mask_util()
+            .mask_digits(raw_input, mask, &mut writer)
+            .expect("Failed to mask");
         assert_eq!(writer.into_inner(), "+* (***) ***-4567");
     }
 
     #[test]
     fn normal_intl_mask_all() {
-        let mask = MaskType::MaskDigits(MaskDigitsConfig::new('*', false));
+        let mask = MaskDigitsConfig::new('*', 100, 0);
         let raw_input = "+1 918 123-4567";
-        let util = get_phone_util();
         let mut writer = AllocationTrackedWriter::new();
-        mask_number(util, raw_input, &mask, &mut writer).expect("Failed to mask");
+        get_phone_mask_util()
+            .mask_digits(raw_input, mask, &mut writer)
+            .expect("Failed to mask");
         assert_eq!(writer.into_inner(), "+* *** ***-****");
     }
 
     #[test]
     fn edge_short_number() {
-        let mask = MaskType::MaskDigits(MaskDigitsConfig::default());
+        let mask = MaskDigitsConfig::default();
         let raw_input = "911";
-        let util = get_phone_util();
         let mut writer = AllocationTrackedWriter::new();
-        mask_number(util, raw_input, &mask, &mut writer).expect("Failed to mask");
+        get_phone_mask_util()
+            .mask_digits(raw_input, mask, &mut writer)
+            .expect("Failed to mask");
         assert_eq!(writer.into_inner(), "***");
     }
 
     #[test]
     fn edge_exactly_seven_digits() {
-        let mask = MaskType::MaskDigits(MaskDigitsConfig::default());
+        let mask = MaskDigitsConfig::default();
         let raw_input = "1234567";
-        let util = get_phone_util();
         let mut writer = AllocationTrackedWriter::new();
-        mask_number(util, raw_input, &mask, &mut writer).expect("Failed to mask");
+        get_phone_mask_util()
+            .mask_digits(raw_input, mask, &mut writer)
+            .expect("Failed to mask");
         assert_eq!(writer.into_inner(), "***4567");
     }
 
     #[test]
     fn edge_no_digits() {
-        let mask = MaskType::MaskDigits(MaskDigitsConfig::default());
+        let mask = MaskDigitsConfig::default();
         let raw_input = "+1-123-FLOWERS";
-        let util = get_phone_util();
         let mut writer = AllocationTrackedWriter::new();
-        mask_number(util, raw_input, &mask, &mut writer).expect("Failed to mask");
+        get_phone_mask_util()
+            .mask_digits(raw_input, mask, &mut writer)
+            .expect("Failed to mask");
         // Letters are masked because they map to numbers
         assert_eq!(writer.into_inner(), "+*-***-***WERS");
     }
 
     #[test]
     fn format_preserve_ext_and_context() {
-        let mask = MaskType::MaskDigits(MaskDigitsConfig::default());
+        let mask = MaskDigitsConfig::default();
         let raw_input = "tel:863-1234;phone-context=+1-918;ext=123";
-        let util = get_phone_util();
         let mut writer = AllocationTrackedWriter::new();
-        mask_number(util, raw_input, &mask, &mut writer).expect("Failed to mask");
+        get_phone_mask_util()
+            .mask_digits(raw_input, mask, &mut writer)
+            .expect("Failed to mask");
         // Context and extension must be masked entirely
         assert_eq!(
             writer.into_inner(),
@@ -131,71 +150,64 @@ mod tests {
 
     #[test]
     fn unicode_cyrillic_mask() {
-        let mask = MaskType::MaskDigits(MaskDigitsConfig::new('Ж', true));
+        let mask = MaskDigitsConfig::new('Ж', 3, 4);
         let raw_input = "123-4567";
-        let util = get_phone_util();
         let mut writer = AllocationTrackedWriter::new();
-        mask_number(util, raw_input, &mask, &mut writer).expect("Failed to mask");
+        get_phone_mask_util()
+            .mask_digits(raw_input, mask, &mut writer)
+            .expect("Failed to mask");
         assert_eq!(writer.into_inner(), "ЖЖЖ-4567");
     }
 
     #[test]
     fn unicode_emoji_mask() {
-        let mask = MaskType::MaskDigits(MaskDigitsConfig::new('🔒', true));
+        let mask = MaskDigitsConfig::new('🔒', 3, 4);
         let raw_input = "+1 918 123-4567";
-        let util = get_phone_util();
         let mut writer = AllocationTrackedWriter::new();
-        mask_number(util, raw_input, &mask, &mut writer).expect("Failed to mask");
+        get_phone_mask_util()
+            .mask_digits(raw_input, mask, &mut writer)
+            .expect("Failed to mask");
         assert_eq!(writer.into_inner(), "+🔒 🔒🔒🔒 🔒🔒🔒-4567");
     }
 
     #[test]
-    fn fixed_mask() {
-        let mask = MaskType::Fixed("REDACTED".into());
-        let raw_input = "+19181234567";
-        let util = get_phone_util();
-        let mut writer = AllocationTrackedWriter::new();
-        mask_number(util, raw_input, &mask, &mut writer).expect("Failed to mask");
-        assert_eq!(writer.into_inner(), "REDACTED");
-    }
-
-    #[test]
     fn semantic_token_no_hash() {
-        let mask = MaskType::SemanticToken {
-            region: Some(Region::US),
-            add_hash: None,
-        };
         let raw_input = "+19181234567";
         let util = get_phone_util();
+        let phone = util.parse(raw_input, None).unwrap();
         let mut writer = AllocationTrackedWriter::new();
-        mask_number(util, raw_input, &mask, &mut writer).expect("Failed to mask");
+
+        get_phone_mask_util()
+            .tokenize(&phone, (), &mut writer)
+            .expect("Failed to tokenize");
         assert_eq!(writer.into_inner(), "<Phone country=\"US\">");
     }
 
     #[test]
     fn semantic_token_world_fallback() {
-        let mask = MaskType::SemanticToken {
-            region: None,
-            add_hash: None,
-        };
         let raw_input = "+80012345678";
         let util = get_phone_util();
+        let phone = util.parse(raw_input, None).unwrap();
         let mut writer = AllocationTrackedWriter::new();
-        mask_number(util, raw_input, &mask, &mut writer).expect("Failed to mask");
+
+        get_phone_mask_util()
+            .tokenize(&phone, (), &mut writer)
+            .expect("Failed to tokenize");
         assert_eq!(writer.into_inner(), "<Phone country=\"001\">");
     }
 
     #[test]
     fn semantic_token_with_hash() {
-        let fake_hash = Hashed::from_slice(b"fakehash").unwrap();
-        let mask = MaskType::SemanticToken {
-            region: Some(Region::US),
-            add_hash: Some(fake_hash),
-        };
+        let fake_hash = b"fakehash".to_vec();
+        let hasher = FakeHasher { hash: fake_hash };
         let raw_input = "+19181234567";
         let util = get_phone_util();
+        let phone = util.parse(raw_input, None).unwrap();
         let mut writer = AllocationTrackedWriter::new();
-        mask_number(util, raw_input, &mask, &mut writer).expect("Failed to mask");
+
+        get_phone_mask_util()
+            .tokenize(&phone, hasher, &mut writer)
+            .expect("Failed to tokenize");
 
         let result = writer.into_inner();
         assert!(result.starts_with("<Phone country=\"US\" hash=\""));
@@ -205,13 +217,15 @@ mod tests {
 
     #[test]
     fn hash_only_mask() {
-        let fake_hash = Hashed::from_slice(&[0x12, 0x34, 0xab, 0xcd]).unwrap();
-        let mask = MaskType::Hash(fake_hash);
+        let fake_hash = vec![0x12, 0x34, 0xab, 0xcd];
+        let hasher = FakeHasher { hash: fake_hash };
         let raw_input = "+19181234567";
         let util = get_phone_util();
-        let mut writer = AllocationTrackedWriter::new();
-        mask_number(util, raw_input, &mask, &mut writer).expect("Failed to mask");
-        let result = writer.into_inner();
+        let phone = util.parse(raw_input, None).unwrap();
+
+        let result = get_phone_mask_util()
+            .hash_number_to_string(&phone, hasher)
+            .expect("Failed to hash");
         assert_eq!(result, "1234abcd");
     }
 
@@ -233,7 +247,10 @@ mod tests {
     #[test]
     fn hashed_from_slice_none_on_too_large() {
         let too_big_slice = [0x00; 65];
-        assert_eq!(Hashed::from_slice(&too_big_slice), None);
+        assert_eq!(
+            Hashed::from_slice(&too_big_slice),
+            Err(MaxHashedLengthExceededError(65))
+        );
     }
 
     #[test]
@@ -261,48 +278,52 @@ mod tests {
         let hasher = DefaultHasher::new();
         let hashed_result = PhoneStdHasher(hasher).hash_phone(&tel);
 
-        assert!(hashed_result.is_some());
+        assert!(hashed_result.is_ok());
         let hashed = hashed_result.unwrap();
         assert_eq!(hashed.as_slice().len(), 8);
     }
 
     #[test]
     fn edge_empty_input() {
-        let mask = MaskType::MaskDigits(MaskDigitsConfig::default());
+        let mask = MaskDigitsConfig::default();
         let raw_input = "";
-        let util = get_phone_util();
         let mut writer = AllocationTrackedWriter::new();
-        mask_number(util, raw_input, &mask, &mut writer).expect("Failed to mask");
+        get_phone_mask_util()
+            .mask_digits(raw_input, mask, &mut writer)
+            .expect("Failed to mask");
         assert_eq!(writer.into_inner(), "");
     }
 
     #[test]
     fn edge_only_context_no_digits_in_main() {
-        let mask = MaskType::MaskDigits(MaskDigitsConfig::default());
+        let mask = MaskDigitsConfig::default();
         let raw_input = "tel:;phone-context=+1234";
-        let util = get_phone_util();
         let mut writer = AllocationTrackedWriter::new();
-        mask_number(util, raw_input, &mask, &mut writer).expect("Failed to mask");
+        get_phone_mask_util()
+            .mask_digits(raw_input, mask, &mut writer)
+            .expect("Failed to mask");
         assert_eq!(writer.into_inner(), "tel:;phone-context=*****");
     }
 
     #[test]
     fn edge_all_letters_no_real_digits() {
-        let mask = MaskType::MaskDigits(MaskDigitsConfig::default());
+        let mask = MaskDigitsConfig::default();
         let raw_input = "CALL-ME-NOW";
-        let util = get_phone_util();
         let mut writer = AllocationTrackedWriter::new();
-        mask_number(util, raw_input, &mask, &mut writer).expect("Failed to mask");
+        get_phone_mask_util()
+            .mask_digits(raw_input, mask, &mut writer)
+            .expect("Failed to mask");
         assert_eq!(writer.into_inner(), "****-*E-NOW");
     }
 
     #[test]
     fn edge_extension_only() {
-        let mask = MaskType::MaskDigits(MaskDigitsConfig::default());
+        let mask = MaskDigitsConfig::default();
         let raw_input = "доб. 12345";
-        let util = get_phone_util();
         let mut writer = AllocationTrackedWriter::new();
-        mask_number(util, raw_input, &mask, &mut writer).expect("Failed to mask");
+        get_phone_mask_util()
+            .mask_digits(raw_input, mask, &mut writer)
+            .expect("Failed to mask");
 
         assert_eq!(writer.into_inner(), "доб. *****");
     }
@@ -311,6 +332,19 @@ mod tests {
     fn debug_representation() {
         let h = Hashed::from_slice(&[0xde, 0xad, 0xbe, 0xef]);
         let debug_str = format!("{:?}", h);
-        assert_eq!(debug_str, "Some(Hash(\"deadbeef\"))");
+        assert_eq!(debug_str, "Ok(Hash(\"deadbeef\"))");
+    }
+
+    #[test]
+    fn string_api_works() {
+        let util = get_phone_util();
+        let phone = util.parse("+19181234567", None).unwrap();
+
+        let mask = MaskDigitsConfig::default();
+        let masked = get_phone_mask_util().mask_digits_to_string("123-4567", mask);
+        assert_eq!(masked, "***-4567");
+
+        let tokenized = get_phone_mask_util().tokenize_to_string(&phone, ());
+        assert_eq!(tokenized, "<Phone country=\"US\">");
     }
 }
