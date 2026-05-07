@@ -4,7 +4,13 @@ mod phone_mask_util;
 #[cfg(feature = "global_static")]
 use std::sync::LazyLock;
 
-pub use hash::{PhoneDigestHasher, PhoneMacHasher, PhoneStdHasher};
+#[cfg(feature = "digest")]
+pub use hash::PhoneDigestHasher;
+
+#[cfg(feature = "digest_mac")]
+pub use hash::PhoneMacHasher;
+
+pub use hash::PhoneStdHasher;
 pub use helper_types::{Hashed, MaskDigitsConfig, MaxHashedLengthExceededError, Result};
 pub use phone_mask_util::{PhoneMaskUtil, PhoneMaskUtilFallible};
 

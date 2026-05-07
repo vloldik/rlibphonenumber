@@ -6,7 +6,6 @@ use digest::{Digest as TraitDigest, Update as TraitUpdate};
 #[cfg(feature = "digest_mac")]
 use digest::Mac as TraitMac;
 
-#[cfg(feature = "digest_mac")]
 use crate::phonenumber_mask::helper_types;
 use crate::{PhoneNumber as LocalPhoneNumber, interfaces::PhoneHasher as TraitPhoneHasher};
 use crate::{interfaces::OptionalHasher, phonenumber_mask::Hashed as LocalHashed};

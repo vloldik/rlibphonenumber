@@ -344,7 +344,9 @@ mod tests {
         let masked = get_phone_mask_util().mask_digits_to_string("123-4567", mask);
         assert_eq!(masked, "***-4567");
 
-        let tokenized = get_phone_mask_util().tokenize_to_string(&phone, ());
+        let tokenized = get_phone_mask_util()
+            .tokenize_to_string(&phone, ())
+            .unwrap();
         assert_eq!(tokenized, "<Phone country=\"US\">");
     }
 }
