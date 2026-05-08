@@ -35,7 +35,7 @@ mod phonenumber_match_factory;
 
 pub use {
     leniency::Leniency,
-    matcher_internal::{PhoneNUmberMatcherFallible, PhoneNumberMatcher},
+    matcher_internal::{PhoneNumberMatcher, PhoneNumberMatcherFallible},
     phonenumber_match::PhoneNumberMatch,
     phonenumber_match_factory::{MatcherBuilder, PhoneNumberMatcherFactory},
 };

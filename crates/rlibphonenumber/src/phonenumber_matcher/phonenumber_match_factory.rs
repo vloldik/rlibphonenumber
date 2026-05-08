@@ -9,7 +9,7 @@ use crate::enums::Region;
 use crate::interfaces::AsOriginal;
 use crate::phonenumber_matcher::leniency::Leniency;
 use crate::phonenumber_matcher::matcher_internal::{
-    PhoneNUmberMatcherFallible, PhoneNumberMatcher,
+    PhoneNumberMatcher, PhoneNumberMatcherFallible,
 };
 use crate::phonenumber_matcher::matcher_regex::MatcherRegex;
 use crate::phonenumberutil::phonenumberutil_internal::PhoneNumberUtilInternal;
