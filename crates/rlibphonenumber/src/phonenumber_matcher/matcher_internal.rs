@@ -96,7 +96,7 @@ pub struct PhoneNumberMatcherInternal<
         ret: Self -> Self => | v | Self { inner: v },
     },
 
-    PhoneNUmberMatcherFallible {
+    PhoneNumberMatcherFallible {
         ret: Self -> Self => | v | Self { inner: v },
     }
 )]
