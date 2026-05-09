@@ -55,9 +55,9 @@ impl MatcherRegex {
         let lead_class = Regex::new(&format!("^{lead_class_str}")).unwrap();
 
         let pattern = Regex::new(&format!(
-            "(?i)(?:{lead_class_str}{punctuation}){lead_limit}\
+            "(?:{lead_class_str}{punctuation}){lead_limit}\
              {digit_sequence}(?:{punctuation}{digit_sequence}){block_limit}\
-             (?:{})?",
+             (?i)(?:{})?",
             create_extn_pattern(false),
         ))
         .unwrap();

@@ -6,12 +6,12 @@ use libfuzzer_sys::{
     fuzz_target,
 };
 use rlibphonenumber::{
-    PHONE_NUMBER_UTIL, PhoneNumberUtil, Region,
+    PhoneNumberUtil, Region,
     phonenumber_matcher::{Leniency, PhoneNumberMatcherFactory},
 };
 use rlibphonenumber_fuzz::ffi;
 
-const ALPHABET: &[u8] = b"+0123456789()-=. abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const ALPHABET: &[u8] = b"+0123456789()-=. abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ;";
 
 #[derive(Debug)]
 pub struct FuzzText(pub String);

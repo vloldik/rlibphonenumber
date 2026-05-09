@@ -252,14 +252,14 @@ export class Rlibphonenumber {
     ): string[] {
         let args = [
             "cargo", "run", "-p", "rlibphonenumber_cli",
-            "build-metadata",
-            input, output, name,
+            "metadata",
+            "-i", input,
+            ...(alternateFormats ? ['--alternate-formats'] : []),
+            "build",
+            output, name,
             "--const-name", constName,
             '-m'
         ]
-        if (alternateFormats) {
-            args.push('--alternate-formats')
-        }
 
         return args
     }

@@ -72,7 +72,7 @@ fn formatting_benchmark(c: &mut Criterion) {
 
     for (number_a, number_b) in rlp_numbers.iter().zip(rlib_numbers.iter()) {
         assert_eq!(
-            rlp::format(number_a).mode(Mode::E164).to_string(), // Пример валидации
+            rlp::format(number_a).mode(Mode::E164).to_string(), 
             PHONE_NUMBER_UTIL.format(number_b, PhoneNumberFormat::E164)
         );
     }

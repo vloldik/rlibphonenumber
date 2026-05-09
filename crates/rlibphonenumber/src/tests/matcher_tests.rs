@@ -281,6 +281,19 @@ mod tests {
     }
 
     #[test]
+    fn test_find_with_x_delim_and_ext() {
+        let str =
+            "+7)7778777.777X88665X3- URq+1-800-123-32-17X3222222222222222222222222222222222DXXXX31";
+
+        let found = find_numbers(str, None).next().unwrap();
+
+        assert!(
+            found.raw_string == "+1-800-123-32-17X322222222" && found.number.country_code == 1,
+            "Number with X ext should be found"
+        )
+    }
+
+    #[test]
     fn test_is_latin_letter() {
         type DummyMatcher<'a> = PhoneNumberMatcherInternal<
             'a,

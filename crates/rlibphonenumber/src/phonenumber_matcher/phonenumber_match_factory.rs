@@ -261,7 +261,7 @@ pub trait FindNumberExt {
     ///
     /// # Example
     /// ```rust
-    /// use rlibphonenumber::phonenumber_matcher::PhoneNumberExt;
+    /// use crate::rlibphonenumber::phonenumber_matcher::FindNumberExt;
     ///
     /// let text = "Call +1 555-0199 for more details.";
     /// for match_result in text.find_phone_numbers() {
@@ -289,7 +289,7 @@ pub trait FindNumberExt {
     ///
     /// # Example
     /// ```rust
-    /// use rlibphonenumber::phonenumber_matcher::PhoneNumberExt;
+    /// use crate::rlibphonenumber::phonenumber_matcher::FindNumberExt;
     /// use rlibphonenumber::phonenumber_matcher::Leniency;
     /// use rlibphonenumber::enums::Region;
     ///
