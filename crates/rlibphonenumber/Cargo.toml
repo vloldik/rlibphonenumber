@@ -1,6 +1,6 @@
 [package]
 name = "rlibphonenumber"
-version = "1.1.4"
+version = "1.1.6"
 edition = "2024"
 
 rust-version = "1.88"
@@ -25,9 +25,10 @@ categories = [
 build = "build/rust_build.rs"
 
 [features]
-default = ["global_static", "regex", "digest", "digest_mac"]
+default = ["builtin_metadata", "global_static", "regex", "digest", "digest_mac"]
 
-global_static = []
+builtin_metadata = []
+global_static = ["builtin_metadata"]
 
 regex = ["dep:regex"]
 lite = ["dep:regex-lite"]
