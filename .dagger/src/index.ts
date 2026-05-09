@@ -64,7 +64,7 @@ export class Rlibphonenumber {
 
         const generated = this.metadataRunner(src)
 
-        return source
+        return dag.directory()
             .withDirectory(
                 "crates/rlibphonenumber/src/generated",
                 generated.directory("/project/crates/rlibphonenumber/src/generated"),
@@ -134,6 +134,7 @@ export class Rlibphonenumber {
             .withExec(["apt-get", "update", "-qq"])
             .withExec(["apt-get", "install", "-y", "--no-install-recommends", "jq"])
             .withMountedCache("/usr/local/cargo/registry", cargoRegistry)
+            .withMountedCache("/usr/local/cargo/bin", dag.cacheVolume("cargo-bin"))
             .withMountedDirectory("/project", source)
             .withWorkdir("/project")
             .withExec(["cargo", "install", "cargo-edit", "--locked"])
@@ -218,8 +219,15 @@ export class Rlibphonenumber {
     }
 
     private metadataRunner(source: Directory): Container {
+        const cargoRegistry = dag.cacheVolume("cargo-registry")
+        const cargoGit = dag.cacheVolume("cargo-git")
+        const cargoTarget = dag.cacheVolume("cargo-target")
+
         return this.buildBase()
+            .withMountedCache("/usr/local/cargo/registry", cargoRegistry)
+            .withMountedCache("/usr/local/cargo/git", cargoGit)
             .withMountedDirectory("/project", source)
+            .withMountedCache("/project/target", cargoTarget)
             .withWorkdir("/project")
             .withExec(this.callCliGenerate(
                 "resources/PhoneNumberMetadata.xml",
@@ -245,6 +253,7 @@ export class Rlibphonenumber {
             .withExec(["bash", "-c",
                 "cp resources/PhoneNumberMetadata.xml crates/rlibphonenumber_macro/resources/",
             ])
+
     }
 
     private callCliGenerate(
