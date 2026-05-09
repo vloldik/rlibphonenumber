@@ -29,7 +29,7 @@ pub struct PhoneMacHasher<T: TraitMac + TraitUpdate>(pub T);
 impl<T: StdHasher> TraitPhoneHasher for PhoneStdHasher<T> {
     fn hash_phone(mut self, phone: &LocalPhoneNumber) -> helper_types::Result<LocalHashed> {
         phone.hash(&mut self.0);
-        LocalHashed::from_slice(&self.0.finish().to_be_bytes())
+        LocalHashed::from_slice(self.0.finish().to_be_bytes())
     }
 }
 
@@ -76,7 +76,7 @@ impl<M: TraitMac + TraitUpdate> TraitPhoneHasher for PhoneMacHasher<M> {
         feed_phone_bytes(&mut self.0, phone);
         let out = self.0.finalize();
 
-        LocalHashed::from_slice(&out.as_bytes())
+        LocalHashed::from_slice(out.as_bytes())
     }
 }
 

@@ -6,7 +6,7 @@
 //! # Fallibility and Custom Metadata
 //!
 //! When configuring a matcher, you can choose between an **infallible** matcher
-//! ([`PhoneNumberMatcher`]) and a **fallible** matcher ([`PhoneNUmberMatcherFallible`]).
+//! ([`PhoneNumberMatcher`]) and a **fallible** matcher ([`PhoneNumberMatcherFallible`]).
 //!
 //! It is crucial to understand that the errors returned by the fallible matcher are
 //! **strictly internal errors** caused by broken or malformed metadata (e.g., invalid
@@ -17,7 +17,7 @@
 //! - **Infallible (`PhoneNumberMatcher`)**: This is the default and recommended matcher.
 //!   If it encounters corrupted metadata, it will **panic**. This behavior is perfectly
 //!   safe and expected when using the default, built-in metadata.
-//! - **Fallible (`PhoneNUmberMatcherFallible`)**: Yields `Result` items, allowing you to
+//! - **Fallible (`PhoneNumberMatcherFallible`)**: Yields `Result` items, allowing you to
 //!   catch internal metadata errors. You should only use this if you are dynamically
 //!   loading arbitrary, untested custom metadata at runtime and need to prevent panics.
 //!

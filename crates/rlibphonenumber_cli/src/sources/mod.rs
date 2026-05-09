@@ -1,15 +1,48 @@
 mod find_numbers;
 
+use rlibphonenumber::PhoneNumber;
+use rlibphonenumber::phonenumber_matcher::PhoneNumberMatch;
 use std::fs::File;
-use std::io::{BufRead, BufReader, Seek, SeekFrom};
+use std::io::{BufRead, BufReader, Seek, SeekFrom, stdin};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::str::FromStr;
 use thiserror::Error;
 use url::Url;
 
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct FoundNumber {
+    pub number: PhoneNumber,
+    pub start: usize,
+    pub len: usize,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum FoundToken<'a> {
+    Phone(FoundNumber, &'a str),
+    NoPhone(&'a str),
+}
+
+pub trait SearchNumbers {
+    fn search_phone_numbers<F, EP>(
+        &self,
+        window_size: usize,
+        overlap: usize,
+        extract_matches: F,
+        emit_phone: EP,
+    ) -> Result<(), SourceReadError>
+    where
+        F: FnMut(&str, &mut dyn FnMut(PhoneNumberMatch<'_>)),
+        EP: FnMut(FoundToken);
+}
+
+pub trait ReadSource {
+    fn read(&self) -> Result<Box<dyn BufRead>, SourceReadError>;
+}
+
 #[derive(Debug, Clone)]
 pub enum Source {
+    Stdin,
     File(PathBuf),
     Http(Url),
     Ssh {
@@ -33,6 +66,9 @@ impl FromStr for Source {
     type Err = SourceParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s == "-" {
+            return Ok(Source::Stdin);
+        }
         // Attempt to parse as a standard URL
         if let Ok(url) = Url::parse(s) {
             match url.scheme() {
@@ -82,13 +118,15 @@ impl FromStr for Source {
         }
 
         // Fallback for SCP-like SSH strings (e.g., user@host:/path)
-        if s.contains('@') && s.contains(':') && !s.starts_with("http") {
-            if let Some((user_host, path)) = s.split_once(':') {
-                return Ok(Source::Ssh {
-                    user_host: user_host.to_string(),
-                    path: path.to_string(),
-                });
-            }
+        if s.contains('@')
+            && s.contains(':')
+            && !s.starts_with("http")
+            && let Some((user_host, path)) = s.split_once(':')
+        {
+            return Ok(Source::Ssh {
+                user_host: user_host.to_string(),
+                path: path.to_string(),
+            });
         }
 
         // Ultimate fallback: treat as a local file path
@@ -111,12 +149,12 @@ pub enum SourceReadError {
     Git(String),
 }
 
-impl Source {
+impl ReadSource for Source {
     /// Reads the content from the given source.
     /// Returns a dynamically dispatched `BufRead`. Streams the data where natively possible,
     /// or downloads it securely into an anonymous temporary file that is automatically
     /// deleted when dropped.
-    pub fn read(&self) -> Result<Box<dyn BufRead>, SourceReadError> {
+    fn read(&self) -> Result<Box<dyn BufRead>, SourceReadError> {
         match self {
             Source::File(path) => {
                 let file = File::open(path)?;
@@ -127,6 +165,8 @@ impl Source {
                 let response = reqwest::blocking::get(url.clone())?.error_for_status()?;
                 Ok(Box::new(BufReader::new(response)))
             }
+
+            Source::Stdin => Ok(Box::new(BufReader::new(stdin()))),
 
             Source::Ssh { user_host, path } => {
                 // Anonymous temp file. Auto-deletes on handle drop.
@@ -183,17 +223,22 @@ impl Source {
             }
         }
     }
+}
 
+impl Source {
     /// Extracts a reliable file name from the source string to be used for validation checks
     pub fn file_name(&self) -> Option<String> {
         match self {
             Source::File(path) => path.file_name().map(|s| s.to_string_lossy().into_owned()),
             Source::Http(url) => url
                 .path_segments()
-                .and_then(|seg| seg.last())
+                .and_then(|mut seg| seg.next_back())
                 .map(|s| s.to_string()),
-            Source::Ssh { path, .. } => path.split('/').last().map(|s| s.to_string()),
-            Source::Git { file_path, .. } => file_path.split('/').last().map(|s| s.to_string()),
+            Source::Stdin => None,
+            Source::Ssh { path, .. } => path.split('/').next_back().map(|s| s.to_string()),
+            Source::Git { file_path, .. } => {
+                file_path.split('/').next_back().map(|s| s.to_string())
+            }
         }
     }
 }

@@ -2671,7 +2671,7 @@ impl PhoneNumberUtilInternal {
         // copy so that we can revert to the original string if necessary.
         let transform_rule = metadata.original.national_prefix_transform_rule();
 
-        let captures = possible_national_prefix_pattern.captures(&phone_number);
+        let captures = possible_national_prefix_pattern.captures(phone_number);
         let first_capture = captures.as_ref().and_then(|c| c.get(1));
         let second_capture = captures.as_ref().and_then(|c| c.get(2));
 
@@ -2697,7 +2697,7 @@ impl PhoneNumberUtilInternal {
             // Rust note: There is no known transform rules containing $\d\d
             // But if any appears this should be handled with {} braces: {$\d}\d
             let replaced_number =
-                possible_national_prefix_pattern.replace(&phone_number, transform_rule);
+                possible_national_prefix_pattern.replace(phone_number, transform_rule);
             if is_viable_original_number
                 && !helper_functions::is_match(&self.matcher_api, &replaced_number, general_desc)?
             {

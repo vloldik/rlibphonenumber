@@ -22,13 +22,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         CommandEnum::BuildMetadata(cmd) => {
             commands::build_metadata::execute(cmd)?;
         }
-        CommandEnum::PhoneInfo(cmd) => {
-            commands::phone_info::execute(cmd)?;
-        }
         CommandEnum::ValidateMetadata(cmd) => {
             commands::validate_metadata::execute(cmd)?;
         }
-        CommandEnum::FindNumbers(cmd) => commands::find_numbers::execute(cmd)?,
+        CommandEnum::Number(cmd) => commands::number_command::execute(cmd)?,
     }
 
     Ok(())

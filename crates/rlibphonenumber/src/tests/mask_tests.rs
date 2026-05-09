@@ -223,20 +223,18 @@ mod tests {
         let util = get_phone_util();
         let phone = util.parse(raw_input, None).unwrap();
 
-        let result = get_phone_mask_util()
-            .hash_number_to_string(&phone, hasher)
-            .expect("Failed to hash");
+        let result = hasher.hash_phone(&phone).unwrap().to_string();
         assert_eq!(result, "1234abcd");
     }
 
     #[test]
     fn hashed_from_slice_validations() {
         let max_slice = [0xff; 64];
-        let hash_max = Hashed::from_slice(&max_slice).unwrap();
+        let hash_max = Hashed::from_slice(max_slice).unwrap();
         assert_eq!(hash_max.as_slice(), max_slice);
 
         let min_slice = [0x00; 0];
-        let hash_min = Hashed::from_slice(&min_slice).unwrap();
+        let hash_min = Hashed::from_slice(min_slice).unwrap();
         assert_eq!(hash_min.as_slice(), &[] as &[u8]);
 
         let mid_slice = b"hello_world";
@@ -248,7 +246,7 @@ mod tests {
     fn hashed_from_slice_none_on_too_large() {
         let too_big_slice = [0x00; 65];
         assert_eq!(
-            Hashed::from_slice(&too_big_slice),
+            Hashed::from_slice(too_big_slice),
             Err(MaxHashedLengthExceededError(65))
         );
     }
@@ -330,7 +328,7 @@ mod tests {
 
     #[test]
     fn debug_representation() {
-        let h = Hashed::from_slice(&[0xde, 0xad, 0xbe, 0xef]);
+        let h = Hashed::from_slice([0xde, 0xad, 0xbe, 0xef]);
         let debug_str = format!("{:?}", h);
         assert_eq!(debug_str, "Ok(Hash(\"deadbeef\"))");
     }

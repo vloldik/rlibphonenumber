@@ -1,4 +1,4 @@
-use std::{hash::Hasher, io::ErrorKind};
+use std::{fmt::Display, hash::Hasher, io::ErrorKind};
 
 #[cfg(feature = "digest_mac")]
 use digest::Mac;
@@ -152,6 +152,36 @@ impl Hashed {
     pub fn len(&self) -> usize {
         self.1
     }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Helper function to zero-allocation convert a `Hashed` buffer into a lowercase hexadecimal string.
+    pub fn as_hex<'a>(&self, buf: &'a mut [u8; 128]) -> &'a str {
+        const HEX_CHARS: &[u8; 16] = b"0123456789abcdef";
+        let bytes = self.as_slice();
+
+        for (i, &byte) in bytes.iter().enumerate() {
+            buf[i * 2] = HEX_CHARS[(byte >> 4) as usize];
+            buf[i * 2 + 1] = HEX_CHARS[(byte & 0xf) as usize];
+        }
+
+        let hex_len = bytes.len() * 2;
+
+        // SAFETY: The buffer is populated strictly with predefined ASCII characters ('0'-'9' and 'a'-'f').
+        // It is mathematically guaranteed to be valid UTF-8. No original undefined bytes
+        // from the buffer are exposed, because the slice is bounded precisely by `hex_len`.
+        unsafe { std::str::from_utf8_unchecked(&buf[..hex_len]) }
+    }
+}
+
+impl Display for Hashed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut buf = [0; 128];
+        write!(f, "{}", self.as_hex(&mut buf))
+    }
 }
 
 // Standard trait implementations for `Hashed`
@@ -208,4 +238,3 @@ impl LenWriteString {
         Self(String::new())
     }
 }
-

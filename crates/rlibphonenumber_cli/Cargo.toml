@@ -9,7 +9,10 @@ regex = "1.12.3"
 roxmltree = "0.21.1"
 cel = "0.13.0"
 thiserror = { workspace = true }
-rlibphonenumber = { path = "../rlibphonenumber" }
+rlibphonenumber = { path = "../rlibphonenumber", features = [
+    "digest",
+    "digest_mac",
+] }
 argh = "0.1"
 prost = { workspace = true }
 serde = { workspace = true }
@@ -17,3 +20,6 @@ serde_json = "1.0"
 url = "2.5.8"
 reqwest = { version = "0.13.3", features = ["blocking"] }
 tempfile = "3.27.0"
+hmac = "0.13.0"
+rand = "0.10.1"
+sha2 = "0.11.0"

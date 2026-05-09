@@ -106,8 +106,8 @@ impl<U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U> + Clone>
         leniency: Leniency,
         max_tries: u64,
         preferred_region: Option<Region>,
-    ) -> PhoneNUmberMatcherFallible<'a, U, T> {
-        PhoneNUmberMatcherFallible::new_for_util(
+    ) -> PhoneNumberMatcherFallible<'a, U, T> {
+        PhoneNumberMatcherFallible::new_for_util(
             self.phone_util.clone(),
             self.regexps.clone(),
             text,
@@ -215,7 +215,7 @@ impl<'a, 'f, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U> + Clon
         )
     }
 
-    /// Builds and returns a `PhoneNUmberMatcherFallible` iterator.
+    /// Builds and returns a `PhoneNumberMatcherFallible` iterator.
     ///
     /// This iterator yields `Result` values, providing access to underlying internal
     /// metadata errors instead of panicking.
@@ -225,7 +225,7 @@ impl<'a, 'f, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U> + Clon
     /// from custom metadata), *not* text parsing errors. It is generally recommended
     /// to test custom metadata thoroughly using the `rlibphonenumber` CLI and use
     /// the infallible [`build`](Self::build) method instead.
-    pub fn build_fallible(self) -> PhoneNUmberMatcherFallible<'a, U, T> {
+    pub fn build_fallible(self) -> PhoneNumberMatcherFallible<'a, U, T> {
         self.factory.create_matcher_fallible(
             self.text,
             self.leniency,

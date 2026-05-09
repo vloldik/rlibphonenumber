@@ -840,7 +840,7 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>> Iterator
 }
 
 impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>> Iterator
-    for PhoneNUmberMatcherFallible<'a, U, T>
+    for PhoneNumberMatcherFallible<'a, U, T>
 {
     type Item = Result<PhoneNumberMatch<'a>, InternalError<Infallible>>;
 
@@ -858,7 +858,7 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
 }
 
 impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
-    AsOriginal<PhoneNumberMatcherInternal<'a, U, T>> for PhoneNUmberMatcherFallible<'a, U, T>
+    AsOriginal<PhoneNumberMatcherInternal<'a, U, T>> for PhoneNumberMatcherFallible<'a, U, T>
 {
     fn as_original(&self) -> &PhoneNumberMatcherInternal<'a, U, T> {
         &self.inner

@@ -4296,15 +4296,15 @@ fn parse_with_phone_context() {
     assert_eq!(expected_number, actual_number);
 
     // Невалидный descriptor
-    assert_throws_for_invalid_phone_context(&phone_util, "tel:033316005;phone-context=");
-    assert_throws_for_invalid_phone_context(&phone_util, "tel:033316005;phone-context=+");
-    assert_throws_for_invalid_phone_context(&phone_util, "tel:033316005;phone-context=64");
-    assert_throws_for_invalid_phone_context(&phone_util, "tel:033316005;phone-context=++64");
-    assert_throws_for_invalid_phone_context(&phone_util, "tel:033316005;phone-context=+abc");
-    assert_throws_for_invalid_phone_context(&phone_util, "tel:033316005;phone-context=.");
-    assert_throws_for_invalid_phone_context(&phone_util, "tel:033316005;phone-context=3phone");
-    assert_throws_for_invalid_phone_context(&phone_util, "tel:033316005;phone-context=a-.nz");
-    assert_throws_for_invalid_phone_context(&phone_util, "tel:033316005;phone-context=a{b}c");
+    assert_throws_for_invalid_phone_context(phone_util, "tel:033316005;phone-context=");
+    assert_throws_for_invalid_phone_context(phone_util, "tel:033316005;phone-context=+");
+    assert_throws_for_invalid_phone_context(phone_util, "tel:033316005;phone-context=64");
+    assert_throws_for_invalid_phone_context(phone_util, "tel:033316005;phone-context=++64");
+    assert_throws_for_invalid_phone_context(phone_util, "tel:033316005;phone-context=+abc");
+    assert_throws_for_invalid_phone_context(phone_util, "tel:033316005;phone-context=.");
+    assert_throws_for_invalid_phone_context(phone_util, "tel:033316005;phone-context=3phone");
+    assert_throws_for_invalid_phone_context(phone_util, "tel:033316005;phone-context=a-.nz");
+    assert_throws_for_invalid_phone_context(phone_util, "tel:033316005;phone-context=a{b}c");
 }
 
 #[test]

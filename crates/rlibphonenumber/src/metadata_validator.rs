@@ -141,13 +141,14 @@ fn test_triplets(triplets: &RegexTriplets, context: &str) -> Result<(), Metadata
 
     triplets.original_base();
 
-    if let Some(base) = &triplets.pattern_base {
-        if !base.is_empty() && !(base.starts_with("^(?:") && base.ends_with(")$")) {
-            return Err(MetadataValidationError::InvalidRegexWrapping {
-                context: context.to_string(),
-                base: base.clone(),
-            });
-        }
+    if let Some(base) = &triplets.pattern_base
+        && !base.is_empty()
+        && !(base.starts_with("^(?:") && base.ends_with(")$"))
+    {
+        return Err(MetadataValidationError::InvalidRegexWrapping {
+            context: context.to_string(),
+            base: base.clone(),
+        });
     }
 
     Ok(())

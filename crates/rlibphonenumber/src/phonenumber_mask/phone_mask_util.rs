@@ -5,10 +5,10 @@ use crate::PhoneNumberUtil;
 use crate::{
     InternalError, PhoneNumber, PhoneNumberFormat, Region,
     generated::uniprops_digits,
-    interfaces::{AsOriginal, LenWrite, OptionalHasher, PhoneHasher},
+    interfaces::{AsOriginal, LenWrite, OptionalHasher},
     panic_internal,
     phonenumber_mask::{
-        Hashed, MaskDigitsConfig, MaxHashedLengthExceededError,
+        MaskDigitsConfig, MaxHashedLengthExceededError,
         helper_types::{self, LenWriteString},
     },
     phonenumberutil::{
@@ -203,27 +203,12 @@ impl<U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>> PhoneMaskUtil
         if let Some(hashed) = hashed {
             writer.write_all(SEMANTIC_TOKEN_HASH.as_bytes())?;
             let mut buf = [0; 128];
-            writer.write_all(Self::hash_to_hex(&hashed, &mut buf).as_bytes())?;
+            writer.write_all(hashed.as_hex(&mut buf).as_bytes())?;
         }
 
         writer.write_all(SEMANTIC_TOKEN_END.as_bytes())?;
 
         Ok(())
-    }
-
-    /// Hashes the given phone number and returns the resulting lowercase hexadecimal string.
-    ///
-    /// Requires a concrete implementation of `PhoneHasher`. Passing `()` is intentionally unsupported
-    /// here, as an explicit hash is requested.
-    #[export]
-    pub fn hash_number_to_string(
-        &self,
-        phone: &PhoneNumber,
-        hasher: impl PhoneHasher,
-    ) -> helper_types::Result<String> {
-        let hashed = hasher.hash_phone(phone)?;
-        let mut buf = [0u8; 128];
-        Ok(Self::hash_to_hex(&hashed, &mut buf).to_string())
     }
 
     /// Formats the given phone number strictly according to the provided `PhoneNumberFormat`,
@@ -247,7 +232,7 @@ impl<U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>> PhoneMaskUtil
     pub fn mask_digits_to_string(&self, raw_input: &str, config: MaskDigitsConfig) -> String {
         let mut writer = LenWriteString::new();
 
-        self.mask_digits(&raw_input, config, &mut writer)
+        self.mask_digits(raw_input, config, &mut writer)
             .expect("In-memory string write should never fail");
 
         writer.into()
@@ -273,24 +258,6 @@ impl<U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>> PhoneMaskUtil
         Ok(writer.into())
     }
 
-    /// Helper function to zero-allocation convert a `Hashed` buffer into a lowercase hexadecimal string.
-    fn hash_to_hex<'a>(hashed: &Hashed, buf: &'a mut [u8; 128]) -> &'a str {
-        const HEX_CHARS: &[u8; 16] = b"0123456789abcdef";
-        let bytes = hashed.as_slice();
-
-        for (i, &byte) in bytes.iter().enumerate() {
-            buf[i * 2] = HEX_CHARS[(byte >> 4) as usize];
-            buf[i * 2 + 1] = HEX_CHARS[(byte & 0xf) as usize];
-        }
-
-        let hex_len = bytes.len() * 2;
-
-        // SAFETY: The buffer is populated strictly with predefined ASCII characters ('0'-'9' and 'a'-'f').
-        // It is mathematically guaranteed to be valid UTF-8. No original undefined bytes
-        // from the buffer are exposed, because the slice is bounded precisely by `hex_len`.
-        unsafe { std::str::from_utf8_unchecked(&buf[..hex_len]) }
-    }
-
     /// Counts the number of recognizable digits and alphabetic characters (e.g. vanity numbers) in a string.
     fn count_digits(s: &str) -> usize {
         s.chars()
@@ -309,5 +276,12 @@ impl PhoneMaskUtil<PhoneNumberUtil, &'static PhoneNumberUtil> {
         Self {
             inner: PhoneMaskUtilInternal::new_for_util(&PHONE_NUMBER_UTIL),
         }
+    }
+}
+
+#[cfg(feature = "global_static")]
+impl Default for PhoneMaskUtil<PhoneNumberUtil, &'static PhoneNumberUtil> {
+    fn default() -> Self {
+        Self::new()
     }
 }

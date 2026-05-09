@@ -6,7 +6,7 @@ use rlibphonenumber::{PhoneMetadataCollection, metadata_validator::validate_meta
 
 use crate::{
     parser::{builder::MetadataBuilder, transform_for_rust::transform_for_rust},
-    sources::Source,
+    sources::{ReadSource, Source},
 };
 
 #[derive(FromArgs, Debug)]

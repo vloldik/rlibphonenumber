@@ -1,6 +1,6 @@
 #![allow(deprecated)]
 
-use crate::sources::Source;
+use crate::sources::{ReadSource, Source};
 
 use super::{
     constants::*,
