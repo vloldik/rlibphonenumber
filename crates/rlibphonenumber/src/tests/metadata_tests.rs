@@ -7,7 +7,6 @@ use crate::{
 };
 
 #[test]
-#[allow(deprecated)]
 fn test_metadata_regexps() {
     validate_metadata(
         PhoneMetadataCollection::decode(METADATA).expect("Metadata must parse"),

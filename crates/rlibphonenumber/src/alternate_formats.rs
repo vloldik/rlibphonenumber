@@ -1,10 +1,11 @@
-use prost::{DecodeError, Message};
 use rustc_hash::FxHashMap;
 
-use crate::{
-    PhoneMetadataCollection, generated::metadata::ALTERNATE_FORMATS_METADATA,
-    phonenumberutil::regex_wrapper_types::PhoneMetadataWrapper,
-};
+use crate::{PhoneMetadataCollection, phonenumberutil::regex_wrapper_types::PhoneMetadataWrapper};
+
+#[cfg(feature = "builtin_metadata")]
+use crate::generated::metadata::ALTERNATE_FORMATS_METADATA;
+#[cfg(feature = "builtin_metadata")]
+use prost::{DecodeError, Message};
 
 #[derive(Debug)]
 pub struct AlternateFormats {
@@ -22,12 +23,14 @@ impl AlternateFormats {
         }
     }
 
+    #[cfg(feature = "builtin_metadata")]
     pub fn try_new() -> Result<Self, DecodeError> {
         Ok(Self::new_for_metadata(PhoneMetadataCollection::decode(
             ALTERNATE_FORMATS_METADATA,
         )?))
     }
 
+    #[cfg(feature = "builtin_metadata")]
     pub fn new() -> Self {
         Self::try_new().unwrap()
     }

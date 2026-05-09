@@ -15,7 +15,6 @@
 
 use std::{borrow::Cow, collections::HashSet};
 
-use prost::{DecodeError, Message};
 use rustc_hash::FxHashMap;
 use strum::IntoEnumIterator;
 use zeroes_itoa::LeadingZeroBuffer;
@@ -24,10 +23,7 @@ use crate::{
     enums::{NumberLengthType, PhoneNumberFormat, PhoneNumberType},
     errors::{InvalidRegexError, ValidationError},
     generated::{
-        metadata::METADATA,
-        proto::{PhoneMetadataCollection, PhoneNumber},
-        uniprops_digits::uniprops::get_digit_value,
-        uniprops_without_nl,
+        proto::PhoneNumber, uniprops_digits::uniprops::get_digit_value, uniprops_without_nl,
     },
     interfaces::MatcherApi,
     phonenumberutil::{
@@ -36,12 +32,18 @@ use crate::{
     },
 };
 
+#[cfg(feature = "builtin_metadata")]
+use crate::generated::{metadata::METADATA, proto::PhoneMetadataCollection};
+#[cfg(feature = "builtin_metadata")]
+use prost::{DecodeError, Message};
+
 use super::helper_constants::{
     OPTIONAL_EXT_SUFFIX, PLUS_SIGN, POSSIBLE_CHARS_AFTER_EXT_LABEL,
     POSSIBLE_SEPARATORS_BETWEEN_NUMBER_AND_EXT_LABEL, RFC3966_EXTN_PREFIX, RFC3966_PREFIX,
 };
 
 /// Loads metadata from helper constants METADATA array
+#[cfg(feature = "builtin_metadata")]
 pub fn load_compiled_metadata() -> Result<PhoneMetadataCollection, DecodeError> {
     PhoneMetadataCollection::decode(METADATA)
 }

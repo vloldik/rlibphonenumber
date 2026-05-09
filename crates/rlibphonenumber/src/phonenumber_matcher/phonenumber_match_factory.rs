@@ -43,6 +43,7 @@ impl<U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U> + Clone>
     /// Creates a new factory using the provided phone utility instance.
     ///
     /// This constructor initializes the factory with default alternate formats.
+    #[cfg(feature = "builtin_metadata")]
     pub fn new_for_util(phone_util: T) -> Self {
         Self::new_for_util_with_formats(phone_util, Some(Arc::new(AlternateFormats::new())))
     }

@@ -55,6 +55,39 @@ export class Rlibphonenumber {
     }
 
     @func()
+    async test(
+        @argument({ defaultPath: '/' }) source: Directory,
+        fuzzTime: number = 60,
+    ): Promise<string> {
+        const cargoTarget = dag.cacheVolume("cargo-target-test")
+
+        const testContainer = this.rustBase()
+            .withMountedDirectory("/project", source)
+            .withMountedCache("/project/target", cargoTarget)
+            .withWorkdir("/project")
+
+        const testStdout = await testContainer
+            .withExec([
+                "cargo", "test",
+                "-p", "rlibphonenumber",
+                "-p", "rlibphonenumber_cli",
+                "-p", "rlibphonenumber_macro",
+                "-p", "zeroes_itoa",
+            ])
+            .stdout()
+
+        console.log(`Starting fuzzing for ${fuzzTime}s...`)
+        const fuzzStdout = [
+            await this.fuzz("diff-test", source, fuzzTime),
+            await this.fuzz("matcher-diff-test", source, fuzzTime),
+            await this.fuzz("full-cycle", source, fuzzTime),
+        ]
+
+
+        return `--- UNIT TESTS OUTPUT ---\n${testStdout}\n--- FUZZING OUTPUT ---\n${fuzzStdout.join('\n')}`
+    }
+
+    @func()
     async generate(
         @argument({ defaultPath: '/' }) source: Directory,
         tag: string = "",
@@ -62,14 +95,21 @@ export class Rlibphonenumber {
         const resolvedTag = tag ? await this.resolveTag(tag) : await this.readLock(source)
         const src = tag ? await this.withFreshResources(source, resolvedTag) : source
 
-        const generated = this.metadataRunner(src)
+        const generated = await this.bumpVersionIfNeeded(this.metadataRunner(src), tag)
 
-        const dir = dag.directory()
+        return dag.directory()
             .withDirectory(
-                "crates/rlibphonenumber/src/generated",
-                generated.directory("/project/crates/rlibphonenumber/src/generated"),
+                "crates/rlibphonenumber",
+                generated.directory("/project/crates/rlibphonenumber"),
             )
-
+            .withDirectory(
+                "crates/rlibphonenumber",
+                generated.directory("/project/crates/rlibphonenumber"),
+            )
+            .withFile(
+                "Readme.md",
+                generated.file("/project/Readme.md")
+            )
             .withDirectory(
                 "crates/rlibphonenumber/resources",
                 generated.directory("/project/crates/rlibphonenumber/resources"),
@@ -83,12 +123,6 @@ export class Rlibphonenumber {
                 generated.directory("/project/crates/rlibphonenumber_macro/resources"),
             )
             .withNewFile(LOCK_FILE, resolvedTag + "\n")
-
-        const bumped = await this.bumpVersionIfNeeded(dir, tag)
-
-        return dir
-            .withDirectory('crates/rlibphonenumber/', bumped.directory('/project/crates/rlibphonenumber/'))
-            .withDirectory('crates/rlibphonenumber_cli/', bumped.directory('/project/crates/rlibphonenumber_cli/'))
     }
 
     @func({ cache: 'never' })
@@ -100,50 +134,35 @@ export class Rlibphonenumber {
     ): Promise<string> {
         const version = await this.readLock(source)
         const built = this.buildLibphonenumber(version, re2Version, false /** In fuzz test we use always use ICU because of matcher */)
-
-        const cargoRegistry = dag.cacheVolume("cargo-registry")
-        const cargoGit = dag.cacheVolume("cargo-git")
         const cargoTarget = dag.cacheVolume(`cargo-target-nightly-fuzz`)
+
 
         const fuzzArgs = maxTotalTime > 0
             ? ["cargo", "+nightly", "fuzz", "run", variant, "--", `-max_total_time=${maxTotalTime}`]
             : ["cargo", "+nightly", "fuzz", "run", variant]
 
-        const baseWithRust = this.buildBase()
+        const baseWithRust = this.rustBase()
             .withExec(["rustup", "toolchain", "install", "nightly", "--no-self-update"])
-            .withExec(["cargo", "install", "cargo-fuzz", "--locked"])
+            .withExec(["cargo", "install", "cargo-fuzz", "--root", "/app/tools", "--locked"])
 
         return this.withPhoneLibs(baseWithRust, built)
-            .withEnvVariable("DEBIAN_FRONTEND", "noninteractive")
             .withDirectory("/usr/local/include", built.directory("/opt/libphonenumber/include"))
             .withDirectory("/usr/local/lib", built.directory("/opt/libphonenumber/lib"))
             .withExec(["ldconfig"])
-            .withMountedCache("/usr/local/cargo/registry", cargoRegistry)
-            .withMountedCache("/usr/local/cargo/git", cargoGit)
             .withMountedDirectory("/project", source)
             .withMountedCache("/project/fuzz/target", cargoTarget)
+
             .withWorkdir("/project")
             .withEnvVariable("CARGO_PROFILE_RELEASE_LTO", "false")
             .withExec(fuzzArgs)
             .stdout()
     }
 
-    @func()
     async bumpVersionIfNeeded(
-        @argument() source: Directory,
+        ctr: Container,
         tag: string,
-    ): Promise<Directory> {
-        const cargoRegistry = dag.cacheVolume("cargo-registry")
-        const cargoBin = dag.cacheVolume("cargo-bin")
-
-        let ctr = dag.container()
-            .from(RUST_IMAGE)
-            .withExec(["apt-get", "update", "-qq"])
-            .withExec(["apt-get", "install", "-y", "--no-install-recommends", "jq", "git"])
-            .withMountedCache("/usr/local/cargo/registry", cargoRegistry)
-            .withMountedCache("/usr/local/cargo/bin", cargoBin)
-            .withMountedDirectory("/project", source)
-            .withWorkdir("/project")
+    ): Promise<Container> {
+        ctr = ctr
             .withExec(["git", "config", "--global", "safe.directory", "*"])
 
         const gitStatus = await ctr
@@ -152,13 +171,13 @@ export class Rlibphonenumber {
 
         if (gitStatus.trim() === "") {
             console.log("No changes detected by git. Skipping version bump.");
-            return dag.directory();
+            return ctr;
         }
 
         console.log("Changes detected. Bumping versions...");
 
         ctr = ctr
-            .withExec(["cargo", "install", "cargo-edit", "--locked"])
+            .withExec(["cargo", "install", "--root", "/app/tools", "cargo-edit", "--locked"])
             .withExec(["cargo", "set-version", "--bump", "patch",
                 "-p", "rlibphonenumber",
                 "-p", "rlibphonenumber_cli",
@@ -170,29 +189,40 @@ export class Rlibphonenumber {
             ])
             .stdout()).trim()
 
+        const readmeTpl = ctr.file('Readme.md.tpl')
+            .withReplaced('{{metadata_version}}', tag, { all: true })
+            .withReplaced('{{package_version}}', newVersion, { all: true })
+
         return ctr
-            .withExec(["sed", "-E", "-i",
-                `s/rlibphonenumber = "[0-9]+\\.[0-9]+\\.[0-9]+"/rlibphonenumber = "${newVersion}"/g`,
-                "Readme.md",
-            ])
-            .withExec(["sed", "-E", "-i",
-                `s/Used metadata version: v[0-9]+\\.[0-9]+\\.[0-9]+/Used metadata version: ${tag}/g`,
-                "Readme.md",
-            ])
-            .directory("/project")
+            .withFile('Readme.md', readmeTpl)
+    }
+
+    private rustBase(): Container {
+        const cargoRegistry = dag.cacheVolume("cargo-registry")
+        const cargoGit = dag.cacheVolume("cargo-git")
+        const cargoCustomBin = dag.cacheVolume("cargo-custom-bin")
+
+        return this.buildBase()
+            .withEnvVariable("PATH", "/app/tools/bin:$PATH", { expand: true })
+            .withMountedCache("/usr/local/cargo/registry", cargoRegistry)
+            .withMountedCache("/usr/local/cargo/git", cargoGit)
+            .withMountedCache("/app/tools", cargoCustomBin)
     }
 
     private buildBase(): Container {
+        const aptCache = dag.cacheVolume("my-apt-cache")
+
         return dag.container()
             .from(RUST_IMAGE)
             .withEnvVariable("DEBIAN_FRONTEND", "noninteractive")
+            .withMountedCache("/var/cache/apt", aptCache)
             .withExec(["apt-get", "update", "-qq"])
             .withExec(["apt-get", "install", "-y", "--no-install-recommends",
                 "build-essential", "cmake", "git", "curl", "ca-certificates",
                 "pkg-config", "libssl-dev",
                 "libprotobuf-dev", "protobuf-compiler",
                 "libicu-dev", "libabsl-dev", "libgtest-dev",
-                "llvm", "clang", "default-jre"
+                "llvm", "clang", "default-jre", "jq"
             ])
     }
 
@@ -240,13 +270,9 @@ export class Rlibphonenumber {
     }
 
     private metadataRunner(source: Directory): Container {
-        const cargoRegistry = dag.cacheVolume("cargo-registry")
-        const cargoGit = dag.cacheVolume("cargo-git")
         const cargoTarget = dag.cacheVolume("cargo-target")
 
-        return this.buildBase()
-            .withMountedCache("/usr/local/cargo/registry", cargoRegistry)
-            .withMountedCache("/usr/local/cargo/git", cargoGit)
+        return this.rustBase()
             .withMountedDirectory("/project", source)
             .withMountedCache("/project/target", cargoTarget)
             .withWorkdir("/project")

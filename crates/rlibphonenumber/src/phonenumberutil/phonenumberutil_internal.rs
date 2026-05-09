@@ -28,8 +28,8 @@ use super::{
     },
     helper_functions::{
         self, copy_core_fields_only, get_number_desc_by_type, get_supported_types_for_metadata,
-        is_national_number_suffix_of_the_other, load_compiled_metadata, normalize_helper,
-        test_number_length, test_number_length_with_unknown_type,
+        is_national_number_suffix_of_the_other, normalize_helper, test_number_length,
+        test_number_length_with_unknown_type,
     },
     helper_functions::{get_national_significant_number, is_unwanted_end_char},
     helper_types::PhoneNumberWithCountryCodeSource,
@@ -43,9 +43,8 @@ use crate::{
     InvalidRegionError, KeepMetadataType,
     enums::{MatchType, NumberLengthType, PhoneNumberFormat, PhoneNumberType, Region},
     errors::{
-        CreateUtilError, ExtractNumberError, GetExampleNumberError, InternalError,
-        InvalidNumberError, NotANumberError, ParseError, ValidationError, unwrap_internal,
-        unwrap_internal_infallible,
+        ExtractNumberError, GetExampleNumberError, InternalError, InvalidNumberError,
+        NotANumberError, ParseError, ValidationError, unwrap_internal, unwrap_internal_infallible,
     },
     generated::{
         proto::{PhoneMetadataCollection, PhoneNumber, phone_number::CountryCodeSource},
@@ -56,6 +55,9 @@ use crate::{
     regex_based_matcher::RegexBasedMatcher,
     string_util::strip_cow_prefix,
 };
+
+#[cfg(feature = "builtin_metadata")]
+use crate::{errors::CreateUtilError, phonenumberutil::helper_functions::load_compiled_metadata};
 
 use crate::regexp::Regex;
 use log::{error, trace, warn};
@@ -201,6 +203,7 @@ impl PhoneNumberUtilInternal {
     ///
     /// You probably want use `PHONE_NUMBER_UTIL` singleton instead
     #[export]
+    #[cfg(feature = "builtin_metadata")]
     pub fn new() -> Result<Self, CreateUtilError> {
         let metadata_collection = load_compiled_metadata()?;
         Ok(Self::new_for_metadata(metadata_collection)?)
