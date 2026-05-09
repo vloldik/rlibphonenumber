@@ -19,13 +19,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let cli: Cli = argh::from_env();
 
     match cli.command {
-        CommandEnum::BuildMetadata(cmd) => {
-            commands::build_metadata::execute(cmd)?;
+        CommandEnum::Metadata(cmd) => {
+            commands::metadata::execute(cmd)?;
         }
-        CommandEnum::ValidateMetadata(cmd) => {
-            commands::validate_metadata::execute(cmd)?;
-        }
-        CommandEnum::Number(cmd) => commands::number_command::execute(cmd)?,
+        CommandEnum::Number(cmd) => commands::number::execute(cmd)?,
     }
 
     Ok(())
