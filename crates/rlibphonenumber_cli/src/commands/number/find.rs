@@ -82,7 +82,7 @@ pub fn execute(
             }
         },
         |token| match token {
-            FoundToken::Phone(found, _) => {
+            FoundToken::Phone(found) => {
                 print_formatted_output(
                     &mut stdout,
                     util,

@@ -122,19 +122,28 @@ impl PhoneNumberUtilInternal {
     pub fn new_for_metadata(
         metadata_collection: PhoneMetadataCollection,
     ) -> Result<Self, InvalidRegionError> {
+        let capacity = metadata_collection.metadata.len();
+
         let mut instance = Self {
             reg_exps: PhoneNumberRegExpsAndMappings::new(),
             country_calling_code_to_region_map: Default::default(),
-            nanpa_regions: Default::default(),
+            nanpa_regions: FxHashSet::with_capacity_and_hasher(30, Default::default()),
             matcher_api: Default::default(),
-            region_to_metadata_map: Default::default(),
+            region_to_metadata_map: FxHashMap::with_capacity_and_hasher(
+                capacity,
+                Default::default(),
+            ),
             country_code_to_non_geographical_metadata_map: Default::default(),
         };
 
         // that share a country calling code when inserting data.
-        let mut country_calling_code_to_region_map = FxHashMap::<i32, VecDeque<Region>>::default();
+        let mut country_calling_code_to_region_map =
+            FxHashMap::<i32, VecDeque<Region>>::with_capacity_and_hasher(
+                capacity / 2,
+                Default::default(),
+            );
+
         for metadata in metadata_collection.metadata {
-            let region = &metadata.id.clone();
             let main_country_code = metadata.main_country_for_code();
 
             // No such restriction, since there is a None option for region
@@ -145,7 +154,7 @@ impl PhoneNumberUtilInternal {
             let Some(country_calling_code) = metadata.country_code else {
                 continue;
             };
-            let region = Region::from_code(region)?;
+            let region = Region::from_code(&metadata.id)?;
 
             if region == Region::World {
                 instance
@@ -176,16 +185,14 @@ impl PhoneNumberUtilInternal {
                 instance.nanpa_regions.insert(region);
             }
         }
+        let mut sorted_map: Vec<_> = country_calling_code_to_region_map
+            .into_iter()
+            .map(|(k, v)| (k, Vec::from(v)))
+            .collect();
 
-        instance.country_calling_code_to_region_map.extend(
-            country_calling_code_to_region_map
-                .into_iter()
-                .map(|(k, v)| (k, Vec::from(v))),
-        );
-        // Sort all the pairs in ascending order according to country calling code.
-        instance
-            .country_calling_code_to_region_map
-            .sort_by_key(|(a, _)| *a);
+        sorted_map.sort_unstable_by_key(|(a, _)| *a);
+
+        instance.country_calling_code_to_region_map = sorted_map;
         Ok(instance)
     }
 

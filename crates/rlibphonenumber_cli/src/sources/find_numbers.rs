@@ -138,10 +138,7 @@ impl<T: super::ReadSource> SearchNumbers for T {
                     }
 
                     last_emitted_offset = last_emitted_offset.max(m_start + m_len);
-                    let string = &valid_text[m.start.saturating_sub(absolute_offset)
-                        ..m.start.saturating_sub(absolute_offset)
-                            + m.len.saturating_sub(absolute_offset)];
-                    emit_phone(FoundToken::Phone(m, string));
+                    emit_phone(FoundToken::Phone(m));
                 } else {
                     i += 1;
                 }
@@ -221,9 +218,8 @@ mod tests {
 
         let mut emit_phone = |found: FoundToken<'_>| {
             match found {
-                FoundToken::Phone(found, s) => {
+                FoundToken::Phone(found) => {
                     let raw_str = &text[found.start..found.start + found.len];
-                    assert_eq!(raw_str, s);
                     tokens.push(Token::Phone(raw_str.to_string()))
                 }
                 FoundToken::NoPhone(text) => tokens.push(Token::Text(text.to_string())),

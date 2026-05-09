@@ -147,7 +147,7 @@ Shared `mask` flags:
 
 | Flag | Short | Default | Description |
 |---|---|---|---|
-| `--format` | `-f` | _(original)_ | Reformat before masking: `e164`, `international`, etc. |
+| `--format` | `-f` | e164 | Reformat before masking: `e164`, `international`, etc. |
 | `--mask-char` | `-m` | `*` | Character used to replace masked digits |
 | `--min-masked` | `-c` | `4` | Minimum number of digits to mask |
 | `--max-unmasked` | `-u` | `4` | Maximum digits left visible at the end |

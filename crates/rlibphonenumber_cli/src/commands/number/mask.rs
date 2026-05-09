@@ -213,7 +213,7 @@ pub fn execute(
             }
         },
         |token| match token {
-            FoundToken::Phone(found, s) => match &options.mask_type {
+            FoundToken::Phone(found) => match &options.mask_type {
                 MaskType::Constant(_) => {
                     handle_pipe!(stdout.write_all(constant_mask_value.unwrap()));
                 }
@@ -238,12 +238,9 @@ pub fn execute(
                 }
                 MaskType::Mask(_) => {
                     let config = mask_config.unwrap();
-                    if let Some(fmt) = mask_format_fmt {
-                        let masked = mask_util.format_and_mask(&found.number, fmt, config);
-                        cli_write_str!(stdout, &masked);
-                    } else {
-                        handle_pipe!(mask_util.mask_digits(s, config, &mut stdout));
-                    }
+                    let masked =
+                        mask_util.format_and_mask(&found.number, mask_format_fmt.unwrap(), config);
+                    cli_write_str!(stdout, &masked);
                 }
             },
             FoundToken::NoPhone(text) => {

@@ -19,7 +19,7 @@ pub struct FoundNumber {
 
 #[derive(Debug, PartialEq)]
 pub enum FoundToken<'a> {
-    Phone(FoundNumber, &'a str),
+    Phone(FoundNumber),
     NoPhone(&'a str),
 }
 
