@@ -1477,7 +1477,6 @@ impl PhoneNumberUtilInternal {
             normalized_raw_input.drain(0..first_national_number_digit);
         }
 
-        // Удалено дублирование: оставили только один блок для NANPA
         if country_code == NANPA_COUNTRY_CODE && self.nanpa_regions.contains(&calling_from) {
             let mut buf = itoa::Buffer::new();
             return Ok(

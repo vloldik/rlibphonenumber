@@ -1,6 +1,6 @@
 use std::{
     error::Error,
-    io::{self, Write},
+    io::{self, BufWriter, Write},
     str::FromStr,
     sync::Arc,
 };
@@ -21,6 +21,40 @@ use rlibphonenumber::{
 use sha2::Sha256;
 
 use crate::sources::{FoundToken, ReadSource, SearchNumbers, Source};
+
+const BUF_CAPACITY: usize = 256 * 1024;
+
+#[cold]
+#[inline(never)]
+fn handle_io_err(e: io::Error) {
+    match e.kind() {
+        io::ErrorKind::BrokenPipe => std::process::exit(0),
+        _ => {
+            panic!("I/O Operation failed: {}", e);
+        }
+    }
+}
+
+macro_rules! handle_pipe {
+    ($expr:expr) => {
+        match $expr {
+            Ok(val) => val,
+            Err(e) => handle_io_err(e),
+        }
+    };
+}
+
+macro_rules! cli_write_str {
+    ($dst:expr, $str:expr) => {
+        handle_pipe!(($dst).write_all(($str).as_bytes()))
+    };
+}
+
+macro_rules! cli_writeln {
+    ($dst:expr, $($arg:tt)*) => {
+        handle_pipe!(writeln!($dst, $($arg)*))
+    };
+}
 
 fn parse_leniency(s: &str) -> Result<Leniency, String> {
     Leniency::from_str(s).map_err(|err| err.to_string())
@@ -143,6 +177,17 @@ pub enum MaskType {
     Mask(FormatMask),
 }
 
+impl MaskType {
+    fn input_str(&self) -> &str {
+        match self {
+            MaskType::Constant(c) => &c.input,
+            MaskType::Token(t) => &t.input,
+            MaskType::Hash(h) => &h.input,
+            MaskType::Mask(m) => &m.input,
+        }
+    }
+}
+
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "constant")]
 /// Replace with a constant string.
@@ -203,11 +248,6 @@ pub struct FormatMask {
     pub max_unmasked: usize,
 }
 
-fn format_phone_number(util: &PhoneNumberUtil, phone: &PhoneNumber, format_str: &str) -> String {
-    let fmt = PhoneNumberFormat::from_str(format_str).unwrap_or(PhoneNumberFormat::E164);
-    util.format(phone, fmt).to_string()
-}
-
 fn load_custom_metadata(metadata_path: Option<&str>) -> Result<PhoneNumberUtil, Box<dyn Error>> {
     let util = if let Some(path) = metadata_path {
         let source: Source = path.parse()?;
@@ -256,26 +296,29 @@ pub fn execute(command: NumberCommand) -> Result<(), Box<dyn Error>> {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn print_formatted_output(
     stdout: &mut dyn Write,
     util: &PhoneNumberUtil,
     phone_number: &PhoneNumber,
     raw_number: Option<&str>,
-    format_used: &str,
+    fmt: PhoneNumberFormat,
+    format_used_str: &str,
     region: Option<Region>,
     output_mode: &str,
-) -> io::Result<()> {
-    let formatted_number = format_phone_number(util, phone_number, format_used);
+) {
+    let formatted_number = util.format(phone_number, fmt);
     let is_valid = phone_number.is_valid();
 
     match output_mode {
         "plaintext" => {
-            writeln!(stdout, "{}", formatted_number)?;
+            cli_write_str!(stdout, &formatted_number);
+            cli_write_str!(stdout, "\n");
         }
         "json" => {
             let mut info = json!({
-                "formatted_number": formatted_number,
-                "format_used": format_used,
+                "formatted_number": formatted_number.as_ref(),
+                "format_used": format_used_str,
                 "country_code": phone_number.country_code,
                 "national_number": phone_number.national_number,
                 "region_code": region.map(|r| r.as_region_str()).as_deref(),
@@ -285,30 +328,36 @@ fn print_formatted_output(
                 info.as_object_mut()
                     .unwrap()
                     .insert("raw_number".to_string(), json!(raw));
-                writeln!(stdout, "{}", serde_json::to_string_pretty(&info).unwrap())?;
-            } else {
-                writeln!(stdout, "{}", serde_json::to_string(&info).unwrap())?;
             }
+            serde_json::to_writer(&mut *stdout, &info).unwrap_or_else(|err| {
+                match err.io_error_kind() {
+                    Some(io::ErrorKind::BrokenPipe) => std::process::exit(0),
+                    _ => panic!("{}", err),
+                }
+            });
+            cli_write_str!(stdout, "\n");
         }
         "wide" => {
-            writeln!(stdout, "{:<20} | Value", "Property")?;
-            writeln!(stdout, "{:-<20}-+-{:-<30}", "", "")?;
+            cli_writeln!(stdout, "{:<20} | Value", "Property");
+            cli_writeln!(stdout, "{:-<20}-+-{:-<30}", "", "");
             if let Some(raw) = raw_number {
-                writeln!(stdout, "{:<20} | {}", "Raw Number", raw)?;
+                cli_writeln!(stdout, "{:<20} | {}", "Raw Number", raw);
             }
-            writeln!(stdout, "{:<20} | {}", "Formatted Number", formatted_number)?;
-            writeln!(stdout, "{:<20} | {}", "Format Used", format_used)?;
-            writeln!(
+            cli_writeln!(stdout, "{:<20} | {}", "Formatted Number", formatted_number);
+            cli_writeln!(stdout, "{:<20} | {}", "Format Used", format_used_str);
+            cli_writeln!(
                 stdout,
                 "{:<20} | {}",
-                "Country Code", phone_number.country_code
-            )?;
-            writeln!(
+                "Country Code",
+                phone_number.country_code
+            );
+            cli_writeln!(
                 stdout,
                 "{:<20} | {}",
-                "National Number", phone_number.national_number
-            )?;
-            writeln!(
+                "National Number",
+                phone_number.national_number
+            );
+            cli_writeln!(
                 stdout,
                 "{:<20} | {}",
                 "Region Code",
@@ -316,20 +365,18 @@ fn print_formatted_output(
                     .map(|r| r.as_region_str())
                     .as_deref()
                     .unwrap_or("None")
-            )?;
-            writeln!(stdout, "{:<20} | {}", "Is Valid", is_valid)?;
-            writeln!(stdout)?; // пустая строка для разделения
+            );
+            cli_writeln!(stdout, "{:<20} | {}", "Is Valid", is_valid);
+            cli_write_str!(stdout, "\n");
         }
         _ => {
-            writeln!(
+            cli_writeln!(
                 stdout,
                 "Unknown output mode: '{}'. Use 'plaintext', 'json', or 'wide'.",
                 output_mode
-            )?;
+            );
         }
     }
-
-    Ok(())
 }
 
 fn execute_parse(
@@ -339,16 +386,23 @@ fn execute_parse(
 ) -> Result<(), Box<dyn Error>> {
     let phone_number = util.parse(&options.number, region)?;
 
+    let stdout_raw = io::stdout();
+    let mut stdout = BufWriter::with_capacity(BUF_CAPACITY, stdout_raw.lock());
+    let format_fmt =
+        PhoneNumberFormat::from_str(&options.format).unwrap_or(PhoneNumberFormat::E164);
+
     print_formatted_output(
-        &mut io::stdout(),
+        &mut stdout,
         util,
         &phone_number,
         Some(&options.number),
+        format_fmt,
         &options.format,
         region,
         &options.output,
-    )?;
+    );
 
+    stdout.flush()?;
     Ok(())
 }
 
@@ -358,7 +412,11 @@ fn execute_find(
     region: Option<Region>,
 ) -> Result<(), Box<dyn Error>> {
     let source: Source = options.input.parse()?;
-    let mut stdout = io::stdout();
+
+    let stdout_raw = io::stdout();
+    let mut stdout = BufWriter::with_capacity(BUF_CAPACITY, stdout_raw.lock());
+    let format_fmt =
+        PhoneNumberFormat::from_str(&options.format).unwrap_or(PhoneNumberFormat::E164);
 
     let factory = PhoneNumberMatcherFactory::new_for_util(util);
 
@@ -384,11 +442,11 @@ fn execute_find(
                     util,
                     &found.number,
                     None,
+                    format_fmt,
                     &options.format,
                     region,
                     &options.output,
-                )
-                .unwrap();
+                );
             }
             FoundToken::NoPhone(_) => {}
         },
@@ -404,21 +462,50 @@ fn execute_mask(
     region: Option<Region>,
 ) -> Result<(), Box<dyn Error>> {
     let mask_util = PhoneMaskUtil::new_for_util(util.clone());
-    let mut stdout = io::stdout();
 
-    let source: Source = match &options.mask_type {
-        MaskType::Constant(constant_mask) => constant_mask.input.as_str().parse(),
-        MaskType::Token(token_mask) => token_mask.input.as_str().parse(),
-        MaskType::Hash(hash_mask) => hash_mask.input.as_str().parse(),
-        MaskType::Mask(format_mask) => format_mask.input.as_str().parse(),
-    }?;
-
+    let stdout_raw = io::stdout();
+    let mut stdout = BufWriter::with_capacity(BUF_CAPACITY, stdout_raw.lock());
+    let source: Source = options.mask_type.input_str().parse()?;
     let factory = PhoneNumberMatcherFactory::new_for_util(util.clone());
+    let base_hmac = match &options.mask_type {
+        MaskType::Hash(_)
+        | MaskType::Token(TokenMask {
+            without_hash: false,
+            ..
+        }) => Some(
+            Hmac::<Sha256>::new_from_slice(&get_hmac_key()).expect("HMAC initialization failed"),
+        ),
+        _ => None,
+    };
 
-    let key = match &options.mask_type {
-        MaskType::Hash(_) => get_hmac_key(),
-        MaskType::Token(o) if !o.without_hash => get_hmac_key(),
-        _ => Default::default(),
+    let constant_mask_value = if let MaskType::Constant(ref c) = options.mask_type {
+        Some(c.value.as_bytes())
+    } else {
+        None
+    };
+
+    let hash_prefix = if let MaskType::Hash(ref h) = options.mask_type {
+        h.prefix.as_deref().map(|s| s.as_bytes())
+    } else {
+        None
+    };
+
+    let mask_format_fmt = if let MaskType::Mask(ref m) = options.mask_type {
+        m.format.as_ref().map(|format_str| {
+            PhoneNumberFormat::from_str(format_str).unwrap_or(PhoneNumberFormat::E164)
+        })
+    } else {
+        None
+    };
+
+    let mask_config = if let MaskType::Mask(ref m) = options.mask_type {
+        Some(MaskDigitsConfig {
+            mask_char: m.mask_char,
+            min_masked: m.min_masked,
+            max_unmasked: m.max_unmasked,
+        })
+    } else {
+        None
     };
 
     source.search_phone_numbers(
@@ -438,52 +525,41 @@ fn execute_mask(
         },
         |token| match token {
             FoundToken::Phone(found, s) => match &options.mask_type {
-                MaskType::Constant(c) => {
-                    write!(stdout, "{}", c.value).unwrap();
+                MaskType::Constant(_) => {
+                    handle_pipe!(stdout.write_all(constant_mask_value.unwrap()));
                 }
-                MaskType::Token(t) => {
-                    if !t.without_hash {
-                        mask_util
-                            .tokenize(
-                                &found.number,
-                                PhoneMacHasher(Hmac::<Sha256>::new_from_slice(&key).unwrap()),
-                                &mut stdout,
-                            )
-                            .unwrap();
+                MaskType::Token(_) => {
+                    if let Some(base) = base_hmac.clone() {
+                        let hasher = PhoneMacHasher(base);
+                        handle_pipe!(mask_util.tokenize(&found.number, hasher, &mut stdout));
                     } else {
-                        mask_util.tokenize(&found.number, (), &mut stdout).unwrap();
+                        handle_pipe!(mask_util.tokenize(&found.number, (), &mut stdout));
                     }
                 }
-                MaskType::Hash(h) => {
-                    let hash_val = PhoneMacHasher(Hmac::<Sha256>::new_from_slice(&key).unwrap())
-                        .hash_phone(&found.number)
-                        .unwrap();
-                    if let Some(ref p) = h.prefix {
-                        write!(stdout, "{}{}", p, hash_val).unwrap();
+                MaskType::Hash(_) => {
+                    let hasher = PhoneMacHasher(base_hmac.clone().unwrap());
+                    let hash_val = hasher.hash_phone(&found.number).unwrap();
+                    let mut buf = [0; 128];
+                    if let Some(p) = hash_prefix {
+                        handle_pipe!(stdout.write_all(p));
+                        cli_write_str!(stdout, hash_val.as_hex(&mut buf));
                     } else {
-                        write!(stdout, "{}", hash_val).unwrap();
+                        cli_write_str!(stdout, hash_val.as_hex(&mut buf));
                     }
                 }
-                MaskType::Mask(m) => {
-                    let config = MaskDigitsConfig {
-                        mask_char: m.mask_char,
-                        min_masked: m.min_masked,
-                        max_unmasked: m.max_unmasked,
-                    };
+                MaskType::Mask(_) => {
+                    let config = mask_config.unwrap();
 
-                    if let Some(format) = &m.format {
-                        let format_fmt =
-                            PhoneNumberFormat::from_str(format).unwrap_or(PhoneNumberFormat::E164);
-
-                        let masked = mask_util.format_and_mask(&found.number, format_fmt, config);
-                        write!(stdout, "{}", masked).unwrap();
+                    if let Some(fmt) = mask_format_fmt {
+                        let masked = mask_util.format_and_mask(&found.number, fmt, config);
+                        cli_write_str!(stdout, &masked);
                     } else {
-                        mask_util.mask_digits(s, config, &mut stdout).unwrap();
+                        handle_pipe!(mask_util.mask_digits(s, config, &mut stdout));
                     }
                 }
             },
             FoundToken::NoPhone(text) => {
-                write!(stdout, "{}", text).unwrap();
+                cli_write_str!(stdout, text);
             }
         },
     )?;

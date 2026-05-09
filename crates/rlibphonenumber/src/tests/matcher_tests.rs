@@ -282,7 +282,6 @@ mod tests {
 
     #[test]
     fn test_is_latin_letter() {
-        // Мы используем тип-заглушку для вызова метода структуры
         type DummyMatcher<'a> = PhoneNumberMatcherInternal<
             'a,
             crate::phonenumberutil::phonenumberutil_internal::PhoneNumberUtilInternal,
@@ -524,7 +523,6 @@ mod tests {
 
     #[test]
     fn test_null_input() {
-        // В Rust строки не могут быть null, так что проверяем только передачу None вместо Region.
         assert!(has_no_matches(find_numbers("foobar", None)));
     }
 
@@ -624,7 +622,6 @@ mod tests {
     #[test]
     fn test_removal_not_supported() {
         // Iterator.remove() отсутствует в стандартном интерфейсе Iterator языка Rust.
-        // Отсутствие этого метода гарантируется компилятором.
     }
 
     // ──────────────────────────── Static test cases ────────────────────────────
