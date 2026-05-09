@@ -64,7 +64,7 @@ export class Rlibphonenumber {
 
         const generated = this.metadataRunner(src)
 
-        return dag.directory()
+        const dir = dag.directory()
             .withDirectory(
                 "crates/rlibphonenumber/src/generated",
                 generated.directory("/project/crates/rlibphonenumber/src/generated"),
@@ -83,6 +83,12 @@ export class Rlibphonenumber {
                 generated.directory("/project/crates/rlibphonenumber_macro/resources"),
             )
             .withNewFile(LOCK_FILE, resolvedTag + "\n")
+
+        const bumped = await this.bumpVersionIfNeeded(dir, tag)
+
+        return dir
+            .withDirectory('crates/rlibphonenumber/', bumped.directory('/project/crates/rlibphonenumber/'))
+            .withDirectory('crates/rlibphonenumber_cli/', bumped.directory('/project/crates/rlibphonenumber_cli/'))
     }
 
     @func({ cache: 'never' })
@@ -123,29 +129,44 @@ export class Rlibphonenumber {
     }
 
     @func()
-    async bumpVersion(
+    async bumpVersionIfNeeded(
         @argument() source: Directory,
         tag: string,
     ): Promise<Directory> {
         const cargoRegistry = dag.cacheVolume("cargo-registry")
+        const cargoBin = dag.cacheVolume("cargo-bin")
 
-        const ctr = dag.container()
+        let ctr = dag.container()
             .from(RUST_IMAGE)
             .withExec(["apt-get", "update", "-qq"])
-            .withExec(["apt-get", "install", "-y", "--no-install-recommends", "jq"])
+            .withExec(["apt-get", "install", "-y", "--no-install-recommends", "jq", "git"])
             .withMountedCache("/usr/local/cargo/registry", cargoRegistry)
-            .withMountedCache("/usr/local/cargo/bin", dag.cacheVolume("cargo-bin"))
+            .withMountedCache("/usr/local/cargo/bin", cargoBin)
             .withMountedDirectory("/project", source)
             .withWorkdir("/project")
+            .withExec(["git", "config", "--global", "safe.directory", "*"])
+
+        const gitStatus = await ctr
+            .withExec(["bash", "-c", "git status --porcelain"])
+            .stdout()
+
+        if (gitStatus.trim() === "") {
+            console.log("No changes detected by git. Skipping version bump.");
+            return dag.directory();
+        }
+
+        console.log("Changes detected. Bumping versions...");
+
+        ctr = ctr
             .withExec(["cargo", "install", "cargo-edit", "--locked"])
             .withExec(["cargo", "set-version", "--bump", "patch",
                 "-p", "rlibphonenumber",
-                "-p", "rlibphonenumber_macro",
+                "-p", "rlibphonenumber_cli",
             ])
 
         const newVersion = (await ctr
             .withExec(["bash", "-c",
-                "cargo metadata --format-version 1 --no-deps | jq -r '.packages[0].version'",
+                "cargo metadata --format-version 1 --no-deps | jq -r '.packages[] | select(.name==\"rlibphonenumber\") | .version'",
             ])
             .stdout()).trim()
 
