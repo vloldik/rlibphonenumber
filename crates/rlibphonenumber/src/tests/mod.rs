@@ -17,6 +17,9 @@ mod common {
     pub static ONCE: std::sync::Once = std::sync::Once::new();
     static UTIL: LazyLock<PhoneNumberUtilInternal> =
         LazyLock::new(|| PhoneNumberUtilInternal::new_for_metadata(load_metadata()).unwrap());
+    static MATCHER_FACTORY: LazyLock<
+        PhoneNumberMatcherFactory<PhoneNumberUtilInternal, &'static PhoneNumberUtilInternal>,
+    > = LazyLock::new(|| PhoneNumberMatcherFactory::new_for_util(get_phone_util()));
 
     pub fn get_phone_mask_util()
     -> PhoneMaskUtil<PhoneNumberUtilInternal, &'static PhoneNumberUtilInternal> {
@@ -36,8 +39,9 @@ mod common {
     }
 
     pub fn get_phone_matcher_factory()
-    -> PhoneNumberMatcherFactory<PhoneNumberUtilInternal, &'static PhoneNumberUtilInternal> {
-        PhoneNumberMatcherFactory::new_for_util(get_phone_util())
+    -> &'static PhoneNumberMatcherFactory<PhoneNumberUtilInternal, &'static PhoneNumberUtilInternal>
+    {
+        &MATCHER_FACTORY
     }
 
     pub fn load_metadata() -> PhoneMetadataCollection {
