@@ -1,4 +1,4 @@
-# rlibphonenumber-cli
+# Rlibphonenumber cli (rpn)
 
 A command-line interface for [rlibphonenumber](https://github.com/vloldik/rlibphonenumber) — a Rust port of Google's [libphonenumber](https://github.com/google/libphonenumber) Java library.
 
@@ -9,6 +9,12 @@ Parse, validate, find, and mask phone numbers from files, URLs, SSH paths, and G
 ## Installation
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/vloldik/rlibphonenumber/main/workspaces/rlibphonenumber/crates/rlibphonenumber_cli/install.sh | bash
+```
+
+You can use `cargo install`
+
+```bash
 cargo install --path .
 ```
 
@@ -16,7 +22,7 @@ Or build from source:
 
 ```bash
 cargo build --release
-./target/release/rlibphonenumber-cli --help
+./target/release/rpn --help
 ```
 
 ---
@@ -39,10 +45,10 @@ Compile an XML metadata file into a binary `.bin` artifact, and optionally emit 
 
 ```bash
 # Basic build
-rlibphonenumber-cli metadata -i PhoneNumberMetadata.xml build ./out core
+rpn metadata -i PhoneNumberMetadata.xml build ./out core
 
 # Skip validation, emit a Rust module with a custom constant name
-rlibphonenumber-cli metadata -i PhoneNumberMetadata.xml build ./out core \
+rpn metadata -i PhoneNumberMetadata.xml build ./out core \
   --const-name PHONE_METADATA \
   --skip-validate \
   --generate-mod
@@ -63,9 +69,9 @@ Output files written to `<output_dir>`:
 Validate an existing XML or binary metadata file without producing any output files.
 
 ```bash
-rlibphonenumber-cli metadata -i PhoneNumberMetadata.xml validate
-rlibphonenumber-cli metadata -i core.bin validate
-rlibphonenumber-cli metadata -i PhoneNumberMetadata.xml --alternate-formats validate
+rpn metadata -i PhoneNumberMetadata.xml validate
+rpn metadata -i core.bin validate
+rpn metadata -i PhoneNumberMetadata.xml --alternate-formats validate
 ```
 
 ---
@@ -84,9 +90,9 @@ Shared flags apply to all `number` subcommands:
 Parse a single phone number and display its properties.
 
 ```bash
-rlibphonenumber-cli number parse "+49 30 12345678"
-rlibphonenumber-cli number -r DE parse "030 12345678" --output wide
-rlibphonenumber-cli number parse "+12025551234" --output json --format international
+rpn number parse "+49 30 12345678"
+rpn number -r DE parse "030 12345678" --output wide
+rpn number parse "+12025551234" --output json --format international
 ```
 
 | Flag | Short | Default | Description |
@@ -99,9 +105,9 @@ rlibphonenumber-cli number parse "+12025551234" --output json --format internati
 Stream text from a source and extract all phone numbers found in it.
 
 ```bash
-rlibphonenumber-cli number find ./contacts.txt
-rlibphonenumber-cli number find https://example.com/data.txt --output json
-rlibphonenumber-cli number -r US find ./emails.txt --leniency possible --max-tries 1000
+rpn number find ./contacts.txt
+rpn number find https://example.com/data.txt --output json
+rpn number -r US find ./emails.txt --leniency possible --max-tries 1000
 ```
 
 | Flag | Short | Default | Description |
@@ -119,19 +125,19 @@ Stream text from a source, replacing every detected phone number with a masked v
 
 ```bash
 # Replace all numbers with a fixed string
-rlibphonenumber-cli number mask constant ./log.txt "[REDACTED]"
+rpn number mask constant ./log.txt "[REDACTED]"
 
 # Replace with a reversible semantic token (e.g. PHONE_XX_XXXXXXXX#<hash>)
-rlibphonenumber-cli number mask token ./log.txt
-rlibphonenumber-cli number mask token ./log.txt --without-hash   # no HMAC suffix
+rpn number mask token ./log.txt
+rpn number mask token ./log.txt --without-hash   # no HMAC suffix
 
 # Replace with an HMAC-SHA256 hash
-rlibphonenumber-cli number mask hash ./log.txt
-rlibphonenumber-cli number mask hash ./log.txt --prefix "ph:"
+rpn number mask hash ./log.txt
+rpn number mask hash ./log.txt --prefix "ph:"
 
 # Format then partially mask digits
-rlibphonenumber-cli number mask mask ./log.txt
-rlibphonenumber-cli number mask mask ./log.txt --format international --mask-char '#' --min-masked 6
+rpn number mask mask ./log.txt
+rpn number mask mask ./log.txt --format international --mask-char '#' --min-masked 6
 ```
 
 Shared `mask` flags:
@@ -189,12 +195,12 @@ The expression must return a `bool`. Return `true` to **keep** a field, `false` 
 
 ```bash
 # Drop example numbers from all descriptors
-rlibphonenumber-cli metadata -i PhoneNumberMetadata.xml \
+rpn metadata -i PhoneNumberMetadata.xml \
   --filter 'field != "example_number"' \
   build ./out lite
 
 # Keep only US and CA regions
-rlibphonenumber-cli metadata -i PhoneNumberMetadata.xml \
+rpn metadata -i PhoneNumberMetadata.xml \
   --filter 'region == "US" || region == "CA"' \
   build ./out north_america
 ```

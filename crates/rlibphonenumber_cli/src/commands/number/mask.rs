@@ -68,6 +68,8 @@ impl MaskType {
             MaskType::Hash(h) => &h.input,
             MaskType::Mask(m) => &m.input,
         }
+        .as_deref()
+        .unwrap_or("-")
     }
 }
 
@@ -77,9 +79,9 @@ impl MaskType {
 pub struct ConstantMask {
     /// input source (file, URL, ssh, git)
     #[argh(positional)]
-    pub input: String,
+    pub input: Option<String>,
     /// the constant string to replace the phone number with
-    #[argh(positional)]
+    #[argh(option, default = "String::from(\"<REDACTED>\")")]
     pub value: String,
 }
 
@@ -89,7 +91,7 @@ pub struct ConstantMask {
 pub struct TokenMask {
     /// input source (file, URL, ssh, git)
     #[argh(positional)]
-    pub input: String,
+    pub input: Option<String>,
     /// whether to exclude the hash in the token
     #[argh(switch, short = 'n')]
     pub without_hash: bool,
@@ -101,7 +103,7 @@ pub struct TokenMask {
 pub struct HashMask {
     /// input source (file, URL, ssh, git)
     #[argh(positional)]
-    pub input: String,
+    pub input: Option<String>,
     /// prefix to prepend to the hash
     #[argh(option, short = 'p')]
     pub prefix: Option<String>,
@@ -113,7 +115,7 @@ pub struct HashMask {
 pub struct FormatMask {
     /// input source (file, URL, ssh, git)
     #[argh(positional)]
-    pub input: String,
+    pub input: Option<String>,
     /// formatting string, default empty (fallback to original or E164)
     #[argh(option, short = 'f')]
     pub format: Option<String>,

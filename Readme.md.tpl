@@ -159,3 +159,80 @@ Both benchmarks bypass CPU branch-predictor memorization.
 * **O(1) Pre-Anchored Regexes:** Instead of runtime string concatenation (`"^(?:" + pattern + ")$"`), validation metadata is compiled AOT (Ahead-of-Time). Rust uses `[..]` string slicing to fast-fail boundary checks, bypassing O(N) regex engine sweeps.
 * **`FxHash` Maps:** We replaced standard `SipHash` with `rustc_hash` for ultra-low latency metadata lookups.
 * **Lazy Compilation:** Regexes are compiled lazily inside the metadata wrappers via `OnceLock`, removing centralized cache contention.
+
+## 🔄 v1 to v2 Migration Guide
+
+### 1. Goodbye `rust-protobuf`, Hello `prost`
+We have completely migrated the internal protobuf representation from `rust-protobuf` to `prost`. This results in faster decoding, a smaller binary footprint, and a much more idiomatic Rust experience.
+
+**What you need to change:**
+* **Direct Field Access:** You no longer need to use Java-style getter and setter methods. Instead of calling `phone.get_country_code()` or `phone.set_national_number(123)`, you now access and modify the public struct fields directly:
+  ```rust
+  // v1 (rust-protobuf)
+  let cc = phone.get_country_code();
+  
+  // v2 (prost)
+  let cc = phone.country_code;
+  ```
+* **Idiomatic Types:** Protobuf `optional` and `repeated` fields now cleanly map to standard `Option<T>` and `Vec<T>`.
+
+### 2. Loading Custom Metadata via `decode`
+If you opt out of the `builtin_metadata` feature to shrink your binary or use custom-filtered telecom rules, loading your own metadata is now seamlessly handled by `prost::Message::decode`.
+
+```rust
+use rlibphonenumber::PhoneMetadataCollection;
+use prost::Message;
+
+// Load your compiled binary metadata
+let raw_bytes = include_bytes!("path/to/custom_metadata.bin");
+let custom_collection = PhoneMetadataCollection::decode(&raw_bytes[..]).unwrap();
+```
+
+### 3. Validating Custom Metadata (Do it at Compile Time!)
+**⚠️ Important:** `v2` enforces strict correctness. Validating metadata involves verifying byte lengths (`< 64`), checking region codes, and compiling hundreds of regular expressions to catch syntax errors. 
+
+Because **this process is slow**, performing validation dynamically at runtime will significantly degrade your application's startup time or risk unexpected runtime panics if the metadata is malformed. **You should always validate custom metadata at compile-time or prepare-time.**
+
+You have two ways to do this:
+
+#### Option A: Using the CLI (Recommended)
+The easiest way to prepare and check your data is via the provided `rlibphonenumber_cli`. The CLI uses `argh` to expose explicit `Build` and `Validate` commands:
+
+```rust
+// Internally handled by the CLI:
+#[derive(FromArgs, Debug)]
+#[argh(subcommand)]
+pub enum MetadataAction {
+    Build(BuildAction),
+    Validate(ValidateAction),
+}
+```
+You can simply run the CLI tool in your CI/CD pipeline or preparation scripts to guarantee the metadata is flawless before it ever reaches your application:
+```bash
+rlibphonenumber-cli validate --input custom_metadata.bin
+```
+
+#### Option B: Programmatic Validation (e.g., in `build.rs`)
+If you are building custom tooling or a `build.rs` script, you can invoke the validation logic directly using `validate_metadata`. If this passes, you can safely inject the metadata into your app knowing it won't panic or fail regex compilation at runtime.
+
+```rust
+use rlibphonenumber::{
+    PhoneMetadataCollection, 
+    metadata_validator::validate_metadata
+};
+use prost::Message;
+
+fn main() {
+    let raw_bytes = std::fs::read("custom_metadata.bin").unwrap();
+    let collection = PhoneMetadataCollection::decode(&raw_bytes[..])
+        .expect("Failed to decode protobuf");
+
+    // Validate regexes, lengths, and region boundaries AOT
+    // The second parameter specifies whether to allow alternate formats
+    if let Err(err) = validate_metadata(collection, false) {
+        panic!("Metadata validation failed during build: {}", err);
+    }
+    
+    // Proceed to embed or use the validated metadata...
+}
+```
