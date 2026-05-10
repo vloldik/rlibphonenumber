@@ -3,13 +3,14 @@ name = "rlibphonenumber_cli"
 version = "0.1.0"
 edition = "2024"
 readme.workspace = true
+license = "Apache-2.0"
 
 [dependencies]
 regex = "1.12.3"
 roxmltree = "0.21.1"
 cel = "0.13.0"
 thiserror = { workspace = true }
-rlibphonenumber = { path = "../rlibphonenumber", features = [
+rlibphonenumber = { path = "../rlibphonenumber", version = "2.0", features = [
     "digest",
     "digest_mac",
 ] }
