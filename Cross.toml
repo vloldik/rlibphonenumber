@@ -2,5 +2,8 @@
 [target.aarch64-unknown-linux-gnu]
 pre-build =[
     "apt-get update",
-    "DEBIAN_FRONTEND=noninteractive apt-get install -y protobuf-compiler"
+    "DEBIAN_FRONTEND=noninteractive apt-get install -y curl unzip",
+    "curl -sLO https://github.com/protocolbuffers/protobuf/releases/download/v25.3/protoc-25.3-linux-x86_64.zip",
+    "unzip -o protoc-25.3-linux-x86_64.zip -d /usr/local",
+    "rm protoc-25.3-linux-x86_64.zip"
 ]
