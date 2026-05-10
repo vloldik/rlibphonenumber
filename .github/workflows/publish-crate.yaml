@@ -19,6 +19,11 @@ jobs:
             - name: Set up Rust
               uses: dtolnay/rust-toolchain@1.90.0
 
+            - name: Install Protoc
+              uses: arduino/setup-protoc@v3
+              with:
+                repo-token: ${{ secrets.GITHUB_TOKEN }}
+
             - name: Install protoc (apt)
               run: |
                 sudo apt-get update
