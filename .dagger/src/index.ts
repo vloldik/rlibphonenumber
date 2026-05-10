@@ -164,9 +164,14 @@ export class Rlibphonenumber {
         ctr = ctr
             .withExec(["git", "config", "--global", "safe.directory", "*"])
 
-        const gitStatus = await ctr
+        const rawGitStatus: string = await ctr
             .withExec(["bash", "-c", "git status --porcelain -uno"])
             .stdout()
+
+        const gitStatus = rawGitStatus
+            .split('\n')
+            .filter(line => line.trim() !== '' && !line.includes('Cargo.lock'))
+            .join('\n')
 
         if (gitStatus.trim() === "") {
             console.log("No tracked changes detected by git. Skipping version bump.");
