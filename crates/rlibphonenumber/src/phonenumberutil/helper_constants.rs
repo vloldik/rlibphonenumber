@@ -14,7 +14,7 @@
 // limitations under the License.
 
 #[cfg(all(feature = "lite", not(feature = "regex")))]
-use crate::generated::uniprops_digits_pat;
+use crate::generated::{uniprops_digits_pat, uniprops_separators_pat};
 
 // The minimum and maximum length of the national significant number.
 pub const MIN_LENGTH_FOR_NSN: usize = 2;
@@ -45,8 +45,6 @@ pub const VALID_PUNCTUATION: &str = "-x\
 // This corresponds to SECOND_NUMBER_START in the java version.
 pub const CAPTURE_UP_TO_SECOND_NUMBER_START: &str = r"(.*)[\\/] *x";
 
-pub const REGION_CODE_FOR_NON_GEO_ENTITY: &str = "001";
-
 pub const PLUS_SIGN: &str = "+";
 pub const STAR_SIGN: &str = "*";
 pub const RFC3966_EXTN_PREFIX: &str = ";ext=";
@@ -60,6 +58,12 @@ pub const DIGITS: &str = r"\p{Nd}";
 
 #[cfg(all(feature = "lite", not(feature = "regex")))]
 pub const DIGITS: &str = uniprops_digits_pat::uniprops::DIGITS_ND;
+
+#[cfg(feature = "regex")]
+pub const SEPARATORS: &str = r"\p{Z}";
+
+#[cfg(all(feature = "lite", not(feature = "regex")))]
+pub const SEPARATORS: &str = uniprops_separators_pat::uniprops::SEPARATORS;
 
 pub const VALID_ALPHA: &str = "a-z";
 pub const VALID_ALPHA_INCL_UPPERCASE: &str = "A-Za-z";

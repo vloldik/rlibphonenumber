@@ -1,1 +1,1 @@
-include!(concat!(env!("OUT_DIR"), "/proto_gen/mod.rs"));
+include!(concat!(env!("OUT_DIR"), "/i18n.phonenumbers.rs"));

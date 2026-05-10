@@ -2,7 +2,8 @@ use std::{borrow::Cow, fmt::Display, str::FromStr};
 
 use crate::{
     NumberLengthType, PHONE_NUMBER_UTIL, ParseError, PhoneNumber, PhoneNumberFormat,
-    PhoneNumberType, ValidationError,
+    PhoneNumberType, ValidationError, enums::Region,
+    phonenumberutil::helper_functions::get_national_significant_number_owned,
 };
 
 impl PhoneNumber {
@@ -10,7 +11,7 @@ impl PhoneNumber {
         PHONE_NUMBER_UTIL.format(self, format)
     }
 
-    pub fn format_in_original_format(&self, region_calling_from: impl AsRef<str>) -> Cow<'_, str> {
+    pub fn format_in_original_format(&self, region_calling_from: Region) -> Cow<'_, str> {
         PHONE_NUMBER_UTIL.format_in_original_format(self, region_calling_from)
     }
 
@@ -20,7 +21,7 @@ impl PhoneNumber {
 
     pub fn format_for_mobile_dialing(
         &self,
-        region_calling_from: impl AsRef<str>,
+        region_calling_from: Region,
         with_formatting: bool,
     ) -> Option<Cow<'_, str>> {
         PHONE_NUMBER_UTIL.format_number_for_mobile_dialing(
@@ -32,20 +33,20 @@ impl PhoneNumber {
 
     pub fn format_out_of_country_calling_number(
         &self,
-        region_calling_from: impl AsRef<str>,
+        region_calling_from: Region,
     ) -> Cow<'_, str> {
         PHONE_NUMBER_UTIL.format_out_of_country_calling_number(self, region_calling_from)
     }
 
     pub fn format_out_of_country_keeping_alpha_chars(
         &self,
-        region_calling_from: impl AsRef<str>,
+        region_calling_from: Region,
     ) -> Cow<'_, str> {
         PHONE_NUMBER_UTIL.format_out_of_country_keeping_alpha_chars(self, region_calling_from)
     }
 
-    pub fn get_region_code<'a>(&self) -> Option<&'a str> {
-        PHONE_NUMBER_UTIL.get_region_code_for_number(self)
+    pub fn get_region_code(&self) -> Option<Region> {
+        PHONE_NUMBER_UTIL.get_region_for_number(self)
     }
 
     pub fn get_type(&self) -> PhoneNumberType {
@@ -64,7 +65,7 @@ impl PhoneNumber {
         PHONE_NUMBER_UTIL.is_valid_number(self)
     }
 
-    pub fn is_valid_for_region(&self, region: impl AsRef<str>) -> bool {
+    pub fn is_valid_for_region(&self, region: Region) -> bool {
         PHONE_NUMBER_UTIL.is_valid_number_for_region(self, region)
     }
 
@@ -85,7 +86,14 @@ impl PhoneNumber {
     }
 
     pub fn get_national_significant_number(&self) -> String {
-        PHONE_NUMBER_UTIL.get_national_significant_number(self)
+        get_national_significant_number_owned(self)
+    }
+
+    pub fn parse(
+        number_to_parse: impl AsRef<str>,
+        default_region: Option<Region>,
+    ) -> Result<PhoneNumber, ParseError> {
+        PHONE_NUMBER_UTIL.parse(number_to_parse, default_region)
     }
 }
 
@@ -93,7 +101,7 @@ impl FromStr for PhoneNumber {
     type Err = ParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        PHONE_NUMBER_UTIL.parse(s)
+        Self::parse(s, None)
     }
 }
 

@@ -1,5 +1,7 @@
 #include "wrapper.h"
 #include <phonenumbers/phonenumberutil.h>
+#include <phonenumbers/phonenumbermatch.h>
+#include <phonenumbers/phonenumbermatcher.h>
 
 using namespace i18n::phonenumbers;
 
@@ -77,3 +79,32 @@ CppResult test_cpp_impl(rust::Str number_str, rust::Str region_str) {
     return res;
 }
 
+
+rust::Vec<MatchResult> test_cpp_matcher(rust::Str text_str, rust::Str region_str) {
+    static PhoneNumberUtil* util = PhoneNumberUtil::GetInstance();
+
+    std::string text(text_str.data(),   text_str.size());
+    std::string region(region_str.data(), region_str.size());
+
+    PhoneNumberMatcher matcher(*util, text, region,
+                               PhoneNumberMatcher::VALID,
+                               /*max_tries=*/std::numeric_limits<int>::max());
+
+    rust::Vec<MatchResult> results;
+    while (matcher.HasNext()) {
+        PhoneNumberMatch match;
+        matcher.Next(&match);
+
+        MatchResult r;
+        r.start      = static_cast<int32_t>(match.start());
+        r.end        = static_cast<int32_t>(match.end());
+        r.raw_string = match.raw_string();
+
+        std::string e164;
+        util->Format(match.number(), PhoneNumberUtil::E164, &e164);
+        r.e164 = e164;
+
+        results.push_back(r);
+    }
+    return results;
+}

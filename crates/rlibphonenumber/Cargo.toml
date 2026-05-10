@@ -1,6 +1,6 @@
 [package]
 name = "rlibphonenumber"
-version = "1.1.6"
+version = "2.0.0"
 edition = "2024"
 
 rust-version = "1.88"
@@ -25,11 +25,16 @@ categories = [
 build = "build/rust_build.rs"
 
 [features]
-default = ["global_static", "regex"]
+default = ["builtin_metadata", "global_static", "regex", "digest", "digest_mac"]
+
+builtin_metadata = []
+global_static = ["builtin_metadata"]
+
 regex = ["dep:regex"]
 lite = ["dep:regex-lite"]
 
-global_static = []
+digest_mac = ["digest", "digest?/mac"]
+digest = ["dep:digest"]
 serde = ["global_static", "dep:serde"]
 
 [lib]
@@ -38,16 +43,15 @@ path = "src/lib.rs"
 
 
 [dependencies]
+prost = { workspace = true }
+
 # logging standard in rust
 log = "0.4"
-# protobuf lib required to use .proto files from assets
-protobuf = "3.7"
 # optimized concurrent map
 dashmap = "5.5"
 # just regex package
 regex = { version = "1.10", optional = true }
 regex-lite = { version = "0.1", optional = true }
-
 
 thiserror = { workspace = true }
 
@@ -57,26 +61,27 @@ itoa = "1.0"
 fast-cat = "0.1"
 # lib for derive enum iteration
 strum = { version = "0.26", features = ["derive"] }
-# Simple lib to converts any unicode valid chars into decimals 
-rlibphonenumbers_macro = { path = "../rlibphonenumbers_macro", version = "0.1" }
+# Simple lib to converts any unicode valid chars into decimals
+rlibphonenumber_macro = { path = "../rlibphonenumber_macro", version = "0.2" }
 zeroes_itoa = { path = "../zeroes_itoa", version = "0.1" }
 
-serde = { version = "1", optional = true }
+serde = { workspace = true, optional = true }
 
 rustc-hash = { version = "2.1" }
 
+digest = { version = "0.11", optional = true }
+
 [build-dependencies]
 thiserror = "1.0"
-protobuf-codegen = "3.7"
-protobuf = "3.7"
-uniprops-gen = "0.3"
+prost-build = "0.14"
+uniprops-gen = "0.3.5"
 
 [dev-dependencies]
 colog = "1.3"
 env_logger = "0.11"
 criterion = "0.5"
 phonenumber = "0.3"
-phonelib = "1.0.3"
+phonelib = "1.1.3"
 serde_json = "1.0"
 
 [[bench]]
@@ -89,4 +94,8 @@ harness = false
 
 [[bench]]
 name = "create_bench"
+harness = false
+
+[[bench]]
+name = "matcher_bench"
 harness = false

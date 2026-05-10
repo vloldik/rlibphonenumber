@@ -25,7 +25,20 @@ pub mod uniprops_without_nl {
     include!(concat!(env!("OUT_DIR"), "/uniprops_without_nl.rs"));
 }
 
+pub mod uniprops_latin_letters {
+    include!(concat!(env!("OUT_DIR"), "/uniprops_latin_letters.rs"));
+}
+
+pub mod uniprops_currencies {
+    include!(concat!(env!("OUT_DIR"), "/uniprops_currencies.rs"));
+}
+
 #[cfg(all(feature = "lite", not(feature = "regex")))]
 pub mod uniprops_digits_pat {
     include!(concat!(env!("OUT_DIR"), "/uniprops_digits_pat.rs"));
+}
+
+#[cfg(all(feature = "lite", not(feature = "regex")))]
+pub mod uniprops_separators_pat {
+    include!(concat!(env!("OUT_DIR"), "/uniprops_separators_pat.rs"));
 }

@@ -2,7 +2,8 @@
 resolver = "2"
 members = [
     "crates/rlibphonenumber",
-    "crates/rlibphonenumbers_macro",
+    "crates/rlibphonenumber_cli",
+    "crates/rlibphonenumber_macro",
     "fuzz",
     "crates/zeroes_itoa",
 ]
@@ -10,7 +11,14 @@ members = [
 [workspace.dependencies]
 # helpful error package
 thiserror = "1.0"
+prost = "0.14"
+serde = "1.0"
 
 [workspace.package]
-
 readme = "Readme.md"
+
+[profile.release]
+strip = true
+opt-level = 3
+lto = true
+codegen-units = 1

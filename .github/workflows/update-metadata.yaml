@@ -1,59 +1,62 @@
 name: Update Metadata & Push
 
 on:
-  schedule:
-    - cron: '0 0 * * 0'
-  workflow_dispatch: 
-
+    schedule:
+        - cron: '0 0 * * 0'
+    workflow_dispatch:
 
 permissions:
-  contents: write
-  pull-requests: write
+    contents: write
+    pull-requests: write
 
 jobs:
-  update-and-publish:
-    runs-on: ubuntu-latest
+    update-and-publish:
+        runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v5
-        with:
-          cache: maven
-          java-version: '17'
-          distribution: 'temurin'
+            - name: Generate Metadata using Dagger
+              uses: dagger/dagger-for-github@v8
+              with:
+                  version: "latest"
+                  call: generate --source . --tag latest-supported export --path .
 
-      - name: Install Protobuf Compiler
-        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+            - name: Check for changes
+              id: check
+              run: |
+                  if [[ -z $(git status --porcelain) ]]; then
+                      echo "changes=false" >> "$GITHUB_OUTPUT"
+                      echo "No changes detected by git. Skipping version bump."
+                  else
+                      echo "changes=true" >> "$GITHUB_OUTPUT"
+                      echo "Changes detected."
+                      
+                      NEW_VERSION=$(grep -m1 -oP '^version\s*=\s*"\K[^"]+' crates/rlibphonenumber/Cargo.toml)
+                      echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+                      echo "New version bumped to: $NEW_VERSION"
+                  fi
 
-      - name: Set up Rust
-        # Required for cargo-edit
-        uses: dtolnay/rust-toolchain@1.91.0
+            - name: Run Tests using Dagger
+              if: steps.check.outputs.changes == 'true'
+              uses: dagger/dagger-for-github@v8
+              with:
+                  version: "latest"
+                  call: test --source . --fuzz-time 60
 
-      - name: Generate Metadata
-        id: generate_metadata
-        run: |
-          chmod +x ./tools/scripts/generate_metadata.sh
-          ./tools/scripts/generate_metadata.sh --tag latest-supported --update-version
-      
-      - name: Run Tests
-        if: steps.generate_metadata.outputs.changes == 'true'
-        run: cargo test -p rlibphonenumber -p rlibphonenumbers_macro
+            - name: Create Pull Request
+              if: steps.check.outputs.changes == 'true'
+              uses: peter-evans/create-pull-request@v6
+              with:
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  commit-message: "[release] Update metadata to latest and bump version to ${{ steps.check.outputs.new_version }}"
+                  branch: "chore/update-metadata-${{ steps.check.outputs.new_version }}"
+                  title: "Release ${{ steps.check.outputs.new_version }}. Update metadata"
+                  body: |
+                      Automated update of libphonenumber metadata.
 
-      - name: Create Pull Request
-        if: steps.generate_metadata.outputs.changes == 'true'
-        uses: peter-evans/create-pull-request@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "[release] Update metadata to latest and bump version to ${{ steps.generate_metadata.outputs.new_version }}"
-          branch: "chore/update-metadata-${{ steps.generate_metadata.outputs.new_version }}"
-          title: "Release ${{ steps.generate_metadata.outputs.new_version }}. Update metadata"
-          body: |
-            Automated update of libphonenumber metadata.
-            
-            - Metadata updated using `latest-supported` tag.
-            - Version bumped to `${{ steps.generate_metadata.outputs.new_version }}`.
-            - `cargo test` passed.
-          labels: automated-pr, release
+                      - Metadata updated using `latest-supported` tag via Dagger pipeline.
+                      - Version bumped to `${{ steps.check.outputs.new_version }}`.
+                      - `dagger call test` passed successfully.
+                  labels: automated-pr, release

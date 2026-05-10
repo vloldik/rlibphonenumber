@@ -1,239 +1,149 @@
-
-# Rlibphonenumber
+# Rlibphonenumber v2
 
 [![Crates.io](https://img.shields.io/crates/v/rlibphonenumber.svg)](https://crates.io/crates/rlibphonenumber)
 [![Docs.rs](https://docs.rs/rlibphonenumber/badge.svg)](https://docs.rs/rlibphonenumber)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![WASM Preview](https://img.shields.io/badge/Live-WASM_Preview-success.svg)](https://vloldik.github.io/rlibphonenumber-wasm/)
 
-A zero-allocation, high-performance Rust port of Google's `libphonenumber` library for parsing, formatting, and validating international phone numbers. 
+A zero-allocation, high-performance Rust port of Google's `libphonenumber` library for parsing, formatting, extracting, and validating international phone numbers. 
 
-🌐 **Live WASM Preview:** [Try the library directly in browser!](https://vloldik.github.io/rlibphonenumber-wasm/)
-
-**Used metadata version: v9.0.30**  
-**Version:** `1.1.1`  
+**Used metadata version:** `v9.0.28`  
+**Package version**: `1.1.6`
 **Base libphonenumber:** `9.0.8`  
 **Min supported Rust version:** `1.88.0`
+---
 
-## 🛡️ Correctness
+## 🚀 What's New in v2 (Migration Guide & Breaking Changes)
 
-Through over **11.2 million iterations** of malformed, randomized, and edge-case inputs, this library has proven **zero mismatches** in parsing, validation rules (`is_valid`, `is_possible`), and formatting outputs (E.164, National, International, RFC3966) compared to the upstream C++ implementation. It provides exact drop-in behavior with Rust's memory safety and high execution speed.
+Version 2 brings a completely redesigned core, shedding legacy implementations in favor of idiomatic, zero-cost Rust abstractions.
 
-## Performance
+*   **Migrated from `rust-protobuf` to `prost`**: The internal representation now uses `prost`, resulting in a smaller footprint, faster decoding, and more idiomatic Rust types.
+*   **Unified `parse` API with `Region` Enum**: `parse` and `parse_with_region` have been merged. The API **no longer accepts string slices** for regions. You must now pass a strictly typed `Region` enum (e.g., `Region::US`).
+*   **O(1) Branchless Region Parsing**: The `Region` enum is generated at compile-time using bitwise shifts (mapping 2-letter ASCII codes to 16-bit discriminants). Parsing `"US"` into `Region::US` now takes exactly 1 CPU cycle without a single `match` branch or `if/else`. Generating a string back is done via a zero-allocation, 4-byte stack structure (`RegionStr`).
+*   **Redesigned Public API Wrapper**: We implemented a custom procedural macro that generates a clean, infallible public API while keeping the complex generic and lifetime-heavy implementations completely internal.
+*   **AOT Metadata Validation**: Custom metadata is now strictly validated at compile time (checking lengths < 64, compiling all regexes to prevent runtime panics).
+*   **Initialization Speedup**: Bootstrapping `PhoneNumberUtil::new()` is now **~10% faster**, taking only **~4.97 ms**.
 
-Performance is measured using `criterion`. We compare `rlibphonenumber` with the popular `rust-phonenumber` (the `phonenumber` crate) and `phonelib` crates.
+## ✨ Enterprise Features
 
-All benchmarks measure the average time required to process a **single phone number**.
+### 🔍 Streaming Matcher (Number Extraction)
+*   **Exact Grouping Leniency:** Validates not just the digits, but whether the user formatted the number exactly according to the country's telecom rules (e.g., rejecting `12-34-567-890` while accepting `(123) 456-7890`).
+*   **Extension Traits:** Simply call `"Call +1 555-0199".find_phone_numbers()` to start extracting.
+*   *Correctness:* The matcher has passed **500,000 iterations of Differential Fuzzing** directly against Google's C++ ICU implementation with zero mismatches.
 
-### Initialization
-`rlibphonenumber` requires initializing `PhoneNumberUtil`, which loads the necessary metadata. This is typically done once at application startup:
-* **`PhoneNumberUtil::new()`**: ~5.33 ms
+### 🛡️ Data Loss Prevention (Masking & Hashing)
+The new `PhoneMaskUtil` is designed for GDPR/PII compliance in high-throughput environments:
+*   **Zero-Allocation Pipeline:** Uses a custom `LenWrite` trait to predict output lengths and write masked numbers or XML tokens directly into `stdout` or file buffers without heap allocations.
+*   **Cryptographic Hashing:** Supports `HMAC` and `SHA256` hashing directly into stack-allocated 64-byte arrays.
+*   **Smart Obfuscation:** Automatically detects and fully masks RFC3966 URIs and phone extensions, leaving only the requested digits visible (e.g., `***-***-1234`).
 
-### Parsing
-Time required to parse a string representation into a phone number object:
+## ⚙️ CI/CD & Dagger Pipelines
 
-| Library | `parse()` | Notes |
-|---|---|---|
-| **`rlibphonenumber`** | **~500 ns** | **Fastest & most reliable** |
-| `rust-phonenumber` | ~1.66 µs | Fails on certain valid numbers.* |
-| `phonelib` | *Failed* | Fails on certain valid numbers. |
+The repository is fully automated using **Dagger** (Infrastructure as Code). Our pipelines automatically:
+1. Fetch the latest `v9.0.x` XML metadata from Google.
+2. Compile and validate the regexes.
+3. Perform Differential Fuzzing against a compiled C++ container.
+4. Auto-bump crate versions.
 
-*\* During testing, we found that `rust-phonenumber` (`rlp`) returns an error on valid phone numbers, such as the Brazilian number `"+55 11 98765-4321"`.*
+---
 
-### Formatting
-Time required to format a parsed phone number object into various standards:
+## 📦 Installation & Feature Flags
 
-| Format | `rlibphonenumber` | `rust-phonenumber` | `phonelib` |
-|---|---|---|---|
-| **E164** | **~33 ns** 🚀 | ~731 ns | ~814 ns |
-| **International** | **~432 ns** | ~1.03 µs | ~905 ns |
-| **National** | **~558 ns** | ~1.45 µs | ~896 ns |
-| **RFC3966** | **~606 ns** | ~1.17 µs | ~1.02 µs |
-
-### Under the Hood: How is it so fast?
-* **Zero-Allocation Formatting:** Intermediate heap allocations are eliminated. By utilizing `Cow<str>`, stack-allocated buffers (via a custom zero-padding `itoa` implementation), and a specialized Builder pattern, formatting numbers rarely touches the system allocator.
-* **Build-Time Anchored Regexes (`RegexTriplets`):** Instead of allocating strings at runtime to wrap patterns in `^(?:...)$`, a custom Java build script pre-compiles and wraps metadata directly into the Protobuf output. At runtime, Rust uses `[..]` string slicing (zero-cost) to extract exact bounds, bypassing the regex engine's O(N) linear search and forcing `O(1)` fast-fail anchor matching.
-* **Fast Hashing:** Replaces the default `SipHash` with `FxHash` (`rustc_hash`) for ultra-low-latency metadata lookups by region code and integer keys.
-* **Lazy Initialization:** Regular expressions are compiled lazily and cached on-demand directly inside metadata wrappers using `std::sync::OnceLock`, removing the locking overhead of a centralized regex cache.
-
-## Installation & Feature Flags
-
-Add `rlibphonenumber` to your `Cargo.toml`. You can choose between the standard regex engine (fastest parsing) or the lite engine (smallest binary size).
-
-### 1. Standard (Recommended for Backend/Desktop)
-Uses the full `regex` crate. Provides maximum parsing performance.
+Add `rlibphonenumber` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
 rlibphonenumber = "1.1.6"
 ```
 
-### 2. Lite (Recommended for WASM/Embedded)
-Uses `regex-lite` to significantly reduce binary size. Parsing is slower than the standard backend but still efficient enough for UI/Validation tasks. Formatting speed remains virtually identical. 
-
-*(Check out our [Live WASM Preview](https://vloldik.github.io/rlibphonenumber-wasm/) to see it in action!)*
-
-```toml
-[dependencies]
-rlibphonenumber = { version = "1.1.1", default-features = false, features = ["lite", "global_static"] }
-```
-
 ### Available Features
 
 | Feature | Description | Default |
 |---|---|---|
-| `regex` | Uses the `regex` crate (SIMD optimizations, large Unicode tables). Best for speed. | ✅ |
-| `lite` | Uses `regex-lite`. Optimizes for binary size. Best for WASM or embedded targets. | ❌ |
-| `global_static` | Enables the lazy-loaded global `PHONE_NUMBER_UTIL` instance. | ✅ |
+| `builtin_metadata` | Embeds the compiled `.bin` metadata into the binary. **Required for `global_static`.** | ✅ |
+| `global_static` | Enables the lazy-loaded global `PHONE_NUMBER_UTIL` and `FindNumberExt` string traits. | ✅ |
+| `regex` | Uses the standard `regex` crate for maximum speed. | ✅ |
+| `lite` | Uses `regex-lite`. Optimizes for binary size (ideal for WASM/Embedded). | ❌ |
+| `digest` | Enables cryptographic hashing of phone numbers (e.g., SHA256) into stack buffers. | ❌ |
+| `digest_mac` | Enables keyed hashing (HMAC) for phone numbers. Depends on `digest`. | ❌ |
 | `serde` | Enables `Serialize`/`Deserialize` for `PhoneNumber`. | ❌ |
 
-## Getting Started
+---
 
-The library exposes a global static `PHONE_NUMBER_UTIL`, but for most common operations, you can use methods directly on the `PhoneNumber` struct.
+## 🛠️ CLI & Custom Metadata Management
 
-### Complete Example
+`rlibphonenumber` includes a powerful CLI for masking files on the fly and compiling custom metadata (e.g., filtering out pager rules via CEL expressions to shrink binary size).
 
+📖 **[Read the dedicated CLI Documentation here.](./crates/rlibphonenumber_cli/Readme.md)**
+
+---
+
+## 🚀 Getting Started
+
+### Parsing & Formatting
 ```rust
-use rlibphonenumber::{
-    PHONE_NUMBER_UTIL,
-    PhoneNumber,
-    PhoneNumberFormat,
-    ParseError,
-};
+use rlibphonenumber::{PHONE_NUMBER_UTIL, PhoneNumber, PhoneNumberFormat, enums::Region};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let number_string = "+1-587-530-2271";
+    // 1. Parse the number (v2 requires the Region enum)
+    let number = PHONE_NUMBER_UTIL.parse("555-0199", Some(Region::US))?;
 
-    // 1. Parse the number
-    // You can use the standard FromStr trait:
-    let number: PhoneNumber = number_string.parse()?;
-
-    println!("✅ Successfully parsed number.");
-    println!("   - Country Code: {}", number.country_code());
-    println!("   - National Number: {}", number.national_number());
-
-    // 2. Validate the number
-    // `is_valid()` performs a full validation (length, prefix, region rules)
-    let is_valid = number.is_valid();
-    println!(
-        "\nIs the number valid? {}",
-        if is_valid { "Yes" } else { "No" }
-    );
-
-    if !is_valid {
-        return Ok(());
+    // 2. Validate
+    if number.is_valid() {
+        // 3. Format
+        println!("E.164: {}", number.format_as(PhoneNumberFormat::E164)); // +15550199
     }
-
-    // 3. Format the number
-    // Display trait uses E164 by default
-    println!("\nDefault Display: {}", number); 
-
-    let e164_format = number.format_as(PhoneNumberFormat::E164);
-    let international_format = number.format_as(PhoneNumberFormat::International);
-    let national_format = number.format_as(PhoneNumberFormat::National);
-    let rfc3966_format = number.format_as(PhoneNumberFormat::RFC3966);
-
-    println!("Formatted Outputs:");
-    println!("   - E.164:         {}", e164_format);         // +15875302271
-    println!("   - International: {}", international_format); // +1 587-530-2271
-    println!("   - National:      {}", national_format);      // (587) 530-2271
-    println!("   - RFC3966:       {}", rfc3966_format);       // tel:+1-587-530-2271
-
-    // 4. Get additional information
-    let number_type = number.get_type(); // e.g., Mobile, FixedLine
-    let region_code = number.get_region_code(); // e.g., "CA"
-
-    println!("\nInfo:");
-    println!("   - Type:   {:?}", number_type);
-    println!("   - Region: {:?}", region_code.unwrap_or("Unknown"));
 
     Ok(())
 }
 ```
 
-### Serde Integration
-
-When the `serde` feature is enabled, `PhoneNumber` serializes to a string (E.164 format) and can be deserialized from a string.
-
+### Finding Numbers in Text (Matcher)
 ```rust
-use rlibphonenumber::PhoneNumber;
-use serde_json::json;
+use rlibphonenumber::phonenumber_matcher::FindNumberExt;
 
 fn main() {
-    let raw = "+15875302271";
-    let number: PhoneNumber = raw.parse().unwrap();
-
-    // Serializes to "+15875302271"
-    let json_output = json!({ "phone": number });
-    println!("{}", json_output); 
-}
-```
-
-## Differential Fuzzing
-
-We invite anyone to verify our correctness parity. The repository includes a Dockerized environment that links Google's C++ `libphonenumber` side-by-side with our Rust implementation via `cxx`.
-
-To run the differential fuzzer locally:
-
-1. Clone the repository and open the provided DevContainer/Docker environment.
-2. Run the `full-cycle` fuzz target to check fully random user inputs and ensure no panics occur:
-   ```sh
-   cargo +nightly fuzz run full-cycle
-   ```
-3. Run the `diff-test` target to compare outputs with the original library (requires the C++ library version to match the metadata version used):
-   ```sh
-   cargo +nightly fuzz run diff-test
-   ```
-
-If the fuzzer ever finds a single input where the Rust output deviates from the C++ output, it will immediately crash and save the artifact.
-
-## Manual Instantiation
-
-By default, this crate enables the `global_static` feature, which initializes a thread-safe, lazy-loaded static instance `PHONE_NUMBER_UTIL`. This allows you to use convenience methods directly on `PhoneNumber`.
-
-If you need granular control over memory usage, wish to avoid global state, or are working in a strict environment, you can disable this feature.
-
-```toml
-[dependencies]
-rlibphonenumber = { version = "1.1.1", default-features = false, features = ["regex"] }
-```
-
-When `global_static` is disabled, helper methods on `PhoneNumber` (like `.format_as()`, `.is_valid()`) **will not be available**. You must instantiate the utility manually.
-
-**⚠️ Performance Note:** `PhoneNumberUtil::new()` compiles regexes upon initialization. This is an expensive operation. Create it once and reuse it (e.g., wrap it in an `Arc` or pass it by reference).
-
-```rust
-use rlibphonenumber::{PhoneNumberUtil, PhoneNumber};
-
-fn main() {
-    // 1. Initialize the utility once
-    let phone_util = PhoneNumberUtil::new();
-
-    let number_str = "+15550109988";
-
-    // 2. Parse using the instance
-    if let Ok(number) = phone_util.parse(number_str, None) {
-        // 3. Use the instance for validation
-        let is_valid = phone_util.is_valid_number(&number).unwrap_or(false);
-        println!("Valid: {}", is_valid);
+    let text = "Contact us at +1 (202) 555-0173 or drop a fax at 020 7183 8750.";
+    
+    // Extension trait directly on &str
+    for match_result in text.find_phone_numbers() {
+        println!("Found: {} at index {}", match_result.number, match_result.start);
     }
 }
 ```
 
-## ⚖️ C++ Comparison & Methodology
+### High-Performance Masking & Hashing
+*(Requires `digest_mac` feature)*
+```rust
+use rlibphonenumber::{PHONE_NUMBER_UTIL, phonenumber_mask::{PhoneMaskUtil, MaskDigitsConfig, PhoneMacHasher}};
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
 
-To ensure absolute fairness and eliminate any Foreign Function Interface (FFI) overhead, we benchmarked `rlibphonenumber` against Google's upstream C++ library using completely native toolchains for both languages (`criterion` for Rust, `google/benchmark` for C++).
+fn main() {
+    let mask_util = PhoneMaskUtil::new();
+    let number = PHONE_NUMBER_UTIL.parse("+12025550173", None).unwrap();
 
-### Build Environment & Methodology
-The C++ library was built from source inside a controlled Docker environment with the **maximum possible performance configuration**:
-*   **Compiler:** C++17 with `-O3 -DNDEBUG` (optimizations enabled, debug assertions disabled).
-*   **Regex Engine:** Compiled directly against Google's ultra-fast **RE2** engine (`-DUSE_RE2=ON`, `-DUSE_ICU_REGEXP=OFF`), replacing the slower default ICU engine.
-*   **Memory Allocator fairness:** In the C++ formatting benchmark, the target `std::string` had `.reserve()` called before formatting to ensure the time measured represents the library's algorithm, not the underlying OS heap allocator.
+    // 1. Partial Masking (***-***-0173)
+    let config = MaskDigitsConfig::new('*', 4, 4); // mask at least 4, leave last 4
+    let masked = mask_util.mask_digits_to_string("+1 202-555-0173 ext. 89", config);
+    println!("Masked: {}", masked);
 
-Both benchmarks run over the exact same set of 12 diverse international phone numbers in a cyclic batch configuration to bypass CPU branch-predictor memorization.
+    // 2. Semantic Tokenization with HMAC
+    let mut mac = Hmac::<Sha256>::new_from_slice(b"my_secret_salt").unwrap();
+    let token = mask_util.tokenize_to_string(&number, PhoneMacHasher(mac)).unwrap();
+    
+    // <Phone country="US" hash="a1b2c3d4...">
+    println!("Token: {}", token); 
+}
+```
 
-### Pure Native Performance Results
-*(Average time to process a single phone number)*
+---
+
+## ⚡ Performance
+
+Benchmarks use `criterion` measuring the average time to process a **single phone number** using native toolchains (C++ `google/benchmark` with RE2 vs Rust `rlibphonenumber`). 
+
+Both benchmarks bypass CPU branch-predictor memorization.
 
 | Operation | C++ (`libphonenumber` + RE2) | Rust (`rlibphonenumber`) | Speedup |
 | :--- | :--- | :--- | :--- |
@@ -242,3 +152,9 @@ Both benchmarks run over the exact same set of 12 diverse international phone nu
 | **Format (International)** | ~2.03 µs *(2028 ns)* | **~0.43 µs *(432 ns)*** | **~4.7x** |
 | **Format (National)** | ~2.48 µs *(2484 ns)* | **~0.56 µs *(558 ns)*** | **~4.4x** |
 | **Format (RFC3966)** | ~2.42 µs *(2417 ns)* | **~0.61 µs *(606 ns)*** | **~4.0x** |
+
+### Under the Hood: Why is it so fast?
+* **Zero-Allocation Formatter:** Intermediate heap allocations are eliminated using `Cow<str>` and stack-allocated zero-padding buffers.
+* **O(1) Pre-Anchored Regexes:** Instead of runtime string concatenation (`"^(?:" + pattern + ")$"`), validation metadata is compiled AOT (Ahead-of-Time). Rust uses `[..]` string slicing to fast-fail boundary checks, bypassing O(N) regex engine sweeps.
+* **`FxHash` Maps:** We replaced standard `SipHash` with `rustc_hash` for ultra-low latency metadata lookups.
+* **Lazy Compilation:** Regexes are compiled lazily inside the metadata wrappers via `OnceLock`, removing centralized cache contention.

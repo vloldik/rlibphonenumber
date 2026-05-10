@@ -13,7 +13,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{InvalidRegexError, phonenumberutil::regex_wrapper_types::PhoneNumberDescWrapper};
+use std::io::Write;
+
+use crate::{
+    PhoneNumber,
+    errors::InvalidRegexError,
+    phonenumber_mask::{self, Hashed},
+    phonenumberutil::regex_wrapper_types::PhoneNumberDescWrapper,
+};
 
 /// Internal phonenumber matching API used to isolate the underlying
 /// implementation of the matcher and allow different implementations to be
@@ -28,4 +35,36 @@ pub(crate) trait MatcherApi: Send + Sync {
         number_desc: &PhoneNumberDescWrapper,
         allow_prefix_match: bool,
     ) -> Result<bool, InvalidRegexError>;
+}
+
+// Used for wrappers to get common behavior on different wrappers
+pub trait AsOriginal<T> {
+    fn as_original(&self) -> &T;
+}
+
+pub trait LenWrite {
+    fn grow(&mut self, len: usize);
+    fn write_all(&mut self, buf: &[u8]) -> std::io::Result<()>;
+}
+
+impl<T: Write> LenWrite for T {
+    fn grow(&mut self, _: usize) {}
+
+    fn write_all(&mut self, buf: &[u8]) -> std::io::Result<()> {
+        self.write_all(buf)
+    }
+}
+
+pub trait PhoneHasher {
+    fn hash_phone(self, phone: &PhoneNumber) -> phonenumber_mask::Result<Hashed>;
+}
+
+pub trait OptionalHasher {
+    fn hash_phone(self, phone: &PhoneNumber) -> phonenumber_mask::Result<Option<Hashed>>;
+}
+
+impl<T: PhoneHasher> OptionalHasher for T {
+    fn hash_phone(self, phone: &PhoneNumber) -> phonenumber_mask::Result<Option<Hashed>> {
+        Ok(Some(PhoneHasher::hash_phone(self, phone)?))
+    }
 }

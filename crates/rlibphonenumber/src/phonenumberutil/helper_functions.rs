@@ -15,14 +15,15 @@
 
 use std::{borrow::Cow, collections::HashSet};
 
-use protobuf::Message;
 use rustc_hash::FxHashMap;
 use strum::IntoEnumIterator;
+use zeroes_itoa::LeadingZeroBuffer;
 
 use crate::{
+    enums::{NumberLengthType, PhoneNumberFormat, PhoneNumberType},
+    errors::{InvalidRegexError, ValidationError},
     generated::{
-        metadata::METADATA,
-        proto::{phonemetadata::PhoneMetadataCollection, phonenumber::PhoneNumber},
+        proto::PhoneNumber, uniprops_digits::uniprops::get_digit_value, uniprops_without_nl,
     },
     interfaces::MatcherApi,
     phonenumberutil::{
@@ -31,18 +32,20 @@ use crate::{
     },
 };
 
-use super::{
-    enums::{NumberLengthType, PhoneNumberFormat, PhoneNumberType},
-    errors::ValidationError,
-    helper_constants::{
-        OPTIONAL_EXT_SUFFIX, PLUS_SIGN, POSSIBLE_CHARS_AFTER_EXT_LABEL,
-        POSSIBLE_SEPARATORS_BETWEEN_NUMBER_AND_EXT_LABEL, RFC3966_EXTN_PREFIX, RFC3966_PREFIX,
-    },
+#[cfg(feature = "builtin_metadata")]
+use crate::generated::{metadata::METADATA, proto::PhoneMetadataCollection};
+#[cfg(feature = "builtin_metadata")]
+use prost::{DecodeError, Message};
+
+use super::helper_constants::{
+    OPTIONAL_EXT_SUFFIX, PLUS_SIGN, POSSIBLE_CHARS_AFTER_EXT_LABEL,
+    POSSIBLE_SEPARATORS_BETWEEN_NUMBER_AND_EXT_LABEL, RFC3966_EXTN_PREFIX, RFC3966_PREFIX,
 };
 
 /// Loads metadata from helper constants METADATA array
-pub fn load_compiled_metadata() -> Result<PhoneMetadataCollection, protobuf::Error> {
-    PhoneMetadataCollection::parse_from_bytes(&METADATA)
+#[cfg(feature = "builtin_metadata")]
+pub fn load_compiled_metadata() -> Result<PhoneMetadataCollection, DecodeError> {
+    PhoneMetadataCollection::decode(METADATA)
 }
 
 /// Returns a pointer to the description inside the metadata of the appropriate
@@ -73,20 +76,15 @@ pub fn get_number_prefix_by_format_and_calling_code(
     number_format: PhoneNumberFormat,
 ) -> PrefixParts<'_> {
     match number_format {
-        PhoneNumberFormat::E164 => {
-            PrefixParts::Parts2([PLUS_SIGN.into(), country_calling_code.into()])
-        }
+        PhoneNumberFormat::E164 => PrefixParts([PLUS_SIGN, country_calling_code, "", ""], 2),
         PhoneNumberFormat::International => {
-            PrefixParts::Parts3([PLUS_SIGN.into(), country_calling_code.into(), " ".into()])
+            PrefixParts([PLUS_SIGN, country_calling_code, " ", ""], 3)
         }
-        PhoneNumberFormat::RFC3966 => PrefixParts::Parts4([
-            RFC3966_PREFIX.into(),
-            PLUS_SIGN.into(),
-            country_calling_code.into(),
-            "-".into(),
-        ]),
+        PhoneNumberFormat::RFC3966 => {
+            PrefixParts([RFC3966_PREFIX, PLUS_SIGN, country_calling_code, "-"], 4)
+        }
         // here code is already returned
-        PhoneNumberFormat::National => PrefixParts::Empty,
+        PhoneNumberFormat::National => PrefixParts([""; 4], 0),
     }
 }
 
@@ -97,9 +95,9 @@ pub fn is_national_number_suffix_of_the_other(
     second_number: &PhoneNumber,
 ) -> bool {
     let mut buf = itoa::Buffer::new();
-    let first_number_national_number = buf.format(first_number.national_number());
+    let first_number_national_number = buf.format(first_number.national_number);
     let mut buf = itoa::Buffer::new();
-    let second_number_national_number = buf.format(second_number.national_number());
+    let second_number_national_number = buf.format(second_number.national_number);
     // Note that HasSuffixString returns true if the numbers are equal.
     first_number_national_number.ends_with(second_number_national_number)
         || second_number_national_number.ends_with(first_number_national_number)
@@ -131,7 +129,7 @@ pub fn get_national_significant_number<'b>(
     buf: &'b mut zeroes_itoa::LeadingZeroBuffer,
 ) -> Cow<'b, str> {
     buf.format(
-        phone_number.national_number(),
+        phone_number.national_number,
         if phone_number.italian_leading_zero() {
             phone_number
                 .number_of_leading_zeros()
@@ -141,6 +139,22 @@ pub fn get_national_significant_number<'b>(
             0
         },
     )
+}
+
+pub fn get_national_significant_number_owned(phone_number: &PhoneNumber) -> String {
+    let mut buf = LeadingZeroBuffer::new();
+    get_national_significant_number(phone_number, &mut buf).to_string()
+}
+
+pub fn normalize_digits(string: &str) -> String {
+    string
+        .chars()
+        .map(|char| {
+            get_digit_value(char)
+                .map(|digit| (digit + b'0') as char)
+                .unwrap_or(char)
+        })
+        .collect()
 }
 
 // Helper initialiser method to create the regular-expression pattern to match
@@ -359,9 +373,9 @@ pub fn desc_has_data(desc: &PhoneNumberDescWrapper) -> bool {
     // exampleNumber). We don't bother checking the PossibleLengthsLocalOnly,
     // since if this is the only thing that's present we don't really support the
     // type at all: no type-specific methods will work with only this data.
-    desc.original.has_example_number()
+    desc.original.example_number.is_some()
         || desc_has_possible_number_data(desc)
-        || desc.original.has_national_number_pattern()
+        || desc.national_number_pattern().pattern_base.is_some()
 }
 
 /// Returns the types we have metadata for based on the PhoneMetadata object
@@ -395,87 +409,81 @@ pub fn get_supported_types_for_metadata(
     types
 }
 
+#[inline]
+fn build_length_mask(lengths: &[i32]) -> u64 {
+    let mut mask = 0u64;
+    for &l in lengths {
+        if l != -1 {
+            mask |= 1 << l;
+        } else {
+            mask = 0;
+        }
+    }
+    mask
+}
+
 /// Helper method to check a number against possible lengths for this number
 /// type, and determine whether it matches, or is too short or too long.
-pub fn test_number_length(
+/// Metadata REQUIRED to have AT MOST 63 possible lengths
+pub(crate) fn test_number_length(
     phone_number: &str,
     phone_metadata: &PhoneMetadataWrapper,
     phone_number_type: PhoneNumberType,
 ) -> Result<NumberLengthType, ValidationError> {
     let desc_for_type = get_number_desc_by_type(phone_metadata, phone_number_type);
-    // There should always be "possibleLengths" set for every element. This is
-    // declared in the XML schema which is verified by
-    // PhoneNumberMetadataSchemaTest. For size efficiency, where a
-    // sub-description (e.g. fixed-line) has the same possibleLengths as the
-    // parent, this is missing, so we fall back to the general desc (where no
-    // numbers of the type exist at all, there is one possible length (-1) which
-    // is guaranteed not to match the length of any real phone number).
-    let mut possible_lengths = if desc_for_type.original.possible_length.is_empty() {
-        phone_metadata.general_desc.original.possible_length.clone()
+    let mut possible_mask = if desc_for_type.original.possible_length.is_empty() {
+        build_length_mask(&phone_metadata.general_desc.original.possible_length)
     } else {
-        desc_for_type.original.possible_length.clone()
+        build_length_mask(&desc_for_type.original.possible_length)
     };
 
-    let mut local_lengths = desc_for_type.original.possible_length_local_only.clone();
+    let mut local_mask = build_length_mask(&desc_for_type.original.possible_length_local_only);
+
     if phone_number_type == PhoneNumberType::FixedLineOrMobile {
         let fixed_line_desc = get_number_desc_by_type(phone_metadata, PhoneNumberType::FixedLine);
         if !desc_has_possible_number_data(fixed_line_desc) {
-            // The rare case has been encountered where no fixedLine data is available
-            // (true for some non-geographical entities), so we just check mobile.
             return test_number_length(phone_number, phone_metadata, PhoneNumberType::Mobile);
         } else {
             let mobile_desc = get_number_desc_by_type(phone_metadata, PhoneNumberType::Mobile);
             if desc_has_possible_number_data(mobile_desc) {
-                // Merge the mobile data in if there was any. Note that when adding the
-                // possible lengths from mobile, we have to again check they aren't
-                // empty since if they are this indicates they are the same as the
-                // general desc and should be obtained from there.
-
-                // RUST NOTE: since merge adds elements to the end of the list, we can do the same
                 let len_to_append = if mobile_desc.original.possible_length.is_empty() {
                     &phone_metadata.general_desc.original.possible_length
                 } else {
                     &mobile_desc.original.possible_length
                 };
-                possible_lengths.extend_from_slice(len_to_append);
-                possible_lengths.sort();
 
-                if local_lengths.is_empty() {
-                    local_lengths = mobile_desc.original.possible_length_local_only.clone();
-                } else {
-                    local_lengths
-                        .extend_from_slice(&mobile_desc.original.possible_length_local_only);
-                    local_lengths.sort();
-                }
+                possible_mask |= build_length_mask(len_to_append);
+                local_mask |= build_length_mask(&mobile_desc.original.possible_length_local_only);
             }
         }
     }
 
-    // If the type is not suported at all (indicated by the possible lengths
-    // containing -1 at this point) we return invalid length.
-    if *possible_lengths.first().unwrap_or(&-1) == -1 {
+    if possible_mask == 0 {
         return Err(ValidationError::InvalidLength);
     }
 
-    let actual_length = phone_number.len() as i32;
-    // This is safe because there is never an overlap beween the possible lengths
-    // and the local-only lengths; this is checked at build time.
-    if local_lengths.contains(&actual_length) {
+    let actual_length = phone_number.len() as u32;
+    if actual_length >= 64 {
+        return Err(ValidationError::TooLong);
+    }
+
+    let actual_length_bit = 1u64 << actual_length;
+    if (local_mask & actual_length_bit) != 0 {
         return Ok(NumberLengthType::IsPossibleLocalOnly);
     }
 
-    // here we can unwrap safe
-    let minimum_length = possible_lengths[0];
+    let minimum_length = possible_mask.trailing_zeros();
+    let maximum_length = 63 - possible_mask.leading_zeros();
 
     if minimum_length == actual_length {
         return Ok(NumberLengthType::IsPossible);
     } else if minimum_length > actual_length {
         return Err(ValidationError::TooShort);
-    } else if possible_lengths[possible_lengths.len() - 1] < actual_length {
+    } else if maximum_length < actual_length {
         return Err(ValidationError::TooLong);
     }
-    // We skip the first element; we've already checked it.
-    if possible_lengths[1..].contains(&actual_length) {
+
+    if (possible_mask & actual_length_bit) != 0 {
         Ok(NumberLengthType::IsPossible)
     } else {
         Err(ValidationError::InvalidLength)
@@ -498,18 +506,14 @@ pub fn test_number_length_with_unknown_type(
 /// These fields correspond to those set in `parse()` rather than
 /// `parse_and_keep_raw_input()`.
 pub(crate) fn copy_core_fields_only(from_number: &PhoneNumber) -> PhoneNumber {
-    let mut to_number = PhoneNumber::new();
-    to_number.set_country_code(from_number.country_code());
-    to_number.set_national_number(from_number.national_number());
-    if let Some(extension) = &from_number.extension {
-        to_number.set_extension(extension.clone());
+    PhoneNumber {
+        country_code: from_number.country_code,
+        national_number: from_number.national_number,
+        extension: from_number.extension.clone(),
+        italian_leading_zero: from_number.italian_leading_zero,
+        number_of_leading_zeros: from_number.number_of_leading_zeros,
+        ..Default::default()
     }
-    if from_number.italian_leading_zero() {
-        to_number.set_italian_leading_zero(true);
-        // This field is only relevant if there are leading zeros at all.
-        to_number.set_number_of_leading_zeros(from_number.number_of_leading_zeros());
-    }
-    to_number
 }
 
 /// Determines whether the given number is a national number match for the given
@@ -518,6 +522,10 @@ pub fn is_match(
     matcher_api: &dyn MatcherApi,
     number: &str,
     number_desc: &PhoneNumberDescWrapper,
-) -> Result<bool, crate::InvalidRegexError> {
+) -> Result<bool, InvalidRegexError> {
     matcher_api.match_national_number(number, number_desc, false)
+}
+
+pub fn is_unwanted_end_char(c: char) -> bool {
+    c != '#' && uniprops_without_nl::uniprops::Category::from_char(c).is_some()
 }

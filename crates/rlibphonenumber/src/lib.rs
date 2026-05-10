@@ -13,17 +13,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod alternate_formats;
 /// This module is automatically generated from /resources/*.proto
 mod generated;
-mod interfaces;
 mod phonenumberutil;
 mod regex_based_matcher;
+
 pub(crate) mod regexp;
 pub(crate) mod string_util;
 
-pub use generated::proto::phonemetadata;
-pub use generated::proto::phonenumber::PhoneNumber;
-pub use generated::proto::phonenumber::phone_number::CountryCodeSource;
+pub mod enums;
+pub mod errors;
+pub mod interfaces;
+pub mod phonenumber_matcher;
+
+pub use enums::*;
+pub use errors::*;
+pub use generated::proto::phone_number::CountryCodeSource;
+pub use generated::proto::{
+    NumberFormat, PhoneMetadata, PhoneMetadataCollection, PhoneNumber, PhoneNumberDesc,
+};
+pub use phonenumberutil::helper_functions::get_national_significant_number_owned;
 
 #[cfg(feature = "global_static")]
 mod phone_ext;
@@ -33,5 +43,10 @@ pub use crate::phonenumberutil::PHONE_NUMBER_UTIL;
 #[cfg(feature = "serde")]
 pub mod serde;
 
-pub use phonenumberutil::{enums::*, errors::*, phonenumberutil_public::PhoneNumberUtil};
+pub use phonenumberutil::phonenumberutil_internal::PhoneNumberUtil;
+
+#[cfg(test)]
 mod tests;
+
+pub mod metadata_validator;
+pub mod phonenumber_mask;

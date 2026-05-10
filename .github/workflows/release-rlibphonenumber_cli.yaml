@@ -1,0 +1,118 @@
+name: Release rlibphonenumber_cli
+
+on:
+  workflow_dispatch: 
+
+permissions:
+  contents: write
+
+jobs:
+  get-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.extract.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: extract
+        run: |
+          VERSION=$(cargo metadata --format-version=1 | jq -r '.packages[] | select(.name=="rlibphonenumber_cli") | .version')
+          
+          if [ -z "$VERSION" ]; then
+            echo "Error: Could not find version for rlibphonenumber_cli"
+            exit 1
+          fi
+          
+          echo "Extracted version: $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+  build:
+    needs: get-version
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            use_cross: false
+            ext: ""
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            use_cross: true 
+            ext: ""
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            use_cross: false
+            ext: ""
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            use_cross: false
+            ext: ""
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            use_cross: false
+            ext: ".exe"
+          - os: windows-latest
+            target: aarch64-pc-windows-msvc
+            use_cross: false
+            ext: ".exe"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross
+        if: matrix.use_cross == true
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+
+      - name: Build binary
+        shell: bash
+        run: |
+          if [ "${{ matrix.use_cross }}" == "true" ]; then
+            cross build --release --target ${{ matrix.target }} -p rlibphonenumber_cli
+          else
+            cargo build --release --target ${{ matrix.target }} -p rlibphonenumber_cli
+          fi
+
+      - name: Prepare artifact
+        shell: bash
+        run: |
+          mkdir -p dist
+          mv target/${{ matrix.target }}/release/rlibphonenumber_cli${{ matrix.ext }} dist/rpn-${{ matrix.target }}${{ matrix.ext }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.target }}
+          path: dist/*
+          retention-days: 1 
+
+  release:
+    needs: [get-version, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-binaries
+          merge-multiple: true 
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: rlibphonenumber_cli-v${{ needs.get-version.outputs.version }}
+          name: rlibphonenumber_cli v${{ needs.get-version.outputs.version }}
+          files: release-binaries/*
+          generate_release_notes: true
+          draft: false
+          prerelease: false

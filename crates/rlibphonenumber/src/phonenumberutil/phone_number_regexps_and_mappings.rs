@@ -27,7 +27,7 @@ use crate::phonenumberutil::{
 };
 
 #[allow(unused)]
-pub(super) struct PhoneNumberRegExpsAndMappings {
+pub(crate) struct PhoneNumberRegExpsAndMappings {
     /// A map that contains characters that are essential when dialling. That means
     /// any of the characters in this map must not be removed from a number when
     /// dialing, otherwise the call will not reach the intended destination.
@@ -85,11 +85,6 @@ pub(super) struct PhoneNumberRegExpsAndMappings {
     pub separator_pattern_anchor_start: Regex,
     pub separator_pattern: Regex,
 
-    /// Regexp of all possible ways to write extensions, for use when finding phone
-    /// numbers in text. This will be run as a case-insensitive regexp match. Wide
-    /// character versions are also provided after each ASCII version.
-    pub extn_patterns_for_matching: String,
-
     /// Regexp of all known extension prefixes used by different regions followed
     /// by 1 or more valid digits, for use when parsing.
     pub extn_pattern: Regex,
@@ -141,104 +136,89 @@ pub(super) struct PhoneNumberRegExpsAndMappings {
 impl PhoneNumberRegExpsAndMappings {
     fn initialize_regexp_mappings(&mut self) {
         self.mobile_token_mappings.insert(54, '9');
-
         self.geo_mobile_countries_without_mobile_area_codes
             .insert(86); // China
-
         self.countries_without_national_prefix_with_area_codes
             .insert(52); // Mexico
 
         self.geo_mobile_countries.insert(52); // Mexico
         self.geo_mobile_countries.insert(54); // Argentina
         self.geo_mobile_countries.insert(55); // Brazil
-        self.geo_mobile_countries.insert(62); // Indonesia: some prefixes only (fixed CMDA wireless)
-        self.geo_mobile_countries
-            .extend(&self.geo_mobile_countries_without_mobile_area_codes);
+        self.geo_mobile_countries.insert(62); // Indonesia
+        self.geo_mobile_countries.insert(86); // China 
 
-        // Simple ASCII digits map used to populate ALPHA_PHONE_MAPPINGS and
-        // ALL_PLUS_NUMBER_GROUPING_SYMBOLS.
-        let mut ascii_digit_mappings = FxHashMap::default();
+        for (ch, digit) in [
+            ('A', '2'),
+            ('B', '2'),
+            ('C', '2'),
+            ('D', '3'),
+            ('E', '3'),
+            ('F', '3'),
+            ('G', '4'),
+            ('H', '4'),
+            ('I', '4'),
+            ('J', '5'),
+            ('K', '5'),
+            ('L', '5'),
+            ('M', '6'),
+            ('N', '6'),
+            ('O', '6'),
+            ('P', '7'),
+            ('Q', '7'),
+            ('R', '7'),
+            ('S', '7'),
+            ('T', '8'),
+            ('U', '8'),
+            ('V', '8'),
+            ('W', '9'),
+            ('X', '9'),
+            ('Y', '9'),
+            ('Z', '9'),
+        ] {
+            self.alpha_mappings.insert(ch, digit);
+            self.alpha_phone_mappings.insert(ch, digit);
+            self.all_plus_number_grouping_symbols
+                .insert(ch.to_ascii_lowercase(), ch);
+            self.all_plus_number_grouping_symbols.insert(ch, ch);
+        }
+
         for d in '0'..='9' {
-            ascii_digit_mappings.insert(d, d);
+            self.alpha_phone_mappings.insert(d, d);
+            self.diallable_char_mappings.insert(d, d);
+            self.all_plus_number_grouping_symbols.insert(d, d);
         }
 
-        let mut alpha_map = FxHashMap::default();
-        alpha_map.insert('A', '2');
-        alpha_map.insert('B', '2');
-        alpha_map.insert('C', '2');
-        alpha_map.insert('D', '3');
-        alpha_map.insert('E', '3');
-        alpha_map.insert('F', '3');
-        alpha_map.insert('G', '4');
-        alpha_map.insert('H', '4');
-        alpha_map.insert('I', '4');
-        alpha_map.insert('J', '5');
-        alpha_map.insert('K', '5');
-        alpha_map.insert('L', '5');
-        alpha_map.insert('M', '6');
-        alpha_map.insert('N', '6');
-        alpha_map.insert('O', '6');
-        alpha_map.insert('P', '7');
-        alpha_map.insert('Q', '7');
-        alpha_map.insert('R', '7');
-        alpha_map.insert('S', '7');
-        alpha_map.insert('T', '8');
-        alpha_map.insert('U', '8');
-        alpha_map.insert('V', '8');
-        alpha_map.insert('W', '9');
-        alpha_map.insert('X', '9');
-        alpha_map.insert('Y', '9');
-        alpha_map.insert('Z', '9');
-        // IMPORTANT: only uppercase letters like in Java version
+        self.diallable_char_mappings.insert('+', '+');
+        self.diallable_char_mappings.insert('*', '*');
+        self.diallable_char_mappings.insert('#', '#');
 
-        self.alpha_mappings = alpha_map;
-
-        let mut combined_map = FxHashMap::default();
-        combined_map.extend(self.alpha_mappings.iter());
-        combined_map.extend(ascii_digit_mappings.iter());
-        self.alpha_phone_mappings = combined_map;
-
-        let mut dilatable_char_map = FxHashMap::default();
-        dilatable_char_map.extend(ascii_digit_mappings.iter());
-        dilatable_char_map.insert('+', '+');
-        dilatable_char_map.insert('*', '*');
-        dilatable_char_map.insert('#', '#');
-        self.diallable_char_mappings = dilatable_char_map;
-
-        let mut all_plus_number_groupings = FxHashMap::default();
-        // insert (lower letter -> upper letter) and (upper letter -> upper letter) mappings.
-        for c in self.alpha_mappings.keys() {
-            all_plus_number_groupings.insert(c.to_ascii_lowercase(), *c);
-            all_plus_number_groupings.insert(*c, *c);
+        for (ch, target) in [
+            ('-', '-'),
+            ('\u{FF0D}', '-'),
+            ('\u{2010}', '-'),
+            ('\u{2011}', '-'),
+            ('\u{2012}', '-'),
+            ('\u{2013}', '-'),
+            ('\u{2014}', '-'),
+            ('\u{2015}', '-'),
+            ('\u{2212}', '-'),
+            ('/', '/'),
+            ('\u{FF0F}', '/'),
+            (' ', ' '),
+            ('\u{3000}', ' '),
+            ('\u{2060}', ' '),
+            ('.', '.'),
+            ('\u{FF0E}', '.'),
+        ] {
+            self.all_plus_number_grouping_symbols.insert(ch, target);
         }
-        all_plus_number_groupings.extend(ascii_digit_mappings.iter());
-        // insert grouping symbols.
-        all_plus_number_groupings.insert('-', '-');
-        all_plus_number_groupings.insert('\u{FF0D}', '-');
-        all_plus_number_groupings.insert('\u{2010}', '-');
-        all_plus_number_groupings.insert('\u{2011}', '-');
-        all_plus_number_groupings.insert('\u{2012}', '-');
-        all_plus_number_groupings.insert('\u{2013}', '-');
-        all_plus_number_groupings.insert('\u{2014}', '-');
-        all_plus_number_groupings.insert('\u{2015}', '-');
-        all_plus_number_groupings.insert('\u{2212}', '-');
-        all_plus_number_groupings.insert('/', '/');
-        all_plus_number_groupings.insert('\u{FF0F}', '/');
-        all_plus_number_groupings.insert(' ', ' ');
-        all_plus_number_groupings.insert('\u{3000}', ' ');
-        all_plus_number_groupings.insert('\u{2060}', ' ');
-        all_plus_number_groupings.insert('.', '.');
-        all_plus_number_groupings.insert('\u{FF0E}', '.');
-        self.all_plus_number_grouping_symbols = all_plus_number_groupings;
     }
 
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let alphanum = fast_cat::concat_str!(VALID_ALPHA_INCL_UPPERCASE, DIGITS);
         let extn_patterns_for_parsing = create_extn_pattern(true);
         let valid_phone_number = format!(
-            // moved 2-digits pattern to an end for match full number first
-            "[{}]*(?:[{}{}]*[{}]){{3,}}[{}{}{}{}]*\
-            |[{}]{{{}}}",
+            "[{}]*(?:[{}{}]*[{}]){{3,}}[{}{}{}{}]*|[{}]{{{}}}",
             PLUS_CHARS,
             VALID_PUNCTUATION,
             STAR_SIGN,
@@ -247,7 +227,6 @@ impl PhoneNumberRegExpsAndMappings {
             STAR_SIGN,
             VALID_ALPHA,
             DIGITS,
-            //
             DIGITS,
             MIN_LENGTH_FOR_NSN,
         );
@@ -256,19 +235,27 @@ impl PhoneNumberRegExpsAndMappings {
         let rfc3966_domainlabel = format!("[{}]+((\\-)*[{}])*", alphanum, alphanum);
         let rfc3966_toplabel = format!("[{}]+((\\-)*[{}])*", VALID_ALPHA_INCL_UPPERCASE, alphanum);
         let catch_all_formatting_regex = RegexTriplets::new(Some("^(?:(\\d+)(.*))$".to_string()));
-        // Initialize
         catch_all_formatting_regex.original().unwrap();
 
         let mut instance = Self {
-            // it'll be initialized only once, so we can use slow format!
-            diallable_char_mappings: Default::default(),
-            alpha_mappings: Default::default(),
-            alpha_phone_mappings: Default::default(),
-            all_plus_number_grouping_symbols: Default::default(),
-            mobile_token_mappings: Default::default(),
-            countries_without_national_prefix_with_area_codes: Default::default(),
-            geo_mobile_countries: Default::default(),
-            geo_mobile_countries_without_mobile_area_codes: Default::default(),
+            diallable_char_mappings: FxHashMap::with_capacity_and_hasher(13, Default::default()),
+            alpha_mappings: FxHashMap::with_capacity_and_hasher(26, Default::default()),
+            alpha_phone_mappings: FxHashMap::with_capacity_and_hasher(36, Default::default()),
+            all_plus_number_grouping_symbols: FxHashMap::with_capacity_and_hasher(
+                80,
+                Default::default(),
+            ),
+            mobile_token_mappings: FxHashMap::with_capacity_and_hasher(1, Default::default()),
+            countries_without_national_prefix_with_area_codes: FxHashSet::with_capacity_and_hasher(
+                1,
+                Default::default(),
+            ),
+            geo_mobile_countries: FxHashSet::with_capacity_and_hasher(5, Default::default()),
+            geo_mobile_countries_without_mobile_area_codes: FxHashSet::with_capacity_and_hasher(
+                1,
+                Default::default(),
+            ),
+
             single_international_prefix_fullmatch: Regex::new(
                 "^(?:[\\d]+(?:[~\u{2053}\u{223C}\u{FF5E}][\\d]+)?)$",
             )
@@ -281,20 +268,13 @@ impl PhoneNumberRegExpsAndMappings {
             separator_pattern_anchor_start: Regex::new(&format!("^[{}]+", VALID_PUNCTUATION))
                 .unwrap(),
             separator_pattern: Regex::new(&format!("[{}]+", VALID_PUNCTUATION)).unwrap(),
-            extn_patterns_for_matching: create_extn_pattern(false),
             extn_pattern: Regex::new(&format!("(?i)(?:{})$", &extn_patterns_for_parsing)).unwrap(),
             valid_phone_number_pattern_fullmatch: Regex::new(&format!(
                 "(?i)^(?:{})(?:{})?$",
                 &valid_phone_number, &extn_patterns_for_parsing
             ))
             .unwrap(),
-            // from java
             valid_alpha_phone_pattern_fullmatch: Regex::new("^(?:.*?[A-Za-z]){3}.*$").unwrap(),
-            // The first_group_capturing_pattern was originally set to $1 but there
-            // are some countries for which the first group is not used in the
-            // national pattern (e.g. Argentina) so the $1 group does not match
-            // correctly. Therefore, we use \d, so that the first group actually
-            // used in the pattern will be matched.
             first_group_capturing_pattern: Regex::new("(\\$\\d)").unwrap(),
             carrier_code_pattern: Regex::new("\\$CC").unwrap(),
             plus_chars_pattern_start: Regex::new(&format!("^[{}]+", &PLUS_CHARS)).unwrap(),
@@ -317,6 +297,7 @@ impl PhoneNumberRegExpsAndMappings {
                 .unwrap(),
             catch_all_formatting_regex,
         };
+
         instance.initialize_regexp_mappings();
         instance
     }

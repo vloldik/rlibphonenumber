@@ -39,6 +39,13 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "matcher-diff-test"
+path = "fuzz_targets/matcher-diff-test.rs"
+test = false
+doc = false
+bench = false
+
 [features]
 default = ["rlibphonenumber/lite"]
 

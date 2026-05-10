@@ -33,6 +33,10 @@ allow = [
     "MIT",
     "NCSA",
     "Zlib",
+    "BSD-3-Clause",                   # argh, subtle, antlr4rust
+    "ISC",                            # aws-lc-rs, rustls-webpki, untrusted
+    "MIT-0",                          # aws-lc-sys
+    "CDLA-Permissive-2.0",            # webpki-root-certs (Mozilla CA certs)
     "Unicode-3.0",
 ]
 private = { ignore = true }
