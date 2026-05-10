@@ -95,7 +95,7 @@ export class Rlibphonenumber {
         const resolvedTag = tag ? await this.resolveTag(tag) : await this.readLock(source)
         const src = tag ? await this.withFreshResources(source, resolvedTag) : source
 
-        const generated = await this.bumpVersionIfNeeded(this.metadataRunner(src), tag)
+        const generated = await this.bumpVersionIfNeeded(this.metadataRunner(src))
 
         return dag.directory()
             .withDirectory(
@@ -160,7 +160,6 @@ export class Rlibphonenumber {
 
     async bumpVersionIfNeeded(
         ctr: Container,
-        tag: string,
     ): Promise<Container> {
         ctr = ctr
             .withExec(["git", "config", "--global", "safe.directory", "*"])
@@ -190,8 +189,10 @@ export class Rlibphonenumber {
             ])
             .stdout()).trim()
 
+        const realTag = await this.readLock(ctr.directory('.'))
+
         const readmeTpl = ctr.file('Readme.md.tpl')
-            .withReplaced('{{metadata_version}}', tag, { all: true })
+            .withReplaced('{{metadata_version}}', realTag, { all: true })
             .withReplaced('{{package_version}}', newVersion, { all: true })
 
         return ctr
