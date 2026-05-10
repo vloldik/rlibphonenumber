@@ -11,6 +11,7 @@ A zero-allocation, high-performance Rust port of Google's `libphonenumber` libra
 **Package version**: `2.0.1`
 **Base libphonenumber:** `9.0.8`  
 **Min supported Rust version:** `1.88.0`
+
 ---
 
 ## 🚀 What's New in v2 (Migration Guide & Breaking Changes)
