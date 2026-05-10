@@ -9,7 +9,7 @@ Parse, validate, find, and mask phone numbers from files, URLs, SSH paths, and G
 ## Installation
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/vloldik/rlibphonenumber/main/workspaces/rlibphonenumber/crates/rlibphonenumber_cli/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/vloldik/rlibphonenumber/refs/heads/master/crates/rlibphonenumber_cli/install.sh | bash
 ```
 
 You can use `cargo install`
