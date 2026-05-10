@@ -182,9 +182,12 @@ pub fn execute(
     };
 
     let mask_format_fmt = if let MaskType::Mask(ref m) = options.mask_type {
-        m.format.as_ref().map(|format_str| {
-            PhoneNumberFormat::from_str(format_str).unwrap_or(PhoneNumberFormat::E164)
-        })
+        Some(
+            m.format
+                .as_ref()
+                .and_then(|format_str| PhoneNumberFormat::from_str(format_str).ok())
+                .unwrap_or(PhoneNumberFormat::E164),
+        )
     } else {
         None
     };
