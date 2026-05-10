@@ -166,15 +166,16 @@ export class Rlibphonenumber {
             .withExec(["git", "config", "--global", "safe.directory", "*"])
 
         const gitStatus = await ctr
-            .withExec(["bash", "-c", "git status --porcelain"])
+            .withExec(["bash", "-c", "git status --porcelain -uno"])
             .stdout()
 
         if (gitStatus.trim() === "") {
-            console.log("No changes detected by git. Skipping version bump.");
+            console.log("No tracked changes detected by git. Skipping version bump.");
             return ctr;
         }
 
-        console.log("Changes detected. Bumping versions...");
+        console.log("Changes detected:\n" + gitStatus);
+        console.log("Bumping versions...");
 
         ctr = ctr
             .withExec(["cargo", "install", "--root", "/app/tools", "cargo-edit", "--locked"])
