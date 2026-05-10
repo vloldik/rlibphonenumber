@@ -10,14 +10,13 @@ fuzz_target!(|data: (String, String)| {
         .map(|reg| Some(reg))
         .unwrap_or(None);
 
-    if let Ok(phone_number) = util.parse_with_default_region(&number_str, region) {
+    if let Ok(phone_number) = util.parse(&number_str, region) {
         let _ = util.is_valid_number(&phone_number);
         let _ = util.is_possible_number(&phone_number);
         let _ = util.is_number_geographical(&phone_number);
 
-        let _ = util.get_region_code_for_number(&phone_number);
+        let _ = util.get_region_for_number(&phone_number);
         let _ = util.get_number_type(&phone_number);
-        let _ = util.get_national_significant_number(&phone_number);
 
         let _ = util.format(&phone_number, PhoneNumberFormat::E164);
         let _ = util.format(&phone_number, PhoneNumberFormat::International);
