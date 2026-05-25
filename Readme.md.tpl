@@ -3,12 +3,14 @@
 [![Crates.io](https://img.shields.io/crates/v/rlibphonenumber.svg)](https://crates.io/crates/rlibphonenumber)
 [![Docs.rs](https://docs.rs/rlibphonenumber/badge.svg)](https://docs.rs/rlibphonenumber)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![WASM Preview](https://img.shields.io/badge/Live-WASM_Preview-success.svg)](https://vloldik.github.io/rlibphonenumber-wasm/)
+[![Update Metadata & Push](https://github.com/vloldik/rlibphonenumber/actions/workflows/update-metadata.yaml/badge.svg)](https://github.com/vloldik/rlibphonenumber/actions/workflows/update-metadata.yaml)
+
+[Try library directly in browser! (WASM)](https://vloldik.github.io/rlibphonenumber-wasm/)
 
 A zero-allocation, high-performance Rust port of Google's `libphonenumber` library for parsing, formatting, extracting, and validating international phone numbers. 
 
 **Used metadata version:** `{{metadata_version}}`  
-**Package version**: `{{package_version}}`<br>
+**Package version:** `{{package_version}}`<br>
 **Base libphonenumber:** `9.0.8`  
 **Min supported Rust version:** `1.88.0`
 
@@ -160,16 +162,17 @@ Both benchmarks bypass CPU branch-predictor memorization.
 * **`FxHash` Maps:** We replaced standard `SipHash` with `rustc_hash` for ultra-low latency metadata lookups.
 * **Lazy Compilation:** Regexes are compiled lazily inside the metadata wrappers via `OnceLock`, removing centralized cache contention.
 
+
 ## 🔄 v1 to v2 Migration Guide
 
 ### 1. Goodbye `rust-protobuf`, Hello `prost`
 We have completely migrated the internal protobuf representation from `rust-protobuf` to `prost`. This results in faster decoding, a smaller binary footprint, and a much more idiomatic Rust experience.
 
 **What you need to change:**
-* **Direct Field Access:** You no longer need to use Java-style getter and setter methods. Instead of calling `phone.get_country_code()` or `phone.set_national_number(123)`, you now access and modify the public struct fields directly:
+* **Direct Field Access:** You no longer need to use Java-style getter and setter methods. Instead of calling `phone.country_code()` or `phone.set_national_number(123)`, you now access and modify the public struct fields directly:
   ```rust
   // v1 (rust-protobuf)
-  let cc = phone.get_country_code();
+  let cc = phone.country_code();
   
   // v2 (prost)
   let cc = phone.country_code;
@@ -209,7 +212,7 @@ pub enum MetadataAction {
 ```
 You can simply run the CLI tool in your CI/CD pipeline or preparation scripts to guarantee the metadata is flawless before it ever reaches your application:
 ```bash
-rlibphonenumber-cli validate --input custom_metadata.bin
+rpn metadata --input custom_metadata.bin validate 
 ```
 
 #### Option B: Programmatic Validation (e.g., in `build.rs`)
