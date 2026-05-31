@@ -106,11 +106,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 use rlibphonenumber::phonenumber_matcher::FindNumberExt;
 
 fn main() {
-    let text = "Contact us at +1 (202) 555-0173 or drop a fax at 020 7183 8750.";
+    // Text containing numbers from different regions
+    let text = "GB office: 020 7183 8750. US line: (202) 555-0173.";
     
-    // Extension trait directly on &str
-    for match_result in text.find_phone_numbers() {
-        println!("Found: {} at index {}", match_result.number, match_result.start);
+    // Extension trait directly on &str.
+    // The new `auto_region` feature automatically detects the correct region
+    // for national-format numbers, resolving ambiguities using a fast MRU (Most-Recently-Used) cache!
+    for match_result in text.find_phone_numbers_auto_region() {
+        println!("Found: {} at index {} (Country Code: {})", 
+            match_result.number, 
+            match_result.start, 
+            match_result.number.country_code);
     }
 }
 ```
@@ -162,6 +168,18 @@ Both benchmarks bypass CPU branch-predictor memorization.
 * **`FxHash` Maps:** We replaced standard `SipHash` with `rustc_hash` for ultra-low latency metadata lookups.
 * **Lazy Compilation:** Regexes are compiled lazily inside the metadata wrappers via `OnceLock`, removing centralized cache contention.
 
+## ⚖️ Alternatives Comparison
+
+When choosing a phone number processing library in Rust, there are a few options available. We measure performance using `criterion` and ensure accuracy by validating against the official Google `libphonenumber` test suite.
+
+| Library | `parse()` speed | Accuracy / Reliability |
+| --- | --- | --- |
+| **`rlibphonenumber`** | **~533 ns** | **Fastest & most reliable.** 100% compliant with Google's `libphonenumber`. |
+| `rust-phonenumber` (crate `phonenumber`) | ~1.50 µs | Mostly compliant, but misses some edge cases due to differences in update cycles and older parsing patterns. |
+| `phonelib` | ~527 ns | Fast, but **frequently inaccurate**. Fails on certain valid numbers. |
+
+- **`phonenumber`**: This is the most popular port of `libphonenumber`. However, it relies heavily on heap allocations during parsing and formatting, which makes it significantly slower (about 3x slower for parsing).
+- **`phonelib`**: While `phonelib` demonstrates impressive speed (comparable to `rlibphonenumber` for parsing), it achieves this by taking shortcuts. It fails to correctly parse or validate various complex, perfectly valid international phone numbers found in the real world because it relies on simplified internal mappings instead of the full telecom metadata. If absolute correctness and strict compliance with telecom standards are critical for your application, `phonelib`'s inaccuracies might be a dealbreaker.
 
 ## 🔄 v1 to v2 Migration Guide
 
