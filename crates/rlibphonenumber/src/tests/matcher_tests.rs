@@ -1042,4 +1042,130 @@ mod tests {
             }
         }
     }
+
+    // =========================================================================
+    // Automatic region detection
+    // =========================================================================
+
+    /// Builds an auto-region matcher (no fixed region), optionally seeded with
+    /// an initial most-recently-used region.
+    fn find_numbers_auto(
+        text: &str,
+        initial_region: Option<Region>,
+    ) -> PhoneNumberMatcher<'_, PhoneNumberUtilInternal, &'static PhoneNumberUtilInternal> {
+        get_phone_matcher_factory().create_matcher_auto(
+            text,
+            Leniency::Valid,
+            u64::MAX,
+            initial_region,
+        )
+    }
+
+    fn country_codes_auto(text: &str, initial_region: Option<Region>) -> Vec<i32> {
+        find_numbers_auto(text, initial_region)
+            .map(|m| m.number.country_code)
+            .collect()
+    }
+
+    /// International (`+`) numbers carry their own country code, so auto
+    /// detection must resolve them identically to the classic "no region"
+    /// matcher — regardless of how many regions exist.
+    #[test]
+    fn test_auto_region_matches_international_like_none() {
+        let text = "Call +1 (650) 333-6000 or +44 20 7946 0958.";
+
+        let auto = country_codes_auto(text, None);
+        let fixed_none: Vec<i32> = find_numbers(text, None)
+            .map(|m| m.number.country_code)
+            .collect();
+
+        assert_eq!(auto, fixed_none);
+        assert_eq!(auto, vec![1, 44]);
+    }
+
+    /// A national-format number is found without any region being supplied, and
+    /// the resulting number is valid (even if its region is ambiguous on its
+    /// own).
+    #[test]
+    fn test_auto_region_finds_national_without_seed() {
+        let text = "Reach me at 020 7946 0958.";
+        let match_ = find_numbers_auto(text, None).next();
+
+        assert!(
+            match_.is_some(),
+            "auto region should find a national number even without a seed"
+        );
+        let match_ = match_.unwrap();
+        assert_eq!("020 7946 0958", match_.raw_string);
+        assert!(
+            phone_util().is_valid_number(&match_.number).unwrap(),
+            "the auto-detected number must be valid in the region that matched"
+        );
+    }
+
+    /// When a region is seeded, a national-format number that is valid there is
+    /// attributed to that region (it is tried first).
+    #[test]
+    fn test_auto_region_national_uses_seed() {
+        let text = "Call 020 7946 0958 today";
+        let match_ = find_numbers_auto(text, Some(Region::GB)).next();
+        assert_match_properties(match_, text, "020 7946 0958", Some(Region::GB));
+    }
+
+    /// The most-recently-used region carries across candidates: an
+    /// international number fixes the locale, and a following ambiguous
+    /// national number is then attributed to the same region rather than to an
+    /// arbitrary colliding one.
+    #[test]
+    fn test_auto_region_mru_locality() {
+        let text = "Main +44 20 7946 0958, alt 020 7183 8750.";
+        assert_eq!(country_codes_auto(text, None), vec![44, 44]);
+    }
+
+    /// The same ambiguous digit string is attributed to different regions
+    /// depending on the seed, demonstrating that collisions are resolved by
+    /// context (the MRU/seed) and that the number itself is never rewritten to
+    /// force a region.
+    #[test]
+    fn test_auto_region_collision_resolved_by_context() {
+        let text = "Ambiguous 020 7183 8750 here.";
+
+        let as_gb = find_numbers_auto(text, Some(Region::GB)).next().unwrap();
+        let as_ar = find_numbers_auto(text, Some(Region::AR)).next().unwrap();
+
+        // The very same digits are valid in both regions; the seed decides.
+        assert_eq!(44, as_gb.number.country_code);
+        assert_eq!(54, as_ar.number.country_code);
+        // Same source text, different attribution purely from context.
+        assert_eq!(as_gb.raw_string, as_ar.raw_string);
+    }
+
+    /// Auto detection does not invent matches in plain prose.
+    #[test]
+    fn test_auto_region_no_false_positive_on_text() {
+        let text = "Just some ordinary words, without any phone numbers at all.";
+        assert!(has_no_matches(find_numbers_auto(text, None)));
+    }
+
+    /// The builder entry points (`auto_region` / `auto_region_with_hint`) wire
+    /// up to the same behaviour as the direct factory method.
+    #[test]
+    fn test_auto_region_builder() {
+        let text = "Main +44 20 7946 0958, alt 020 7183 8750.";
+        let codes: Vec<i32> = get_phone_matcher_factory()
+            .matcher_builder(text)
+            .auto_region()
+            .build()
+            .map(|m| m.number.country_code)
+            .collect();
+        assert_eq!(codes, vec![44, 44]);
+
+        let seeded: Vec<i32> = get_phone_matcher_factory()
+            .matcher_builder("020 7183 8750")
+            .auto_region_with_hint(Region::AR)
+            .build()
+            .map(|m| m.number.country_code)
+            .collect();
+        assert_eq!(seeded, vec![54]);
+    }
 }

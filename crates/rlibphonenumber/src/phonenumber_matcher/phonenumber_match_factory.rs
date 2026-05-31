@@ -118,6 +118,59 @@ impl<U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U> + Clone>
             self.alternate_formats.clone(),
         )
     }
+
+    /// Creates a standard (infallible) matcher that auto-detects the region of
+    /// national-format numbers instead of assuming a fixed one.
+    ///
+    /// Numbers written in international format are resolved exactly as with
+    /// [`create_matcher`](Self::create_matcher). National-format numbers are
+    /// tried against every supported region, preferring the most-recently
+    /// matched one to keep ambiguous numbers stable and fast to resolve.
+    ///
+    /// * `initial_region` – an optional seed for the most-recently used region
+    ///   (e.g. the region detected in a previously processed text chunk), or
+    ///   `None` to start without a preference.
+    ///
+    /// *Note: Consider using [`matcher_builder`](Self::matcher_builder) instead for a more ergonomic API.*
+    pub fn create_matcher_auto<'a>(
+        &self,
+        text: &'a str,
+        leniency: Leniency,
+        max_tries: u64,
+        initial_region: Option<Region>,
+    ) -> PhoneNumberMatcher<'a, U, T> {
+        PhoneNumberMatcher::new_for_util_auto_region(
+            self.phone_util.clone(),
+            self.regexps.clone(),
+            text,
+            initial_region,
+            leniency,
+            max_tries,
+            self.alternate_formats.clone(),
+        )
+    }
+
+    /// Creates a fallible matcher that auto-detects the region of
+    /// national-format numbers. See [`create_matcher_auto`](Self::create_matcher_auto)
+    /// for the region-resolution behaviour and [`create_matcher_fallible`](Self::create_matcher_fallible)
+    /// for the meaning of "fallible".
+    pub fn create_matcher_auto_fallible<'a>(
+        &self,
+        text: &'a str,
+        leniency: Leniency,
+        max_tries: u64,
+        initial_region: Option<Region>,
+    ) -> PhoneNumberMatcherFallible<'a, U, T> {
+        PhoneNumberMatcherFallible::new_for_util_auto_region(
+            self.phone_util.clone(),
+            self.regexps.clone(),
+            text,
+            initial_region,
+            leniency,
+            max_tries,
+            self.alternate_formats.clone(),
+        )
+    }
 }
 
 #[cfg(feature = "global_static")]
@@ -139,6 +192,16 @@ impl Default for PhoneNumberMatcherFactory<PhoneNumberUtil, &'static PhoneNumber
 // MatcherBuilder
 // =============================================================================
 
+/// How the matcher should determine the region of national-format numbers.
+#[derive(Debug, Clone, Copy)]
+enum RegionMode {
+    /// Assume a single fixed region (`None` = only international `+` numbers).
+    Fixed(Option<Region>),
+    /// Auto-detect the region, optionally seeded with an initial most-recently
+    /// used region hint.
+    Auto(Option<Region>),
+}
+
 /// A fluent builder for configuring phone number matchers.
 ///
 /// This builder allows you to chain configuration methods to set up the region,
@@ -154,7 +217,7 @@ pub struct MatcherBuilder<
     text: &'a str,
     leniency: Leniency,
     max_tries: u64,
-    preferred_region: Option<Region>,
+    region_mode: RegionMode,
 }
 
 impl<'a, 'f, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U> + Clone>
@@ -165,9 +228,9 @@ impl<'a, 'f, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U> + Clon
         Self {
             factory,
             text,
-            leniency: Leniency::Valid, // Sensible default
-            max_tries: u64::MAX,       // Sensible default
-            preferred_region: None,
+            leniency: Leniency::Valid,            // Sensible default
+            max_tries: u64::MAX,                  // Sensible default
+            region_mode: RegionMode::Fixed(None), // Sensible default
         }
     }
 
@@ -193,8 +256,40 @@ impl<'a, 'f, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U> + Clon
     ///
     /// The preferred region is used as a fallback for phone numbers that are
     /// found without explicit country codes (e.g., numbers without a `+` prefix).
+    ///
+    /// Calling this method switches the builder back to fixed-region mode,
+    /// overriding any previous call to [`auto_region`](Self::auto_region).
     pub fn preferred_region(mut self, region: impl Into<Option<Region>>) -> Self {
-        self.preferred_region = region.into();
+        self.region_mode = RegionMode::Fixed(region.into());
+        self
+    }
+
+    /// Enables automatic region detection.
+    ///
+    /// Instead of assuming a single region, national-format numbers are tried
+    /// against every supported region until one yields a valid number,
+    /// preferring the most-recently matched region. International (`+`) numbers
+    /// are resolved from their own country code as usual.
+    ///
+    /// This is the recommended way to find numbers in text that may contain
+    /// numbers from arbitrary regions. Note that it is more expensive than a
+    /// fixed region, since a candidate may be tried against many regions.
+    ///
+    /// Calling this method overrides any previous call to
+    /// [`preferred_region`](Self::preferred_region).
+    pub fn auto_region(mut self) -> Self {
+        self.region_mode = RegionMode::Auto(None);
+        self
+    }
+
+    /// Like [`auto_region`](Self::auto_region), but seeds the most-recently
+    /// used region with `region`.
+    ///
+    /// This is useful when processing text in independent chunks: pass the
+    /// region detected in the previous chunk so that detection stays
+    /// consistent across the boundary. Pass `None` for no initial preference.
+    pub fn auto_region_with_hint(mut self, region: impl Into<Option<Region>>) -> Self {
+        self.region_mode = RegionMode::Auto(region.into());
         self
     }
 
@@ -208,12 +303,18 @@ impl<'a, 'f, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U> + Clon
     /// metadata, this will never happen. If you are using custom metadata, ensure
     /// it is pre-validated (e.g., via the `rlibphonenumber` CLI).
     pub fn build(self) -> PhoneNumberMatcher<'a, U, T> {
-        self.factory.create_matcher(
-            self.text,
-            self.leniency,
-            self.max_tries,
-            self.preferred_region,
-        )
+        match self.region_mode {
+            RegionMode::Fixed(region) => {
+                self.factory
+                    .create_matcher(self.text, self.leniency, self.max_tries, region)
+            }
+            RegionMode::Auto(initial_region) => self.factory.create_matcher_auto(
+                self.text,
+                self.leniency,
+                self.max_tries,
+                initial_region,
+            ),
+        }
     }
 
     /// Builds and returns a `PhoneNumberMatcherFallible` iterator.
@@ -227,12 +328,20 @@ impl<'a, 'f, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U> + Clon
     /// to test custom metadata thoroughly using the `rlibphonenumber` CLI and use
     /// the infallible [`build`](Self::build) method instead.
     pub fn build_fallible(self) -> PhoneNumberMatcherFallible<'a, U, T> {
-        self.factory.create_matcher_fallible(
-            self.text,
-            self.leniency,
-            self.max_tries,
-            self.preferred_region,
-        )
+        match self.region_mode {
+            RegionMode::Fixed(region) => self.factory.create_matcher_fallible(
+                self.text,
+                self.leniency,
+                self.max_tries,
+                region,
+            ),
+            RegionMode::Auto(initial_region) => self.factory.create_matcher_auto_fallible(
+                self.text,
+                self.leniency,
+                self.max_tries,
+                initial_region,
+            ),
+        }
     }
 }
 
@@ -285,6 +394,26 @@ pub trait FindNumberExt {
         region: impl Into<Option<Region>>,
     ) -> PhoneNumberMatcher<'_, PhoneNumberUtil, &'static PhoneNumberUtil>;
 
+    /// Extracts phone numbers without committing to a single region.
+    ///
+    /// National-format numbers are auto-detected by trying every supported
+    /// region (preferring the most-recently matched one), while international
+    /// (`+`) numbers are resolved from their own country code. Use this when
+    /// the text may contain numbers from arbitrary regions.
+    ///
+    /// # Example
+    /// ```rust
+    /// use crate::rlibphonenumber::phonenumber_matcher::FindNumberExt;
+    ///
+    /// let text = "GB: 020 7183 8750, FR: 01 70 18 99 00";
+    /// for number in text.find_phone_numbers_auto_region() {
+    ///     // Each number carries the country code of its detected region.
+    /// }
+    /// ```
+    fn find_phone_numbers_auto_region(
+        &self,
+    ) -> PhoneNumberMatcher<'_, PhoneNumberUtil, &'static PhoneNumberUtil>;
+
     /// Returns a `MatcherBuilder` to fully configure the matching process directly
     /// from the string.
     ///
@@ -330,6 +459,12 @@ impl FindNumberExt for str {
         self.phone_number_matcher_builder()
             .preferred_region(region)
             .build()
+    }
+
+    fn find_phone_numbers_auto_region(
+        &self,
+    ) -> PhoneNumberMatcher<'_, PhoneNumberUtil, &'static PhoneNumberUtil> {
+        self.phone_number_matcher_builder().auto_region().build()
     }
 
     fn phone_number_matcher_builder(

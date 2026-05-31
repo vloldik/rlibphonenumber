@@ -53,6 +53,56 @@ enum CheckerVariant {
     AllNumberGroupsAreExactlyPresent,
 }
 
+/// Determines which region(s) are used when parsing numbers that are *not*
+/// written in international format (i.e. without a leading `+`).
+///
+/// This is an internal detail of [`PhoneNumberMatcherInternal`]; the public
+/// surface exposes it through the builder methods on
+/// [`MatcherBuilder`](crate::phonenumber_matcher::MatcherBuilder).
+#[derive(Debug, Clone)]
+enum RegionResolver {
+    /// Classic behaviour: a single, fixed preferred region is assumed for
+    /// national-format numbers. `None` means that *only* numbers written in
+    /// international format (with a leading `+`) are considered.
+    Fixed(Option<Region>),
+    /// Automatic detection: national-format numbers are tried against every
+    /// supported region until one yields a valid number.
+    ///
+    /// # Handling collisions between regions
+    ///
+    /// The same digit string can be a valid number in several different
+    /// regions (e.g. a bare national number could belong to many country
+    /// calling codes). Blindly returning the first arbitrary region that
+    /// happens to match would make the output unstable and frequently wrong.
+    ///
+    /// We mitigate this in two complementary ways, *without ever rewriting the
+    /// number itself*: the country code stored on the returned number is
+    /// always the one that was actually produced by parsing — we never force a
+    /// region onto a number.
+    ///
+    /// 1. **Most-recently-used (MRU) region first.** Real-world text tends to
+    ///    contain runs of numbers from the same locale. We always try the last
+    ///    region that produced a match before falling back to the full list.
+    ///    This keeps consecutive ambiguous numbers consistent with their
+    ///    neighbours and is also a large performance win.
+    /// 2. **Stable iteration order.** The remaining regions are visited in a
+    ///    fixed, sorted order so that, absent any MRU hint, the result is at
+    ///    least deterministic across runs.
+    ///
+    /// Numbers written in international format are always resolved with no
+    /// region at all, so they are immune to these collisions; their detected
+    /// region is then fed back into the MRU cache.
+    Auto {
+        /// The most-recently matched region, attempted first on the next
+        /// candidate. Uses interior mutability because the matcher iterates
+        /// over `&self`.
+        last: Cell<Option<Region>>,
+        /// All supported regions in a stable (sorted) order. Shared cheaply
+        /// across clones of the matcher.
+        regions: Arc<[Region]>,
+    },
+}
+
 /// A stateful struct that finds and extracts telephone numbers from text.
 /// Instances are created via the factory methods in [`PhoneNumberUtil`].
 ///
@@ -72,10 +122,9 @@ pub struct PhoneNumberMatcherInternal<
     _phone_util: T,
     /// The text searched for phone numbers.
     text: &'a str,
-    /// The region (country) to assume for phone numbers without an
-    /// international prefix, or `None` if only numbers with a leading plus
-    /// should be considered.
-    preferred_region: Option<Region>,
+    /// Strategy used to pick the region for phone numbers that are not written
+    /// in international format. See [`RegionResolver`].
+    region_resolver: RegionResolver,
     /// The degree of validation requested.
     leniency: Leniency,
     /// The maximum number of retries after matching an invalid number.
@@ -130,7 +179,55 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
             regexps,
             _phone_util: util,
             text,
-            preferred_region,
+            region_resolver: RegionResolver::Fixed(preferred_region),
+            leniency,
+            max_tries: Cell::new(max_tries),
+            state: State::NotReady,
+            last_match: None,
+            search_index: 0,
+            alternate_formats,
+        }
+    }
+
+    /// Creates a new instance that automatically detects the region of phone
+    /// numbers written in national format, instead of assuming a single fixed
+    /// region.
+    ///
+    /// National-format candidates are tried against every supported region
+    /// until one produces a valid number; the most-recently matched region is
+    /// always tried first (see [`RegionResolver::Auto`] for the rationale and
+    /// the collision-handling strategy). Numbers in international format are
+    /// unaffected and resolved exactly as before.
+    ///
+    /// * `initial_region` – an optional hint used to seed the most-recently
+    ///   used region. Pass the region of the previously processed text (for
+    ///   example, the last region detected in the preceding chunk of a large
+    ///   document) to keep detection consistent across boundaries, or `None`
+    ///   to start without a preference.
+    #[export]
+    pub fn new_for_util_auto_region(
+        util: T,
+        regexps: Arc<MatcherRegex>,
+        text: &'a str,
+        initial_region: Option<Region>,
+        leniency: Leniency,
+        max_tries: u64,
+        alternate_formats: Option<Arc<AlternateFormats>>,
+    ) -> Self {
+        // Snapshot the supported regions once, in a stable order, so that the
+        // auto-detection loop is deterministic and allocation-free per call.
+        let mut regions: Vec<Region> =
+            util.deref().as_original().get_supported_regions().collect();
+        regions.sort_unstable();
+
+        Self {
+            regexps,
+            _phone_util: util,
+            text,
+            region_resolver: RegionResolver::Auto {
+                last: Cell::new(initial_region),
+                regions: regions.into(),
+            },
             leniency,
             max_tries: Cell::new(max_tries),
             state: State::NotReady,
@@ -346,9 +443,30 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
             }
         }
 
+        // The checks above are region-independent. The actual parsing and
+        // leniency verification, however, depends on which region we assume
+        // for national-format numbers, so we delegate to the resolver.
+        match &self.region_resolver {
+            RegionResolver::Fixed(region) => self.try_parse_region(candidate, offset, *region),
+            RegionResolver::Auto { last, regions } => {
+                self.resolve_auto_region(candidate, offset, last, regions)
+            }
+        }
+    }
+
+    /// Parses `candidate` assuming a single `region` and verifies the result
+    /// against the configured leniency. Returns the match on success, or
+    /// `None` if the candidate does not parse into a number that satisfies the
+    /// leniency for this region.
+    fn try_parse_region(
+        &self,
+        candidate: &'a str,
+        offset: usize,
+        region: Option<Region>,
+    ) -> Result<Option<PhoneNumberMatch<'a>>, InternalError<Infallible>> {
         let number = match self.phone_util().parse_helper(
             candidate,
-            self.preferred_region,
+            region,
             crate::KeepMetadataType::KeepCountryCodeSource,
             true,
         ) {
@@ -366,6 +484,62 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
             return Ok(Some(PhoneNumberMatch::new(offset, candidate, number)));
         }
         trace!("Failed to verify leniency for number, {candidate}");
+
+        Ok(None)
+    }
+
+    /// Resolves a candidate when no fixed region was supplied, by probing the
+    /// supported regions in a collision-aware order.
+    ///
+    /// The order is:
+    /// 1. No region at all — this resolves international-format (`+`) numbers
+    ///    purely from their own country code, so they never depend on a guess.
+    ///    The detected region is recorded as the new MRU so that the following
+    ///    national-format numbers prefer the same locale.
+    /// 2. The most-recently matched region (`last`), exploiting the locality of
+    ///    real documents and keeping ambiguous numbers consistent.
+    /// 3. Every remaining supported region, in a stable order.
+    ///
+    /// The first region that yields a valid number wins; we never mutate the
+    /// number to force a particular region onto it.
+    fn resolve_auto_region(
+        &self,
+        candidate: &'a str,
+        offset: usize,
+        last: &Cell<Option<Region>>,
+        regions: &[Region],
+    ) -> Result<Option<PhoneNumberMatch<'a>>, InternalError<Infallible>> {
+        // 1. International format: the country code comes from the number
+        //    itself, so no region guessing is required (and a national-format
+        //    candidate simply fails to parse here, cheaply).
+        if let Some(matched) = self.try_parse_region(candidate, offset, None)? {
+            // Best-effort: remember the real region of this number so that
+            // subsequent national-format numbers prefer the same locale.
+            if let Ok(Some(region)) = self.phone_util().get_region_for_number(&matched.number) {
+                last.set(Some(region));
+            }
+            return Ok(Some(matched));
+        }
+
+        // 2. National format: try the most-recently matched region first.
+        let mru = last.get();
+        if let Some(region) = mru
+            && let Some(matched) = self.try_parse_region(candidate, offset, Some(region))?
+        {
+            return Ok(Some(matched));
+        }
+
+        // 3. Fall back to the full, stably-ordered region list.
+        for &region in regions {
+            if Some(region) == mru {
+                // Already attempted as the MRU region above.
+                continue;
+            }
+            if let Some(matched) = self.try_parse_region(candidate, offset, Some(region))? {
+                last.set(Some(region));
+                return Ok(Some(matched));
+            }
+        }
 
         Ok(None)
     }

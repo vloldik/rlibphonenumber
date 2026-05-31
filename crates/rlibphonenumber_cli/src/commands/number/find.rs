@@ -50,6 +50,12 @@ pub struct FindCommand {
     /// overlap size in bytes
     #[argh(option, short = 'v', default = "1024")]
     pub overlap: usize,
+
+    /// auto-detect the region of national-format numbers instead of assuming a
+    /// single one (a number is tried against every supported region). When set,
+    /// any region given via -r is only used as the initial preference.
+    #[argh(switch, short = 'a')]
+    pub auto: bool,
 }
 
 pub fn execute(
@@ -66,23 +72,44 @@ pub fn execute(
 
     let factory = PhoneNumberMatcherFactory::new_for_util(util);
 
+    // In auto mode we carry the most-recently detected region across the
+    // sliding-window chunks so that ambiguous numbers stay consistent with
+    // their neighbours even across chunk boundaries.
+    let mut last_region = region;
+
     source.search_phone_numbers(
         options.window_size,
         options.overlap,
         |text_chunk, yield_match| {
-            let matcher = factory
+            let builder = factory
                 .matcher_builder(text_chunk)
-                .preferred_region(region)
                 .leniency(options.leniency)
-                .max_tries(options.max_tries)
-                .build();
+                .max_tries(options.max_tries);
+
+            let matcher = if options.auto {
+                builder.auto_region_with_hint(last_region).build()
+            } else {
+                builder.preferred_region(region).build()
+            };
 
             for phone_match in matcher {
+                if options.auto
+                    && let Some(detected) = util.get_region_for_number(&phone_match.number)
+                {
+                    last_region = Some(detected);
+                }
                 yield_match(phone_match);
             }
         },
         |token| match token {
             FoundToken::Phone(found) => {
+                // For display, prefer the number's own detected region in auto
+                // mode; otherwise fall back to the user-provided region.
+                let display_region = if options.auto {
+                    util.get_region_for_number(&found.number).or(region)
+                } else {
+                    region
+                };
                 print_formatted_output(
                     &mut stdout,
                     util,
@@ -90,7 +117,7 @@ pub fn execute(
                     None,
                     format_fmt,
                     &options.format,
-                    region,
+                    display_region,
                     &options.output,
                 );
             }
