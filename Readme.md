@@ -9,8 +9,8 @@
 
 A zero-allocation, high-performance Rust port of Google's `libphonenumber` library for parsing, formatting, extracting, and validating international phone numbers. 
 
-**Used metadata version:** `v9.0.31`  
-**Package version:** `2.0.2`<br>
+**Used metadata version:** `9.0.30`  
+**Package version:** `2.1.0`<br>
 **Base libphonenumber:** `9.0.8`  
 **Min supported Rust version:** `1.88.0`
 
@@ -56,7 +56,7 @@ Add `rlibphonenumber` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rlibphonenumber = "2.0.2"
+rlibphonenumber = "2.1.0"
 ```
 
 ### Available Features
