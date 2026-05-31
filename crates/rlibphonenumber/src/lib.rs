@@ -20,7 +20,6 @@ mod phonenumberutil;
 mod regex_based_matcher;
 
 pub(crate) mod regexp;
-pub(crate) mod string_util;
 
 pub mod enums;
 pub mod errors;

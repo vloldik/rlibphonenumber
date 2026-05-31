@@ -53,7 +53,6 @@ use crate::{
     interfaces::AsOriginal,
     phonenumberutil::helper_types::{FormatNsnArguments, GetPrefixArguments},
     regex_based_matcher::RegexBasedMatcher,
-    string_util::strip_cow_prefix,
 };
 
 #[cfg(feature = "builtin_metadata")]
@@ -2126,13 +2125,13 @@ impl PhoneNumberUtilInternal {
                 national_number, default_country_code_string
             );
             if let Some(potential_national_number) =
-                strip_cow_prefix(national_number.clone(), default_country_code_string)
+                national_number.strip_prefix(default_country_code_string)
             {
                 let general_num_desc = &default_region_metadata.general_desc;
                 let (potential_national_number, _) = self
                     .maybe_strip_national_prefix_and_carrier_code(
                         default_region_metadata,
-                        &potential_national_number,
+                        potential_national_number,
                     )
                     .map_err(|err| err.translate_internal())?;
 
@@ -2408,13 +2407,24 @@ impl PhoneNumberUtilInternal {
             ))
         } else {
             // Attempt to parse the first digits as an international prefix.
-            let normalized_number = self.normalize(phone_number);
-            let value = if let Some(idd_prefix) = possible_idd_prefix
-                && let Some(stripped_prefix_number) =
-                    self.parse_prefix_as_idd(&normalized_number, idd_prefix.anchor_start()?)
-            {
+            let mut normalized_number = self.normalize(phone_number);
+            // Compute the byte offset of the IDD prefix to strip (if any) without
+            // holding a borrow of `normalized_number`, so we can reuse its
+            // allocation by draining the prefix in place instead of copying the
+            // suffix into a fresh String.
+            let stripped_idd_offset = if let Some(idd_prefix) = possible_idd_prefix {
+                self.parse_prefix_as_idd(&normalized_number, idd_prefix.anchor_start()?)
+                    .map(|stripped| {
+                        stripped.as_ptr() as usize - normalized_number.as_ptr() as usize
+                    })
+            } else {
+                None
+            };
+
+            let value = if let Some(offset) = stripped_idd_offset {
+                normalized_number.drain(..offset);
                 PhoneNumberWithCountryCodeSource::new(
-                    Cow::Owned(stripped_prefix_number.to_owned()),
+                    Cow::Owned(normalized_number),
                     CountryCodeSource::FromNumberWithIdd,
                 )
             } else {
@@ -2448,15 +2458,37 @@ impl PhoneNumberUtilInternal {
     /// * `phone_number` - Number to normalize.
     #[export]
     pub fn normalize(&self, phone_number: &str) -> String {
-        if self
-            .reg_exps
-            .valid_alpha_phone_pattern_fullmatch
-            .is_match(phone_number)
-        {
+        if self.has_three_or_more_alpha_chars(phone_number) {
             normalize_helper(&self.reg_exps.alpha_phone_mappings, true, phone_number)
         } else {
             self.normalize_digits_only(phone_number)
         }
+    }
+
+    /// Equivalent to matching the anchored regex `^(?:.*?[A-Za-z]){3}.*$`, which
+    /// is used to decide whether a string should be treated as a vanity/alpha
+    /// number. Because every token in that pattern (`.` and `[A-Za-z]`) excludes
+    /// the line-feed character and the pattern is anchored at both ends, it only
+    /// matches when the whole string is free of `\n` and contains at least three
+    /// ASCII letters.
+    ///
+    /// This is on the hot path of every `parse`/`normalize` call, so for the
+    /// overwhelmingly common newline-free input we count letters directly and
+    /// skip the regex engine. Inputs that do contain a `\n` fall back to the
+    /// original regex to preserve exact behaviour.
+    fn has_three_or_more_alpha_chars(&self, phone_number: &str) -> bool {
+        if phone_number.as_bytes().contains(&b'\n') {
+            return self
+                .reg_exps
+                .valid_alpha_phone_pattern_fullmatch
+                .is_match(phone_number);
+        }
+        phone_number
+            .bytes()
+            .filter(u8::is_ascii_alphabetic)
+            .take(3)
+            .count()
+            == 3
     }
 
     /// Strips the IDD from the start of the number if present. Helper function used
@@ -2943,9 +2975,7 @@ impl PhoneNumberUtilInternal {
         }
         // Copy the number, since we are going to try and strip the extension from it.
         let (number, _extension) = self.maybe_strip_extension(phone_number);
-        self.reg_exps
-            .valid_alpha_phone_pattern_fullmatch
-            .is_match(number)
+        self.has_three_or_more_alpha_chars(number)
     }
 }
 
