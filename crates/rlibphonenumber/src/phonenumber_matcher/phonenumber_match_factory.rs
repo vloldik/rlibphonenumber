@@ -171,6 +171,67 @@ impl<U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U> + Clone>
             self.alternate_formats.clone(),
         )
     }
+
+    /// Creates a standard (infallible) matcher that auto-detects the region of
+    /// national-format numbers, but only probes the provided **subset** of
+    /// `regions`.
+    ///
+    /// This mirrors [`create_matcher_auto`](Self::create_matcher_auto) except
+    /// that candidates are tried only against the given list, reducing the
+    /// number of parse attempts per candidate and eliminating spurious matches
+    /// from unrelated regions.
+    ///
+    /// The regions are sorted internally, so order does not matter.
+    ///
+    /// *Note: Consider using [`matcher_builder`](Self::matcher_builder) +
+    /// [`MatcherBuilder::regions`] instead for a more ergonomic API.*
+    pub fn create_matcher_with_regions<'a>(
+        &self,
+        text: &'a str,
+        leniency: Leniency,
+        max_tries: u64,
+        regions: impl IntoIterator<Item = Region>,
+        initial_region: Option<Region>,
+    ) -> PhoneNumberMatcher<'a, U, T> {
+        PhoneNumberMatcher::new_for_util_with_regions(
+            self.phone_util.clone(),
+            self.regexps.clone(),
+            text,
+            sorted_regions(regions),
+            initial_region,
+            leniency,
+            max_tries,
+            self.alternate_formats.clone(),
+        )
+    }
+
+    /// Fallible variant of [`create_matcher_with_regions`](Self::create_matcher_with_regions).
+    pub fn create_matcher_with_regions_fallible<'a>(
+        &self,
+        text: &'a str,
+        leniency: Leniency,
+        max_tries: u64,
+        regions: impl IntoIterator<Item = Region>,
+        initial_region: Option<Region>,
+    ) -> PhoneNumberMatcherFallible<'a, U, T> {
+        PhoneNumberMatcherFallible::new_for_util_with_regions(
+            self.phone_util.clone(),
+            self.regexps.clone(),
+            text,
+            sorted_regions(regions),
+            initial_region,
+            leniency,
+            max_tries,
+            self.alternate_formats.clone(),
+        )
+    }
+}
+
+fn sorted_regions(regions: impl IntoIterator<Item = Region>) -> Arc<[Region]> {
+    let mut v: Vec<Region> = regions.into_iter().collect();
+    v.sort_unstable();
+    v.dedup();
+    v.into()
 }
 
 #[cfg(feature = "global_static")]
@@ -193,13 +254,17 @@ impl Default for PhoneNumberMatcherFactory<PhoneNumberUtil, &'static PhoneNumber
 // =============================================================================
 
 /// How the matcher should determine the region of national-format numbers.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 enum RegionMode {
     /// Assume a single fixed region (`None` = only international `+` numbers).
     Fixed(Option<Region>),
-    /// Auto-detect the region, optionally seeded with an initial most-recently
-    /// used region hint.
+    /// Auto-detect against *all* supported regions (optionally seeded).
     Auto(Option<Region>),
+    /// Auto-detect against a *specific subset* of regions (pre-sorted, deduped).
+    Subset {
+        regions: Arc<[Region]>,
+        hint: Option<Region>,
+    },
 }
 
 /// A fluent builder for configuring phone number matchers.
@@ -293,6 +358,51 @@ impl<'a, 'f, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U> + Clon
         self
     }
 
+    /// Restricts automatic region detection to the provided **subset** of
+    /// regions.
+    ///
+    /// This is the recommended option when domain knowledge limits the set of
+    /// plausible regions (e.g. a product that only handles a few countries).
+    /// Compared to [`auto_region`](Self::auto_region) it:
+    ///
+    /// * **reduces parse attempts** — candidates are tried only against this
+    ///   list, not all ~250 supported regions;
+    /// * **eliminates spurious matches** — a number cannot accidentally be
+    ///   attributed to a region outside the list;
+    /// * **preserves the MRU optimisation** — the most-recently matched region
+    ///   in the list is still tried first.
+    ///
+    /// The regions may be given in any order; they are sorted and deduplicated
+    /// internally for deterministic iteration.
+    ///
+    /// Calling this method overrides any previous call to
+    /// [`preferred_region`](Self::preferred_region), [`auto_region`](Self::auto_region), or
+    /// a prior [`regions`](Self::regions) call.
+    pub fn regions(mut self, regions: impl IntoIterator<Item = Region>) -> Self {
+        self.region_mode = RegionMode::Subset {
+            regions: sorted_regions(regions),
+            hint: None,
+        };
+        self
+    }
+
+    /// Like [`regions`](Self::regions), but additionally seeds the MRU cache
+    /// with `hint`.
+    ///
+    /// Pass the region detected in the previous text chunk so that detection
+    /// stays consistent across sliding-window boundaries.
+    pub fn regions_with_hint(
+        mut self,
+        regions: impl IntoIterator<Item = Region>,
+        hint: impl Into<Option<Region>>,
+    ) -> Self {
+        self.region_mode = RegionMode::Subset {
+            regions: sorted_regions(regions),
+            hint: hint.into(),
+        };
+        self
+    }
+
     /// Builds and returns the standard, infallible `PhoneNumberMatcher` iterator.
     ///
     /// Invalid phone numbers found in the text will be silently skipped.
@@ -308,11 +418,18 @@ impl<'a, 'f, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U> + Clon
                 self.factory
                     .create_matcher(self.text, self.leniency, self.max_tries, region)
             }
-            RegionMode::Auto(initial_region) => self.factory.create_matcher_auto(
+            RegionMode::Auto(hint) => self.factory.create_matcher_auto(
                 self.text,
                 self.leniency,
                 self.max_tries,
-                initial_region,
+                hint,
+            ),
+            RegionMode::Subset { regions, hint } => self.factory.create_matcher_with_regions(
+                self.text,
+                self.leniency,
+                self.max_tries,
+                regions.iter().copied(),
+                hint,
             ),
         }
     }
@@ -335,12 +452,21 @@ impl<'a, 'f, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U> + Clon
                 self.max_tries,
                 region,
             ),
-            RegionMode::Auto(initial_region) => self.factory.create_matcher_auto_fallible(
+            RegionMode::Auto(hint) => self.factory.create_matcher_auto_fallible(
                 self.text,
                 self.leniency,
                 self.max_tries,
-                initial_region,
+                hint,
             ),
+            RegionMode::Subset { regions, hint } => {
+                self.factory.create_matcher_with_regions_fallible(
+                    self.text,
+                    self.leniency,
+                    self.max_tries,
+                    regions.iter().copied(),
+                    hint,
+                )
+            }
         }
     }
 }
@@ -392,6 +518,30 @@ pub trait FindNumberExt {
     fn find_phone_numbers_with_preferred_region(
         &self,
         region: impl Into<Option<Region>>,
+    ) -> PhoneNumberMatcher<'_, PhoneNumberUtil, &'static PhoneNumberUtil>;
+
+    /// Extracts phone numbers using automatic region detection restricted to the
+    /// provided **subset** of `regions`.
+    ///
+    /// This is the drop-in replacement for code that maintains a manual list of
+    /// regions to try: instead of writing your own loop over `phonenumber::parse`
+    /// calls you can pass that list here and let the matcher do the rest,
+    /// including the MRU optimisation that keeps consecutive same-region numbers
+    /// fast.
+    ///
+    /// # Example
+    /// ```rust
+    /// use rlibphonenumber::phonenumber_matcher::FindNumberExt;
+    /// use rlibphonenumber::enums::Region;
+    ///
+    /// let text = "US: (415) 555-2671  GB: 020 7946 0958";
+    /// for m in text.find_phone_numbers_with_regions([Region::US, Region::GB]) {
+    ///     println!("{}", m.number.country_code);
+    /// }
+    /// ```
+    fn find_phone_numbers_with_regions(
+        &self,
+        regions: impl IntoIterator<Item = Region>,
     ) -> PhoneNumberMatcher<'_, PhoneNumberUtil, &'static PhoneNumberUtil>;
 
     /// Extracts phone numbers without committing to a single region.
@@ -459,6 +609,13 @@ impl FindNumberExt for str {
         self.phone_number_matcher_builder()
             .preferred_region(region)
             .build()
+    }
+
+    fn find_phone_numbers_with_regions(
+        &self,
+        regions: impl IntoIterator<Item = Region>,
+    ) -> PhoneNumberMatcher<'_, PhoneNumberUtil, &'static PhoneNumberUtil> {
+        self.phone_number_matcher_builder().regions(regions).build()
     }
 
     fn find_phone_numbers_auto_region(

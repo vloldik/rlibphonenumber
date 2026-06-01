@@ -193,7 +193,7 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
     /// numbers written in national format, instead of assuming a single fixed
     /// region.
     ///
-    /// National-format candidates are tried against every supported region
+    /// National-format candidates are tried against **every** supported region
     /// until one produces a valid number; the most-recently matched region is
     /// always tried first (see [`RegionResolver::Auto`] for the rationale and
     /// the collision-handling strategy). Numbers in international format are
@@ -204,6 +204,9 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
     ///   example, the last region detected in the preceding chunk of a large
     ///   document) to keep detection consistent across boundaries, or `None`
     ///   to start without a preference.
+    ///
+    /// To constrain the search to a specific subset of regions, use
+    /// [`new_for_util_with_regions`](Self::new_for_util_with_regions) instead.
     #[export]
     pub fn new_for_util_auto_region(
         util: T,
@@ -214,19 +217,56 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
         max_tries: u64,
         alternate_formats: Option<Arc<AlternateFormats>>,
     ) -> Self {
-        // Snapshot the supported regions once, in a stable order, so that the
-        // auto-detection loop is deterministic and allocation-free per call.
         let mut regions: Vec<Region> =
             util.deref().as_original().get_supported_regions().collect();
         regions.sort_unstable();
+        Self::new_for_util_with_regions(
+            util,
+            regexps,
+            text,
+            regions.into(),
+            initial_region,
+            leniency,
+            max_tries,
+            alternate_formats,
+        )
+    }
 
+    /// Creates a new instance that auto-detects the region but only probes the
+    /// provided **subset** of regions.
+    ///
+    /// This is useful when the domain knowledge narrows down which regions are
+    /// plausible — for example, a PII recogniser that only needs to handle a
+    /// handful of countries. Narrowing the search space reduces the number of
+    /// parse attempts per candidate and eliminates spurious matches from
+    /// unrelated regions.
+    ///
+    /// The same MRU-first ordering as [`new_for_util_auto_region`] applies, so
+    /// consecutive national-format numbers from the same region are cheap.
+    ///
+    /// * `regions` – the regions to try, **pre-sorted** for deterministic
+    ///   iteration. Use [`MatcherBuilder::regions`] or
+    ///   [`PhoneNumberMatcherFactory::create_matcher_with_regions`] to get the
+    ///   sorting done automatically.
+    /// * `initial_region` – optional MRU seed (see [`new_for_util_auto_region`]).
+    #[export]
+    pub fn new_for_util_with_regions(
+        util: T,
+        regexps: Arc<MatcherRegex>,
+        text: &'a str,
+        regions: Arc<[Region]>,
+        initial_region: Option<Region>,
+        leniency: Leniency,
+        max_tries: u64,
+        alternate_formats: Option<Arc<AlternateFormats>>,
+    ) -> Self {
         Self {
             regexps,
             _phone_util: util,
             text,
             region_resolver: RegionResolver::Auto {
                 last: Cell::new(initial_region),
-                regions: regions.into(),
+                regions,
             },
             leniency,
             max_tries: Cell::new(max_tries),

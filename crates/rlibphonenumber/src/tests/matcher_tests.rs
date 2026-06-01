@@ -1044,6 +1044,125 @@ mod tests {
     }
 
     // =========================================================================
+    // Subset region detection  (.regions([…]))
+    // =========================================================================
+
+    fn find_numbers_subset<'a>(
+        text: &'a str,
+        regions: &[Region],
+        hint: Option<Region>,
+    ) -> PhoneNumberMatcher<'a, PhoneNumberUtilInternal, &'static PhoneNumberUtilInternal> {
+        get_phone_matcher_factory().create_matcher_with_regions(
+            text,
+            Leniency::Valid,
+            u64::MAX,
+            regions.iter().copied(),
+            hint,
+        )
+    }
+
+    /// International (`+`) numbers must be found even when the subset is small,
+    /// because they self-identify via their country code.
+    #[test]
+    fn test_subset_region_finds_intl() {
+        let text = "Call +44 20 7946 0958 now.";
+        let m = find_numbers_subset(text, &[Region::US], None).next();
+        assert!(
+            m.is_some(),
+            "subset should still match international numbers even if country not in subset"
+        );
+        assert_eq!(44, m.unwrap().number.country_code);
+    }
+
+    /// A national-format number inside the subset is matched.
+    #[test]
+    fn test_subset_region_matches_number_in_subset() {
+        let text = "Call 020 7946 0958.";
+        let m = find_numbers_subset(text, &[Region::GB], None).next();
+        assert!(m.is_some(), "number in subset should be matched");
+        assert_eq!(44, m.unwrap().number.country_code);
+    }
+
+    /// The same digits with a different subset are either attributed to a
+    /// different country code or not matched at all — the subset fully controls
+    /// national resolution.
+    #[test]
+    fn test_subset_region_excludes_out_of_subset() {
+        let text = "020 7946 0958";
+        // US subset: these digits don't form a valid US number.
+        let no_match = find_numbers_subset(text, &[Region::US], None).next();
+        assert!(
+            no_match.is_none(),
+            "number that is not valid in any subset region must not be returned"
+        );
+    }
+
+    /// Order of regions passed to `.regions()` doesn't matter (they are sorted
+    /// internally), but the MRU hint still takes priority.
+    #[test]
+    fn test_subset_region_mru_hint_respected() {
+        let text = "020 7183 8750";
+        // AR is before GB in sorted order, but GB is the hint → should win.
+        let m_gb = find_numbers_subset(text, &[Region::AR, Region::GB], Some(Region::GB)).next();
+        let m_ar = find_numbers_subset(text, &[Region::AR, Region::GB], Some(Region::AR)).next();
+        assert_eq!(44, m_gb.unwrap().number.country_code);
+        assert_eq!(54, m_ar.unwrap().number.country_code);
+    }
+
+    /// MRU state is updated across successive matches: first a number seeds the
+    /// MRU, then the second one follows it.
+    #[test]
+    fn test_subset_region_mru_propagates_across_matches() {
+        let text = "First: +44 20 7946 0958. Then: 020 7183 8750.";
+        // AR is in the subset, but GB should win because the first (+44) number
+        // seeds the MRU to GB.
+        let codes: Vec<i32> =
+            find_numbers_subset(text, &[Region::AR, Region::GB], None)
+                .map(|m| m.number.country_code)
+                .collect();
+        assert_eq!(vec![44, 44], codes);
+    }
+
+    /// Builder entry-point: `.regions([…])` and `.regions_with_hint(…, hint)`
+    /// produce the same results as the factory method.
+    #[test]
+    fn test_subset_region_builder_methods() {
+        let text = "020 7183 8750";
+
+        let via_regions: Vec<i32> = get_phone_matcher_factory()
+            .matcher_builder(text)
+            .regions([Region::GB])
+            .build()
+            .map(|m| m.number.country_code)
+            .collect();
+        assert_eq!(vec![44], via_regions);
+
+        // hint for a different region in subset → AR wins
+        let via_hint: Vec<i32> = get_phone_matcher_factory()
+            .matcher_builder(text)
+            .regions_with_hint([Region::AR, Region::GB], Region::AR)
+            .build()
+            .map(|m| m.number.country_code)
+            .collect();
+        assert_eq!(vec![54], via_hint);
+    }
+
+    /// Passing duplicate regions to `.regions()` must not cause duplicate
+    /// attempts or wrong results.
+    #[test]
+    fn test_subset_region_dedup() {
+        let text = "Call 020 7946 0958.";
+        let codes: Vec<i32> = get_phone_matcher_factory()
+            .matcher_builder(text)
+            // GB appears twice — should still work correctly and find it once.
+            .regions([Region::GB, Region::GB, Region::US])
+            .build()
+            .map(|m| m.number.country_code)
+            .collect();
+        assert_eq!(vec![44], codes);
+    }
+
+    // =========================================================================
     // Automatic region detection
     // =========================================================================
 
