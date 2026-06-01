@@ -10,7 +10,7 @@
 A zero-allocation, high-performance Rust port of Google's `libphonenumber` library for parsing, formatting, extracting, and validating international phone numbers. 
 
 **Used metadata version:** `9.0.31`  
-**Package version:** `2.2.0`<br>
+**Package version:** `2.2.1`<br>
 **Base libphonenumber:** `9.0.8`  
 **Min supported Rust version:** `1.88.0`
 
@@ -56,7 +56,7 @@ Add `rlibphonenumber` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rlibphonenumber = "2.2.0"
+rlibphonenumber = "2.2.1"
 ```
 
 ### Available Features
@@ -69,6 +69,7 @@ rlibphonenumber = "2.2.0"
 | `lite` | Uses `regex-lite`. Optimizes for binary size (ideal for WASM/Embedded). | ❌ |
 | `digest` | Enables cryptographic hashing of phone numbers (e.g., SHA256) into stack buffers. | ❌ |
 | `digest_mac` | Enables keyed hashing (HMAC) for phone numbers. Depends on `digest`. | ❌ |
+| `protox` | Build-time only: compiles the bundled `.proto` files with the pure-Rust [`protox`](https://crates.io/crates/protox) compiler, so building needs **no system `protoc`**. Disable to fall back to a `protoc`-based build. | ✅ |
 | `serde` | Enables `Serialize`/`Deserialize` for `PhoneNumber`. | ❌ |
 
 ---

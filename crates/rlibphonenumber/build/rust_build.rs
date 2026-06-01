@@ -49,15 +49,43 @@ fn main() {
         );
     }
 
-    config
-        .compile_protos(
-            &[
-                "resources/phonemetadata.proto",
-                "resources/phonenumber.proto",
-            ],
-            &["resources/"],
+    // Compile the .proto files into Rust types.
+    //
+    // With the default `protox` feature we use the pure-Rust `protox` compiler,
+    // so `rlibphonenumber` (and every downstream crate that depends on it) builds
+    // with a plain `cargo build` and no `protobuf-compiler` install. `protox`
+    // returns a FileDescriptorSet that prost-build consumes via `compile_fds`,
+    // preserving all the `field_attribute` customizations configured above.
+    //
+    // Without the feature we fall back to prost-build's `compile_protos`, which
+    // shells out to a system `protoc`. Both paths feed the same descriptors
+    // through the same prost-build codegen, so the generated public API is
+    // identical either way.
+    compile_protos(&mut config);
+
+    #[cfg(feature = "protox")]
+    fn compile_protos(config: &mut Config) {
+        let file_descriptors = protox::compile(
+            ["resources/phonemetadata.proto", "resources/phonenumber.proto"],
+            ["resources/"],
         )
-        .unwrap();
+        .expect("failed to compile phone metadata protos with protox");
+
+        config.compile_fds(file_descriptors).unwrap();
+    }
+
+    #[cfg(not(feature = "protox"))]
+    fn compile_protos(config: &mut Config) {
+        config
+            .compile_protos(
+                &[
+                    "resources/phonemetadata.proto",
+                    "resources/phonenumber.proto",
+                ],
+                &["resources/"],
+            )
+            .unwrap();
+    }
 
     UnipropsBuilder::new()
         .with_categories(false)

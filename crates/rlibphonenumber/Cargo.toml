@@ -1,6 +1,6 @@
 [package]
 name = "rlibphonenumber"
-version = "2.2.0"
+version = "2.2.1"
 edition = "2024"
 
 rust-version = "1.88"
@@ -25,10 +25,18 @@ categories = [
 build = "build/rust_build.rs"
 
 [features]
-default = ["builtin_metadata", "global_static", "regex", "digest", "digest_mac"]
+default = ["builtin_metadata", "global_static", "regex", "digest", "digest_mac", "protox"]
 
 builtin_metadata = []
 global_static = ["builtin_metadata"]
+
+# Build-time only: compile the bundled `.proto` files with the pure-Rust
+# `protox` compiler instead of requiring a system `protoc` binary. Enabled by
+# default so a plain `cargo build` works with no external tooling. Turn it off
+# (e.g. `default-features = false`) to fall back to prost-build's `protoc`
+# invocation. This feature does not affect the crate's public API: prost-build
+# generates identical Rust types from either path.
+protox = ["dep:protox"]
 
 regex = ["dep:regex"]
 lite = ["dep:regex-lite"]
@@ -74,6 +82,13 @@ digest = { version = "0.11", optional = true }
 [build-dependencies]
 thiserror = "1.0"
 prost-build = "0.14"
+# Pure-Rust protobuf compiler so building this crate does NOT require a system
+# `protoc` binary. Gated behind the (default) `protox` feature; when disabled
+# the build script falls back to prost-build's `protoc`-based `compile_protos`.
+# protox parses/resolves the .proto files into a FileDescriptorSet, which
+# prost-build then turns into Rust types via `Config::compile_fds`. protox 0.9
+# targets prost-build 0.14.
+protox = { version = "0.9", optional = true }
 uniprops-gen = "0.3.5"
 
 [dev-dependencies]
