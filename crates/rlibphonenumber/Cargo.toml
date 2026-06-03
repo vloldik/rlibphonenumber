@@ -25,7 +25,7 @@ categories = [
 build = "build/rust_build.rs"
 
 [features]
-default = ["builtin_metadata", "global_static", "regex", "digest", "digest_mac", "protox"]
+default = ["builtin_metadata", "global_static", "regex", "protox"]
 
 builtin_metadata = []
 global_static = ["builtin_metadata"]

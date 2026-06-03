@@ -217,8 +217,7 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
         max_tries: u64,
         alternate_formats: Option<Arc<AlternateFormats>>,
     ) -> Self {
-        let mut regions: Vec<Region> =
-            util.deref().as_original().get_supported_regions().collect();
+        let mut regions: Vec<Region> = util.deref().as_original().get_supported_regions().collect();
         regions.sort_unstable();
         Self::new_for_util_with_regions(
             util,
@@ -250,6 +249,7 @@ impl<'a, U: AsOriginal<PhoneNumberUtilInternal>, T: Deref<Target = U>>
     ///   sorting done automatically.
     /// * `initial_region` – optional MRU seed (see [`new_for_util_auto_region`]).
     #[export]
+    #[allow(clippy::too_many_arguments)]
     pub fn new_for_util_with_regions(
         util: T,
         regexps: Arc<MatcherRegex>,
