@@ -131,10 +131,7 @@ pub fn get_national_significant_number<'b>(
     buf.format(
         phone_number.national_number,
         if phone_number.italian_leading_zero() {
-            phone_number
-                .number_of_leading_zeros()
-                .try_into()
-                .unwrap_or(0)
+            phone_number.number_of_leading_zeros_safe_for_formatting()
         } else {
             0
         },
