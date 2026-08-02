@@ -84,7 +84,7 @@ pub fn new_formatted_number_builder<'a>(
     FormattedNumberBuilder {
         util,
         leading_zeroes: if number.italian_leading_zero() {
-            number.number_of_leading_zeros().try_into().unwrap_or(0)
+            number.number_of_leading_zeros_safe_for_formatting()
         } else {
             0
         },

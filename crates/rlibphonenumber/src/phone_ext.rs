@@ -7,6 +7,13 @@ use crate::{
 };
 
 impl PhoneNumber {
+    pub(crate) fn number_of_leading_zeros_safe_for_formatting(&self) -> usize {
+        self.number_of_leading_zeros()
+            .try_into()
+            .unwrap_or(0)
+            .min(10)
+    }
+
     pub fn format_as(&self, format: PhoneNumberFormat) -> Cow<'_, str> {
         PHONE_NUMBER_UTIL.format(self, format)
     }
