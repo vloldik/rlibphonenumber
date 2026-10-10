@@ -1537,7 +1537,9 @@ impl PhoneNumberUtilInternal {
         let result = new_formatted_number_builder(self, phone_number)
             .with_format_nsn_args(FormatNsnArguments::RawBorrowed(number_no_prefix))
             .with_get_prefix_args(
-                if let Some(international_prefix) = international_prefix_for_formatting {
+                if let Some(international_prefix) = international_prefix_for_formatting
+                    && !international_prefix.is_empty()
+                {
                     GetPrefixArguments::InternationalPrefix(international_prefix)
                 } else {
                     GetPrefixArguments::WithFormat(PhoneNumberFormat::International)
