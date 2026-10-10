@@ -1433,7 +1433,7 @@ impl PhoneNumberUtilInternal {
         let country_code = phone_number.country_code;
         let metadata = self.get_metadata_for_region_or_calling_code(country_code, region);
         if let Some(metadata) = metadata.filter(|metadata| {
-            !(region == Region::World && country_code != metadata.original.country_code())
+            !(region != Region::World && country_code != metadata.original.country_code())
         }) {
             let mut buf = zeroes_itoa::LeadingZeroBuffer::new();
             let national_number = get_national_significant_number(phone_number, &mut buf);

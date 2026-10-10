@@ -2582,6 +2582,15 @@ fn is_valid_number_for_region() {
             .is_valid_number_for_region(&invalid_number, Region::ZZ)
             .unwrap()
     );
+
+    let mut bs_national_number_with_gb_code = PhoneNumber::default();
+    bs_national_number_with_gb_code.country_code = 44;
+    bs_national_number_with_gb_code.national_number = 2423232345;
+    assert!(
+        !phone_util
+            .is_valid_number_for_region(&bs_national_number_with_gb_code, Region::BS)
+            .unwrap()
+    );
 }
 
 #[test]
