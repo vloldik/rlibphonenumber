@@ -103,12 +103,16 @@ export class Rlibphonenumber {
                 generated.directory("/project/crates/rlibphonenumber"),
             )
             .withDirectory(
-                "crates/rlibphonenumber",
-                generated.directory("/project/crates/rlibphonenumber"),
+                "crates/rlibphonenumber_cli",
+                generated.directory("/project/crates/rlibphonenumber_cli"),
             )
             .withFile(
                 "Readme.md",
                 generated.file("/project/Readme.md")
+            )
+            .withFile(
+                "Cargo.lock",
+                generated.file("/project/Cargo.lock")
             )
             .withDirectory(
                 "crates/rlibphonenumber/resources",
