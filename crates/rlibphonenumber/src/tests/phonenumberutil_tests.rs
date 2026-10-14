@@ -1472,6 +1472,17 @@ fn format_by_pattern() {
         .unwrap();
     assert_eq!("tel:+1-650-253-0000", formatted_number);
 
+    let mut test_number_with_extension = test_number.clone();
+    test_number_with_extension.extension = Some("1234".to_owned());
+    let formatted_number = phone_util
+        .format_by_pattern(
+            &test_number_with_extension,
+            PhoneNumberFormat::RFC3966,
+            &number_formats,
+        )
+        .unwrap();
+    assert_eq!("tel:+1-650-253-0000;ext=1234", formatted_number);
+
     // $NP устанавливается в '1' для США. Здесь мы проверяем, что для других стран
     // NANPA (Североамериканский план нумерации) правила США соблюдаются.
     number_format.national_prefix_formatting_rule = "$NP ($FG)".to_string().into();
