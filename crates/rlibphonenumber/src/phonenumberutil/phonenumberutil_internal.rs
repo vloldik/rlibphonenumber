@@ -680,7 +680,7 @@ impl PhoneNumberUtilInternal {
             .with_ext(Self::get_formatted_extension(
                 phone_number,
                 metadata,
-                PhoneNumberFormat::National,
+                number_format,
             ))
             .build()
     }
