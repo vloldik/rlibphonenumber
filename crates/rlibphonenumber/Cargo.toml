@@ -1,6 +1,6 @@
 [package]
 name = "rlibphonenumber"
-version = "2.2.14"
+version = "2.2.15"
 edition = "2024"
 
 rust-version = "1.88"
