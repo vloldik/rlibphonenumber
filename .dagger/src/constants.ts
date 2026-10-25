@@ -1,6 +1,6 @@
 export const LOCK_FILE = "libphonenumber-version.lock"
 export const RE2_DEFAULT = "2022-12-01"
-export const RUST_IMAGE = "rust:1.93.0-trixie"
+export const RUST_IMAGE = "rust:1.97.0-trixie"
 export const JDK_IMAGE = "eclipse-temurin:21.0.10_7-jdk-noble"
 export const JAR = "tools/java/rust-build/target/rust-build-1.0-SNAPSHOT-jar-with-dependencies.jar"
 
