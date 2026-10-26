@@ -2189,7 +2189,7 @@ dependencies = [
 
 [[package]]
 name = "rlibphonenumber"
-version = "2.2.14"
+version = "2.2.15"
 dependencies = [
  "colog",
  "criterion",
@@ -2229,7 +2229,7 @@ dependencies = [
 
 [[package]]
 name = "rlibphonenumber_cli"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "argh",
  "cel",
