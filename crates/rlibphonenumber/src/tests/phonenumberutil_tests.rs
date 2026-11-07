@@ -1114,6 +1114,15 @@ fn format_out_of_country_keeping_alpha_chars() {
         .format_out_of_country_keeping_alpha_chars(&alpha_numeric_number, Region::DE)
         .unwrap();
     assert_eq!("00 1 800 749 3524", formatted_number);
+
+    let mut au_alpha_numeric_number = PhoneNumber::default();
+    au_alpha_numeric_number.country_code = 61;
+    au_alpha_numeric_number.national_number = 1800749352;
+    au_alpha_numeric_number.raw_input = Some("1-800-SIX-flag".to_owned());
+    let formatted_number = phone_util
+        .format_out_of_country_keeping_alpha_chars(&au_alpha_numeric_number, Region::SG)
+        .unwrap();
+    assert_eq!("+61 1-800-SIX-FLAG", formatted_number);
 }
 
 #[test]
